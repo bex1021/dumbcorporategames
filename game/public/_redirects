@@ -1,0 +1,5 @@
+# SPA fallback for React Router. Any request that doesn't match a static
+# asset (under dist/) or a Pages Function (functions/api/*) falls through
+# to index.html so the client-side router can handle it.
+# Without this, direct navigation to /blocked or any deep link would 404.
+/*    /index.html   200
