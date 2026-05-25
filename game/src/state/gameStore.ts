@@ -1,4 +1,4 @@
-import { create } from 'zustand'
+import { create, type StoreApi, type UseBoundStore } from 'zustand'
 import {
   evaluateAchievements,
   loadUnlocked,
@@ -280,13 +280,17 @@ const REQUIRED_NPC_IDS = ['brent', 'tasha', 'priya', 'chad', 'diane']
 // Stashing the store on globalThis under a Symbol key guarantees that all
 // module instances find the same store object. State persists across HMR.
 const STORE_KEY = Symbol.for('blocked.gameStore.v1')
+// Explicit Zustand store type — without this, TS infers a union from the
+// `existing ?? (...)` expression below that's too ambiguous to call as a
+// hook (production build fails with TS2349 "expression is not callable").
+type GameStoreHook = UseBoundStore<StoreApi<State>>
 type GlobalWithStore = typeof globalThis & {
-  [STORE_KEY]?: ReturnType<typeof create<State>>
+  [STORE_KEY]?: GameStoreHook
 }
 
 const existing = (globalThis as GlobalWithStore)[STORE_KEY]
 
-export const useGameStore =
+export const useGameStore: GameStoreHook =
   existing ??
   ((globalThis as GlobalWithStore)[STORE_KEY] = create<State>((set, get) => ({
   ...INITIAL,
