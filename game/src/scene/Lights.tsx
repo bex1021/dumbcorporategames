@@ -46,8 +46,12 @@ export function Lights() {
         intensity={0.45}
         color="#d6e4ec"
         castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
+        // 1024 instead of 2048: cuts shadow VRAM 4× (16 MB → 4 MB) and
+        // halves shadow-map render time per frame. The office is small
+        // enough that 1024² over its bounds is still ~28 texels per meter,
+        // plenty of resolution for soft indoor shadows.
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
         shadow-camera-left={-OFFICE.halfWidth}
         shadow-camera-right={OFFICE.halfWidth}
         shadow-camera-top={OFFICE.halfDepth}

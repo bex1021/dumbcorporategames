@@ -9,12 +9,14 @@
 //   · contact / signup
 
 import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import {
   PageScroll, BR, brFont, brMono,
   Nav, Ticker, Mission, AboutTheStudio, Signup, Closer, Footer,
   ctaPrimary, ctaSecondary,
   type NavLink,
 } from '../brutalist'
+import { CareerStats } from '../components/CareerStats'
 
 export default function Landing() {
   return (
@@ -38,6 +40,7 @@ export default function Landing() {
         ]}
       />
       <Portfolio />
+      <CareerStats />
       <WhatsNext />
       <Ticker
         items={[
@@ -64,9 +67,9 @@ export default function Landing() {
 
 const NAV_LINKS: NavLink[] = [
   { label: 'GAMES',   href: '#games' },
+  { label: 'HR FILE', href: '#career' },
   { label: 'MISSION', href: '#mission' },
   { label: 'ABOUT',   href: '#about' },
-  { label: 'PRESS',   href: '#press' },
   { label: 'CONTACT', href: 'mailto:hello@dumbcorporategames.com' },
 ]
 
@@ -87,11 +90,16 @@ function Hero() {
         <span>STATUS · <b style={{ color: BR.green }}>● OPERATING</b></span>
       </div>
 
-      {/* Mega headline */}
-      <div style={{ padding: '20px 28px 4px' }}>
+      {/* Mega headline + live studio ops board on the right */}
+      <div style={{
+        padding: '20px 28px 4px',
+        display: 'grid',
+        gridTemplateColumns: 'minmax(0, 1.6fr) minmax(300px, 1fr)',
+        gap: 36, alignItems: 'flex-start',
+      }}>
         <h1 style={{
           margin: 0, fontFamily: brFont, fontWeight: 900,
-          fontSize: 'clamp(44px, 8.5vw, 124px)',
+          fontSize: 'clamp(40px, 7vw, 104px)',
           lineHeight: 0.86, letterSpacing: '-0.055em',
           textTransform: 'uppercase',
         }}>
@@ -99,6 +107,7 @@ function Hero() {
           CORPORATE<br />
           GAMES<span style={{ color: BR.accent }}>.</span>
         </h1>
+        <StudioOps />
       </div>
 
       {/* Tagline + studio facts */}
@@ -149,6 +158,95 @@ function Hero() {
         </div>
       </div>
     </section>
+  )
+}
+
+// ─── Studio Ops — live corporate-style dashboard panel for the hero ──────
+function StudioOps() {
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(id)
+  }, [])
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const time = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
+  const offsetH = -now.getTimezoneOffset() / 60
+  const tz = `UTC${offsetH >= 0 ? '+' : ''}${offsetH}`
+
+  const metrics = [
+    { k: 'SYSTEM',    v: <span style={{ color: BR.green }}>● GREEN</span> },
+    { k: 'DEPLOY',    v: <b>STABLE</b> },
+    { k: 'INCIDENTS', v: <b>0 / 0</b> },
+    { k: 'RUNWAY',    v: <b>INDEFINITE</b> },
+    { k: 'MORALE',    v: <b style={{ color: BR.accent }}>● HOLDING</b> },
+    { k: 'VIBE',      v: <b>OPERATING</b> },
+  ]
+  const logLines = [
+    ['09:14', 'PM ENTERED BULLPEN'],
+    ['09:14', 'ENGINEER: "NO BLOCKERS"'],
+    ['09:14', 'CLAIM FILED · FALSE'],
+  ] as const
+
+  return (
+    <div style={{
+      border: `2px solid ${BR.ink}`,
+      background: BR.paper,
+      fontFamily: brMono,
+      fontSize: 11,
+      color: BR.ink,
+      textTransform: 'uppercase',
+      letterSpacing: '0.08em',
+    }}>
+      {/* Header bar with live clock */}
+      <div style={{
+        background: BR.ink, color: BR.bg,
+        padding: '10px 14px',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        fontWeight: 700, letterSpacing: '0.14em',
+      }}>
+        <span><span style={{ color: BR.accent }}>●</span> STUDIO OPS · LIVE</span>
+        <span style={{
+          color: '#aaa', display: 'flex', gap: 8, alignItems: 'center',
+        }}>
+          <span>{tz}</span>
+          <span style={{ color: BR.accent, fontVariantNumeric: 'tabular-nums' }}>{time}</span>
+        </span>
+      </div>
+
+      {/* Metrics list */}
+      <div style={{ padding: '10px 14px' }}>
+        {metrics.map((m, i) => (
+          <div key={m.k} style={{
+            display: 'flex', justifyContent: 'space-between',
+            padding: '5px 0',
+            borderBottom: i < metrics.length - 1 ? `1px dashed ${BR.dim}` : 'none',
+          }}>
+            <span style={{ color: BR.muted, fontWeight: 700 }}>{m.k}</span>
+            <span>{m.v}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Recent ops log */}
+      <div style={{
+        borderTop: `2px solid ${BR.ink}`,
+        background: BR.bg,
+        padding: '10px 14px',
+      }}>
+        <div style={{
+          color: BR.accent, fontWeight: 700,
+          letterSpacing: '0.16em', marginBottom: 8,
+        }}>OPS LOG · LATEST</div>
+        {logLines.map(([t, msg], i) => (
+          <div key={i} style={{
+            display: 'flex', gap: 10, padding: '3px 0', color: BR.ink,
+          }}>
+            <span style={{ color: BR.muted, fontVariantNumeric: 'tabular-nums' }}>{t}</span>
+            <span>{msg}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 

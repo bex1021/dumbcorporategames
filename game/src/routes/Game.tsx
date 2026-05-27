@@ -1,4 +1,4 @@
-import { Suspense, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { Office } from '../scene/Office'
 import { OfficeDecor } from '../scene/OfficeDecor'
@@ -37,16 +37,43 @@ export default function Game() {
   // before we ask for a new one.
   const [canvasKey, setCanvasKey] = useState(0)
 
+  // Pause rendering when the tab is hidden. R3F's `frameloop="never"` halts
+  // its rAF loop entirely, so we stop burning GPU/battery while the user
+  // is on another tab. We don't unmount — keeping the scene alive means
+  // resume is instant when they come back.
+  const [frameloop, setFrameloop] = useState<'always' | 'never'>(
+    typeof document !== 'undefined' && document.hidden ? 'never' : 'always'
+  )
+  useEffect(() => {
+    const onVis = () => setFrameloop(document.hidden ? 'never' : 'always')
+    document.addEventListener('visibilitychange', onVis)
+    return () => document.removeEventListener('visibilitychange', onVis)
+  }, [])
+
+  // Cap device pixel ratio. On a 4K Retina display devicePixelRatio is 2,
+  // which makes WebGL render at 4× the pixel count — most of which the
+  // user can't see at normal viewing distance. Capping at 1.5 cuts
+  // fragment-shader work roughly in half on those displays with no visible
+  // quality loss. Lower bound 1 covers low-DPI laptops.
+  //
+  // We also disable MSAA on high-DPI displays — at dpr >= 2 the
+  // resolution itself is enough that MSAA's smoothing is mostly invisible
+  // anyway, and skipping it is a significant fragment-shader win.
+  const isHighDPI =
+    typeof window !== 'undefined' && window.devicePixelRatio >= 1.5
+
   return (
     <div className="relative w-full h-full">
       <Canvas
         key={canvasKey}
         shadows
+        dpr={[1, 1.5]}
+        frameloop={frameloop}
         camera={{
           position: [PLAYER.spawnX, CAMERA.height, PLAYER.spawnZ + CAMERA.distance],
           fov: CAMERA.fov,
         }}
-        gl={{ antialias: true }}
+        gl={{ antialias: !isHighDPI }}
         onCreated={({ gl }) => {
           gl.domElement.addEventListener(
             'webglcontextlost',
