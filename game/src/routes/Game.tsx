@@ -21,6 +21,7 @@ import { CopingBar } from '../ui/CopingBar'
 import { SlackPanel } from '../ui/SlackPanel'
 import { LoadingScreen } from '../ui/LoadingScreen'
 import { EndingScreen } from '../ui/EndingScreen'
+import { ExitButton } from '../ui/ExitButton'
 
 export default function Game() {
   const phase = useGameStore((s) => s.phase)
@@ -94,6 +95,9 @@ export default function Game() {
 
       {/* Slack panel (right edge) — collapsible feed of pings */}
       <SlackPanel />
+
+      {/* Exit run button (top-center) — visible only during playing */}
+      <ExitButton />
 
       {/* Ending screen overlay */}
       <EndingScreen />
