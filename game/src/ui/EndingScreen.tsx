@@ -237,11 +237,12 @@ export function EndingScreen() {
             </button>
           </div>
 
-          {/* Right: 2-column grid of compact achievement badges. All 12
-              fit on one viewport without scrolling. Full description
-              shows in the native browser tooltip on hover — the title
-              alone is enough to recognize the achievement at a glance,
-              and the emoji telegraphs the win even more directly. */}
+          {/* Right: 2-column grid of compact achievement cards. Each
+              card stacks an emoji + title row on top and a 2-line
+              description below in a smaller font. Sizing is tuned so
+              all 12 fit a typical viewport (1024×640+) without scroll.
+              Descriptions stay visible so the player can read what
+              each win actually was. */}
           <div className="grid grid-cols-2 gap-1.5 self-start">
             {ACHIEVEMENTS.map((a) => {
               const isUnlocked = unlocked.has(a.id)
@@ -249,9 +250,8 @@ export function EndingScreen() {
               return (
                 <div
                   key={a.id}
-                  title={`${a.title} — ${a.description}`}
                   className={[
-                    'relative flex items-center gap-2 px-2 py-1.5 rounded border',
+                    'relative px-2 py-1.5 rounded border',
                     isUnlocked
                       ? isNew
                         ? 'border-[#f5cd47] bg-[#fff7d6] text-[#172b4d]'
@@ -259,21 +259,35 @@ export function EndingScreen() {
                       : 'border-[#dfe1e6] bg-[#f4f5f7] text-[#5e6c84]',
                   ].join(' ')}
                 >
-                  {/* Emoji badge — desaturated when locked so the icon is
-                      recognizable without spoiling the win. */}
-                  <span
-                    className="text-base leading-none flex-shrink-0"
-                    style={
-                      !isUnlocked
-                        ? { filter: 'grayscale(1)', opacity: 0.45 }
-                        : undefined
-                    }
+                  {/* Title row: emoji + name, single line, truncates */}
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className="text-sm leading-none flex-shrink-0"
+                      style={
+                        !isUnlocked
+                          ? { filter: 'grayscale(1)', opacity: 0.45 }
+                          : undefined
+                      }
+                    >
+                      {a.emoji}
+                    </span>
+                    <span className="text-[11px] font-semibold leading-tight flex-1 min-w-0 truncate">
+                      {a.title}
+                    </span>
+                  </div>
+                  {/* Description — 2-line clamp keeps every card the same
+                      height regardless of how long the description text is. */}
+                  <div
+                    className="text-[10px] leading-snug mt-1 opacity-80 overflow-hidden"
+                    style={{
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                    }}
+                    title={a.description}
                   >
-                    {a.emoji}
-                  </span>
-                  <span className="text-[11px] font-medium leading-tight flex-1 min-w-0 truncate">
-                    {a.title}
-                  </span>
+                    {a.description}
+                  </div>
                   {isNew && (
                     <span className="absolute -top-1 -right-1 text-[8px] uppercase tracking-wider text-[#7f5f01] bg-[#f5cd47] px-1 rounded-sm font-bold">
                       New
