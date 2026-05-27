@@ -237,21 +237,21 @@ export function EndingScreen() {
             </button>
           </div>
 
-          {/* Right: achievements list with full descriptions. Header
-              removed so the first card aligns with the outcome banner
-              top in the center column — the running count is shown in
-              the page title bar instead. Locked achievements still show
-              their emoji but desaturated so the badge is recognizable
-              even before unlock. */}
-          <div className="flex flex-col gap-1.5">
+          {/* Right: 2-column grid of compact achievement badges. All 12
+              fit on one viewport without scrolling. Full description
+              shows in the native browser tooltip on hover — the title
+              alone is enough to recognize the achievement at a glance,
+              and the emoji telegraphs the win even more directly. */}
+          <div className="grid grid-cols-2 gap-1.5 self-start">
             {ACHIEVEMENTS.map((a) => {
               const isUnlocked = unlocked.has(a.id)
               const isNew = justUnlockedSet.has(a.id)
               return (
                 <div
                   key={a.id}
+                  title={`${a.title} — ${a.description}`}
                   className={[
-                    'relative flex items-start gap-2.5 px-2.5 py-2 rounded border',
+                    'relative flex items-center gap-2 px-2 py-1.5 rounded border',
                     isUnlocked
                       ? isNew
                         ? 'border-[#f5cd47] bg-[#fff7d6] text-[#172b4d]'
@@ -259,11 +259,10 @@ export function EndingScreen() {
                       : 'border-[#dfe1e6] bg-[#f4f5f7] text-[#5e6c84]',
                   ].join(' ')}
                 >
-                  {/* Emoji badge — large at left of the card. Locked
-                      achievements get desaturated so the icon is still
-                      legible without spoiling the win. */}
+                  {/* Emoji badge — desaturated when locked so the icon is
+                      recognizable without spoiling the win. */}
                   <span
-                    className="text-xl leading-none flex-shrink-0 mt-0.5"
+                    className="text-base leading-none flex-shrink-0"
                     style={
                       !isUnlocked
                         ? { filter: 'grayscale(1)', opacity: 0.45 }
@@ -272,14 +271,9 @@ export function EndingScreen() {
                   >
                     {a.emoji}
                   </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[12px] font-medium leading-tight">
-                      {a.title}
-                    </div>
-                    <div className="text-[11px] opacity-80 leading-snug mt-0.5">
-                      {a.description}
-                    </div>
-                  </div>
+                  <span className="text-[11px] font-medium leading-tight flex-1 min-w-0 truncate">
+                    {a.title}
+                  </span>
                   {isNew && (
                     <span className="absolute -top-1 -right-1 text-[8px] uppercase tracking-wider text-[#7f5f01] bg-[#f5cd47] px-1 rounded-sm font-bold">
                       New
