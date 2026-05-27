@@ -354,6 +354,49 @@ class AudioManager {
     }
   }
 
+  /** A short high-frequency rustle — dry leaves brushing past each other.
+   *  Used by PhyllisProximityAudio to fire occasional leaf sounds while
+   *  the player is near the plant. The sound is intentionally subtle so
+   *  it reads as "ambient nature" rather than an event.
+   *
+   *  Composition: very high-passed noise (>4kHz) with a fast attack and
+   *  exponential decay, modulated by a quick LFO to give the "shsh-shsh"
+   *  character of leaves moving.
+   */
+  playLeafRustle() {
+    if (!this.ctx || this.muted) return
+    const ctx = this.ctx
+    const now = ctx.currentTime
+    const dur = 0.35 + Math.random() * 0.2 // 0.35–0.55s
+    const len = Math.floor(ctx.sampleRate * dur)
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate)
+    const data = buf.getChannelData(0)
+    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1
+    const src = ctx.createBufferSource()
+    src.buffer = buf
+    // Crisp high-pass for that dry-leaf "shhh" — kills the bass rumble
+    // so it doesn't compete with the HVAC drone.
+    const filter = ctx.createBiquadFilter()
+    filter.type = 'highpass'
+    filter.frequency.value = 3800
+    filter.Q.value = 0.7
+    // Gain envelope: fast attack, slow exponential decay
+    const gain = ctx.createGain()
+    gain.gain.setValueAtTime(0.0001, now)
+    gain.gain.exponentialRampToValueAtTime(0.045, now + 0.04)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + dur)
+    // LFO modulates the gain slightly to give the rustle a natural irregularity.
+    const lfo = ctx.createOscillator()
+    lfo.frequency.value = 13 + Math.random() * 6
+    const lfoGain = ctx.createGain()
+    lfoGain.gain.value = 0.018
+    lfo.connect(lfoGain).connect(gain.gain)
+    src.connect(filter).connect(gain).connect(ctx.destination)
+    src.start(now)
+    lfo.start(now)
+    lfo.stop(now + dur)
+  }
+
   /** A single "bloop" — low-pitched sine with downward pitch glide. Used
    *  by CoffeeProximityAudio to fire a stream of bubble pops while the
    *  player is near the coffee station, like a percolator brewing. */

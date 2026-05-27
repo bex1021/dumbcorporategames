@@ -490,6 +490,10 @@ function ObjectNPC({
           PM is near the coffee station. */}
       {id === 'coffee' && <CoffeeProximityAudio worldX={x} worldZ={z} />}
 
+      {/* Phyllis leaf rustle — dry-leaf shsh sounds at random intervals
+          when PM is near, pairing with the existing leaf sway visual. */}
+      {id === 'phyllis' && <PhyllisProximityAudio worldX={x} worldZ={z} />}
+
       {showLabels && (
         <>
           <Label name={name} role={role} y={labelY} />
@@ -699,6 +703,34 @@ function PrinterProximityAudio({
     const minGap = 2.5 + (1 - closeness) * 1.5
     const maxGap = 5 + (1 - closeness) * 3
     nextFireAtRef.current = now + minGap + Math.random() * (maxGap - minGap)
+  })
+  return null
+}
+
+// Phyllis leaf rustle — fires a short high-passed noise rustle at 1.5–3s
+// intervals when PM is within ~3m. Pairs with the existing leaf-sway
+// visual so the plant feels alive both audibly and visibly.
+function PhyllisProximityAudio({
+  worldX,
+  worldZ,
+}: {
+  worldX: number
+  worldZ: number
+}) {
+  const nextFireAtRef = useRef(performance.now() / 1000 + 2)
+  useFrame(() => {
+    const dx = playerPosition.x - worldX
+    const dz = playerPosition.z - worldZ
+    const distSq = dx * dx + dz * dz
+    if (distSq > 9) return // 3m proximity ring
+    const now = performance.now() / 1000
+    if (now < nextFireAtRef.current) return
+    audio.playLeafRustle()
+    // Sparser than coffee — leaves don't talk much. 1.5–3.5s gaps.
+    const dist = Math.sqrt(distSq)
+    const closeness = 1 - dist / 3
+    const minGap = 1.5 + (1 - closeness) * 0.8
+    nextFireAtRef.current = now + minGap + Math.random() * 1.2
   })
   return null
 }

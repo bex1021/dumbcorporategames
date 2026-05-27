@@ -289,17 +289,216 @@ function Room({ w, d }: { w: number; d: number }) {
 }
 
 function DeskMarker() {
-  // PM's desk — cool gray surface instead of warm wood
+  // PM's desk — Leonard's actual workstation. Warmer light-wood than the
+  // sterile gray NPC desks, plus personal items: monitor, keyboard, coffee
+  // mug, stack of papers, sticky notes, a small framed photo, and a chair
+  // behind it (the "front" of the desk, at +Z relative to the zone).
+  //
+  // Convention for this desk:
+  //   - Desk top runs along X (1.6m wide), depth along Z (0.8m).
+  //   - Back of desk (against the office wall side) is at z=-0.4 local.
+  //   - Front of desk (chair side, +Z local) is at z=+0.4 local.
+  //   - Monitor sits at the back facing +Z toward the chair.
   return (
     <group>
+      {/* ----- Desk slab — light wood top ----- */}
       <mesh position={[0, 0.76, 0]} castShadow receiveShadow>
         <boxGeometry args={[1.6, 0.04, 0.8]} />
-        <meshStandardMaterial color={C.fixture} />
+        <meshStandardMaterial color="#c8a574" roughness={0.65} />
       </mesh>
-      <mesh position={[0, 0.4, 0]} castShadow>
-        <boxGeometry args={[1.5, 0.7, 0.04]} />
-        <meshStandardMaterial color={C.fixture} />
+      {/* ----- 4 legs ----- */}
+      {[
+        [-0.75, 0.38, -0.35],
+        [0.75, 0.38, -0.35],
+        [-0.75, 0.38, 0.35],
+        [0.75, 0.38, 0.35],
+      ].map(([lx, ly, lz], i) => (
+        <mesh key={i} position={[lx, ly, lz]} castShadow>
+          <boxGeometry args={[0.05, 0.74, 0.05]} />
+          <meshStandardMaterial color="#5a3a20" />
+        </mesh>
+      ))}
+      {/* Modesty panel along the back of the desk */}
+      <mesh position={[0, 0.42, -0.36]} castShadow>
+        <boxGeometry args={[1.5, 0.68, 0.03]} />
+        <meshStandardMaterial color="#5a3a20" />
       </mesh>
+
+      {/* ----- Monitor (facing chair, +Z) ----- */}
+      {/* Stand base */}
+      <mesh position={[0, 0.79, -0.3]}>
+        <boxGeometry args={[0.26, 0.018, 0.18]} />
+        <meshStandardMaterial color="#15191c" />
+      </mesh>
+      {/* Stand neck */}
+      <mesh position={[0, 0.88, -0.3]}>
+        <boxGeometry args={[0.05, 0.16, 0.05]} />
+        <meshStandardMaterial color="#15191c" />
+      </mesh>
+      {/* Monitor body — landscape rectangle */}
+      <mesh position={[0, 1.15, -0.3]} castShadow>
+        <boxGeometry args={[0.7, 0.42, 0.04]} />
+        <meshStandardMaterial color="#15191c" />
+      </mesh>
+      {/* Screen surface — emissive dark teal-blue suggesting an active display */}
+      <mesh position={[0, 1.15, -0.275]}>
+        <planeGeometry args={[0.65, 0.37]} />
+        <meshStandardMaterial
+          color="#1a3a4a"
+          emissive="#1f4a5e"
+          emissiveIntensity={0.4}
+        />
+      </mesh>
+      {/* Tiny status LED on monitor edge */}
+      <mesh position={[0.3, 0.95, -0.275]}>
+        <boxGeometry args={[0.015, 0.008, 0.005]} />
+        <meshStandardMaterial color={C.teal} emissive={C.teal} emissiveIntensity={0.9} />
+      </mesh>
+
+      {/* ----- Keyboard ----- */}
+      <mesh position={[0, 0.79, 0.0]} castShadow>
+        <boxGeometry args={[0.45, 0.02, 0.16]} />
+        <meshStandardMaterial color="#1a1a1a" roughness={0.6} />
+      </mesh>
+      {/* Keyboard "keys" — a slightly raised lighter rectangle on top */}
+      <mesh position={[0, 0.802, 0.0]}>
+        <boxGeometry args={[0.42, 0.005, 0.13]} />
+        <meshStandardMaterial color="#2a2a2a" roughness={0.7} />
+      </mesh>
+
+      {/* ----- Mouse — to the right of the keyboard ----- */}
+      <mesh position={[0.32, 0.79, 0.02]} castShadow>
+        <boxGeometry args={[0.06, 0.025, 0.1]} />
+        <meshStandardMaterial color="#1a1a1a" roughness={0.5} />
+      </mesh>
+
+      {/* ----- Coffee mug — right side of the desk ----- */}
+      <mesh position={[0.55, 0.83, -0.15]} castShadow>
+        <cylinderGeometry args={[0.05, 0.045, 0.1, 14]} />
+        <meshStandardMaterial color="#d8c8a8" roughness={0.6} />
+      </mesh>
+      {/* Coffee inside the mug (visible top) */}
+      <mesh position={[0.55, 0.875, -0.15]}>
+        <cylinderGeometry args={[0.04, 0.04, 0.012, 12]} />
+        <meshStandardMaterial color="#3a2010" emissive="#2a1408" emissiveIntensity={0.1} />
+      </mesh>
+      {/* Mug handle — torus on the side */}
+      <mesh position={[0.61, 0.83, -0.15]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.022, 0.007, 8, 16]} />
+        <meshStandardMaterial color="#d8c8a8" />
+      </mesh>
+
+      {/* ----- Stack of papers — left side of the desk ----- */}
+      <mesh position={[-0.5, 0.785, -0.05]} castShadow>
+        <boxGeometry args={[0.21, 0.005, 0.27]} />
+        <meshStandardMaterial color="#f5f5f0" />
+      </mesh>
+      <mesh
+        position={[-0.49, 0.792, -0.055]}
+        rotation={[0, 0.1, 0]}
+        castShadow
+      >
+        <boxGeometry args={[0.21, 0.005, 0.27]} />
+        <meshStandardMaterial color="#f5f5f0" />
+      </mesh>
+      <mesh
+        position={[-0.495, 0.798, -0.04]}
+        rotation={[0, -0.08, 0]}
+        castShadow
+      >
+        <boxGeometry args={[0.21, 0.005, 0.27]} />
+        <meshStandardMaterial color="#fff8d0" />
+      </mesh>
+
+      {/* ----- Sticky notes on the monitor body ----- */}
+      <mesh position={[-0.28, 1.02, -0.275]}>
+        <boxGeometry args={[0.065, 0.065, 0.002]} />
+        <meshStandardMaterial color="#fce97a" />
+      </mesh>
+      <mesh position={[0.25, 1.07, -0.275]} rotation={[0, 0, 0.18]}>
+        <boxGeometry args={[0.055, 0.055, 0.002]} />
+        <meshStandardMaterial color="#f5b6b6" />
+      </mesh>
+
+      {/* ----- Framed photo — small frame to the right of the monitor ----- */}
+      <mesh position={[0.6, 0.93, -0.32]} castShadow>
+        <boxGeometry args={[0.13, 0.16, 0.018]} />
+        <meshStandardMaterial color="#3a2a1a" />
+      </mesh>
+      <mesh position={[0.6, 0.93, -0.31]}>
+        <planeGeometry args={[0.1, 0.13]} />
+        <meshStandardMaterial color="#a8a895" />
+      </mesh>
+
+      {/* ----- Tiny succulent for extra "home" warmth ----- */}
+      <mesh position={[-0.62, 0.81, -0.28]} castShadow>
+        <cylinderGeometry args={[0.04, 0.035, 0.05, 12]} />
+        <meshStandardMaterial color="#7a5a3a" />
+      </mesh>
+      <mesh position={[-0.62, 0.86, -0.28]} castShadow>
+        <sphereGeometry args={[0.05, 10, 8]} />
+        <meshStandardMaterial color="#7aa86c" roughness={0.85} />
+      </mesh>
+
+      {/* ----- Chair behind the desk ----- */}
+      <PMChair />
+    </group>
+  )
+}
+
+// Leonard's actual desk chair — modern office chair, behind his desk
+// (z > 0 = the side facing into the office floor area).
+function PMChair() {
+  return (
+    <group position={[0, 0, 0.65]}>
+      {/* Seat cushion */}
+      <mesh position={[0, 0.45, 0]} castShadow receiveShadow>
+        <boxGeometry args={[0.48, 0.07, 0.48]} />
+        <meshStandardMaterial color="#2a2a2a" roughness={0.7} />
+      </mesh>
+      {/* Backrest — taller, slightly leaned */}
+      <mesh
+        position={[0, 0.86, 0.22]}
+        rotation={[-0.1, 0, 0]}
+        castShadow
+        receiveShadow
+      >
+        <boxGeometry args={[0.48, 0.7, 0.06]} />
+        <meshStandardMaterial color="#2a2a2a" roughness={0.7} />
+      </mesh>
+      {/* Central pillar (gas piston) */}
+      <mesh position={[0, 0.24, 0]} castShadow>
+        <cylinderGeometry args={[0.04, 0.04, 0.4, 10]} />
+        <meshStandardMaterial color="#1a1a1a" metalness={0.5} roughness={0.4} />
+      </mesh>
+      {/* 5-leg star base */}
+      {Array.from({ length: 5 }).map((_, i) => {
+        const angle = (i / 5) * Math.PI * 2
+        return (
+          <mesh
+            key={i}
+            position={[Math.sin(angle) * 0.18, 0.05, Math.cos(angle) * 0.18]}
+            rotation={[0, -angle, 0]}
+            castShadow
+          >
+            <boxGeometry args={[0.05, 0.05, 0.28]} />
+            <meshStandardMaterial color="#1a1a1a" />
+          </mesh>
+        )
+      })}
+      {/* 5 small wheels at the leg tips */}
+      {Array.from({ length: 5 }).map((_, i) => {
+        const angle = (i / 5) * Math.PI * 2
+        return (
+          <mesh
+            key={`wheel-${i}`}
+            position={[Math.sin(angle) * 0.31, 0.025, Math.cos(angle) * 0.31]}
+          >
+            <sphereGeometry args={[0.025, 8, 6]} />
+            <meshStandardMaterial color="#15191c" />
+          </mesh>
+        )
+      })}
     </group>
   )
 }
