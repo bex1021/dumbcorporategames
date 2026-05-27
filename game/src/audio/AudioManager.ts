@@ -9,12 +9,33 @@
 // AudioBufferSourceNode — these are cheap and can overlap freely, so we
 // don't rate-limit at the audio layer.
 
-type SoundCue = 'slack' | 'gmail' | 'calendar' | 'none'
+type SoundCue =
+  | 'slack'
+  | 'gmail'
+  | 'calendar'
+  | 'printer-ping'
+  | 'printer-paper'
+  | 'printer-gears'
+  | 'none'
 
-// Public-domain audio files served from /public/sounds. Add more as we
-// source them — gmail/calendar still use the synth two-tone for now.
+// Public-domain audio files served from /public/sounds. Each entry's
+// presence is checked at runtime — if the file 404s, the matching
+// play* method silently falls back to its synth version. So you can
+// drop new MP3s into game/public/sounds/ without code changes.
+//
+// Suggested sources (CC0 / Pixabay license):
+//   - https://pixabay.com/sound-effects/search/printer/
+//   - https://pixabay.com/sound-effects/search/xerox/
+//   - https://pixabay.com/sound-effects/search/photocopier/
+// Recommended filenames so the loader picks them up automatically:
+//   printer-ping.mp3   — warm-up / "ready" beep (~0.5–1s)
+//   printer-paper.mp3  — paper feed / shuffle (~0.5–1s)
+//   printer-gears.mp3  — long whirring / motor (~1–2s)
 const SOUND_FILES: Partial<Record<SoundCue, string>> = {
   slack: '/sounds/slack-knock.mp3',
+  'printer-ping': '/sounds/printer-ping.mp3',
+  'printer-paper': '/sounds/printer-paper.mp3',
+  'printer-gears': '/sounds/printer-gears.mp3',
 }
 
 class AudioManager {
@@ -211,8 +232,10 @@ class AudioManager {
     else this.playPrinterError()
   }
 
-  /** Long warm-up "ready" ping — sine 800Hz with slow decay, ~0.55s. */
+  /** Long warm-up "ready" ping — sine 800Hz with slow decay, ~0.55s.
+   *  Prefers a real sample at /sounds/printer-ping.mp3 if loaded. */
   private playPrinterPing() {
+    if (this.playSample('printer-ping')) return
     if (!this.ctx) return
     const ctx = this.ctx
     const now = ctx.currentTime
@@ -230,8 +253,10 @@ class AudioManager {
   }
 
   /** Paper shifting / rustling — high-passed noise with tremolo amplitude
-   *  modulation that sounds like sheets being fed through a roller. */
+   *  modulation that sounds like sheets being fed through a roller.
+   *  Prefers a real sample at /sounds/printer-paper.mp3 if loaded. */
   private playPrinterPaperShift() {
+    if (this.playSample('printer-paper')) return
     if (!this.ctx) return
     const ctx = this.ctx
     const now = ctx.currentTime
@@ -263,8 +288,10 @@ class AudioManager {
   }
 
   /** Mechanical gears whirring — low band-passed noise with slow LFO
-   *  modulation, ~1.2s. The dominant "old printer" sound. */
+   *  modulation, ~1.2s. The dominant "old printer" sound.
+   *  Prefers a real sample at /sounds/printer-gears.mp3 if loaded. */
   private playPrinterGears() {
+    if (this.playSample('printer-gears')) return
     if (!this.ctx) return
     const ctx = this.ctx
     const now = ctx.currentTime
