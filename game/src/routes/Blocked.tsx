@@ -9,6 +9,7 @@
 //   About Rebecca · Closer · Signup · Footer
 
 import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import {
   PageScroll, BR, brFont, brMono,
   Nav, Ticker, SectionStarter, Mission, AboutRebecca, Signup, Closer, Footer,
@@ -59,10 +60,12 @@ export default function Blocked() {
       ]} dir="right" speed={50} />
       <Mission />
       <Endorsements />
+      <FAQ />
       <AboutRebecca />
       <Closer />
       <Signup />
       <Footer />
+      <StickyPlayCTA />
     </PageScroll>
   )
 }
@@ -84,21 +87,48 @@ function Hero() {
         <span>UPDATED <b style={{ color: BR.ink }}>0 SECONDS AGO</b></span>
       </div>
 
-      <div style={{ padding: '36px 28px 8px' }}>
+      <div style={{ padding: '20px 28px 4px' }}>
+        <div style={{
+          fontFamily: brMono, fontSize: 11, color: BR.muted,
+          textTransform: 'uppercase', letterSpacing: '0.16em',
+          marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10,
+        }}>
+          <Link to="/" style={{ color: BR.muted, textDecoration: 'none' }}>
+            ← DUMB CORPORATE GAMES
+          </Link>
+          <span>·</span>
+          <span>TITLE 001</span>
+        </div>
         <h1 style={{
           margin: 0, fontFamily: brFont, fontWeight: 900,
-          fontSize: 'clamp(64px, 16vw, 232px)',
-          lineHeight: 0.84, letterSpacing: '-0.055em',
+          fontSize: 'clamp(56px, 14vw, 200px)',
+          lineHeight: 0.86, letterSpacing: '-0.055em',
           textTransform: 'uppercase',
         }}>
-          <Link to="/" style={{ color: BR.ink, textDecoration: 'none' }}>
-            DUMB<br />CORPORATE<br />GAMES<span style={{ color: BR.accent }}>.</span>
-          </Link>
+          BLOCKED<span style={{ color: BR.accent }}>.</span>
         </h1>
+        <div style={{
+          marginTop: 6,
+          fontFamily: brFont, fontWeight: 700,
+          fontSize: 'clamp(16px, 1.6vw, 22px)', letterSpacing: '0.02em',
+          textTransform: 'uppercase', color: BR.muted,
+        }}>
+          PRE-STANDUP ALIGNMENT · 5–10 MIN · BROWSER
+        </div>
+        <div style={{
+          marginTop: 10,
+          fontFamily: brMono, fontSize: 12,
+          textTransform: 'uppercase', letterSpacing: '0.1em', color: BR.muted,
+        }}>
+          ADJACENT TO ·{' '}
+          <b style={{ color: BR.ink }}>PAPERS PLEASE</b> ·{' '}
+          <b style={{ color: BR.ink }}>THE STANLEY PARABLE</b> ·{' '}
+          <b style={{ color: BR.ink }}>GOING UNDER</b>
+        </div>
       </div>
 
       <div style={{
-        padding: '12px 28px 28px',
+        padding: '10px 28px 20px',
         display: 'grid', gridTemplateColumns: 'minmax(0, 1.6fr) minmax(280px, 1fr)',
         gap: 36, alignItems: 'flex-end',
       }}>
@@ -134,7 +164,7 @@ function Hero() {
           fontFamily: brMono, fontSize: 11, textTransform: 'uppercase',
           color: BR.muted, letterSpacing: '0.08em',
         }}>
-          NO INSTALL · NO ACCOUNT · NO STANDUP
+          <span style={{ color: BR.accent, fontWeight: 700 }}>▼ KEEP SCROLLING</span> · NO INSTALL · NO ACCOUNT
         </div>
       </div>
     </section>
@@ -710,6 +740,7 @@ const ENDORSEMENTS: { q: string; who: string; where: string }[] = [
 ]
 
 function Endorsements() {
+  const [featured, ...rest] = ENDORSEMENTS
   return (
     <section style={{ borderBottom: `4px solid ${BR.ink}` }}>
       <SectionStarter
@@ -717,8 +748,43 @@ function Endorsements() {
         title={<>ENDORSEMENTS.</>}
         meta="* SOURCES AVAILABLE NEVER"
       />
+
+      {/* Featured pull-quote — gets the press-blurb treatment */}
+      <div style={{
+        background: BR.ink, color: BR.bg,
+        padding: '40px 32px 36px',
+        borderBottom: `1px solid ${BR.ink}`,
+        display: 'grid', gridTemplateColumns: '1fr auto', gap: 36, alignItems: 'end',
+      }}>
+        <div>
+          <div style={{
+            fontFamily: brFont, fontWeight: 900,
+            fontSize: 'clamp(28px, 3.6vw, 52px)',
+            lineHeight: 1.08, letterSpacing: '-0.02em',
+            textTransform: 'uppercase',
+          }}>
+            <span style={{ color: BR.accent }}>"</span>
+            {featured.q}
+            <span style={{ color: BR.accent }}>"</span>
+          </div>
+          <div style={{
+            marginTop: 18, fontFamily: brMono, fontSize: 12, color: '#aaa',
+            textTransform: 'uppercase', letterSpacing: '0.14em',
+          }}>
+            — <b style={{ color: BR.bg }}>{featured.who}</b> · {featured.where}
+          </div>
+        </div>
+        <div style={{
+          fontFamily: brMono, fontSize: 11, color: BR.accent, fontWeight: 700,
+          textTransform: 'uppercase', letterSpacing: '0.18em', textAlign: 'right',
+          whiteSpace: 'nowrap',
+        }}>
+          FEATURED · 01 / {String(ENDORSEMENTS.length).padStart(2, '0')}
+        </div>
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)' }}>
-        {ENDORSEMENTS.map((e, i) => (
+        {rest.map((e, i) => (
           <div key={i} style={{
             padding: '28px 28px 24px',
             borderLeft: i % 2 ? `1px solid ${BR.ink}` : 'none',
@@ -729,7 +795,7 @@ function Endorsements() {
             <div style={{
               fontFamily: brFont, fontWeight: 900, fontSize: 88, lineHeight: 0.7,
               color: BR.accent, letterSpacing: '-0.04em',
-            }}>{String(i + 1).padStart(2, '0')}</div>
+            }}>{String(i + 2).padStart(2, '0')}</div>
             <div>
               <div style={{
                 fontFamily: brFont, fontWeight: 900, fontSize: 24, lineHeight: 1.18,
@@ -746,5 +812,118 @@ function Endorsements() {
         ))}
       </div>
     </section>
+  )
+}
+
+// ─── FAQ ─────────────────────────────────────────────────────────────────
+const FAQS: { q: string; a: string }[] = [
+  {
+    q: 'WILL THIS RUN ON A CHROMEBOOK OR OLD LAPTOP?',
+    a: 'YES. IT IS A BROWSER GAME. IF YOUR LAPTOP CAN HOLD A GMAIL TAB, IT CAN HOLD A STANDUP.',
+  },
+  {
+    q: 'HOW LONG IS ONE PLAYTHROUGH?',
+    a: 'FIVE TO TEN MINUTES — ROUGHLY THE LENGTH OF THE STANDUP YOU ARE CURRENTLY IGNORING.',
+  },
+  {
+    q: 'IS THERE A MOBILE VERSION?',
+    a: 'NOT YET. THE GAME WAS BUILT FOR DESKTOP BECAUSE THE STANDUP IS A WORKPLACE PROBLEM, AND THE WORKPLACE IS WHERE THE KEYBOARDS ARE.',
+  },
+  {
+    q: 'IS THIS SAFE FOR WORK?',
+    a: 'AS SAFE AS THE WORK ITSELF. NO BLOOD, NO PROFANITY. EXTENSIVE PASSIVE-AGGRESSIVE EMAIL TONE.',
+  },
+  {
+    q: 'CAN I PLAY OFFLINE?',
+    a: 'THE FIRST LOAD FETCHES ~15 MB OF ASSETS. AFTER THAT, YOUR BROWSER CACHES IT — POOR WIFI IS FINE ONCE YOU’RE IN.',
+  },
+  {
+    q: 'WILL FUTURE TITLES BE FREE?',
+    a: 'YES. EVERY GAME FROM THIS STUDIO IS FREE. SUPPORT IS APPRECIATED VIA THE EMAIL SIGNUP AND BY SHARING THE LINK IN A SLACK CHANNEL WHERE IT WILL NOT BE READ.',
+  },
+]
+
+function FAQ() {
+  return (
+    <section id="faq" style={{ borderBottom: `4px solid ${BR.ink}` }}>
+      <SectionStarter
+        eyebrow="OBJECTION HANDLING · LEGALLY NON-BINDING"
+        title={<>QUESTIONS<br />FROM THE FLOOR.</>}
+        meta="SIX (6) ANSWERS · ZERO FOLLOWUPS BOOKED"
+      />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)' }}>
+        {FAQS.map((f, i) => (
+          <div key={i} style={{
+            padding: '24px 28px 26px',
+            borderLeft: i % 2 ? `1px solid ${BR.ink}` : 'none',
+            borderBottom: i < 4 ? `1px solid ${BR.ink}` : 'none',
+            background: i % 2 ? BR.bg : BR.paper,
+          }}>
+            <div style={{
+              fontFamily: brMono, fontSize: 11, color: BR.accent, fontWeight: 700,
+              textTransform: 'uppercase', letterSpacing: '0.16em',
+            }}>Q · {String(i + 1).padStart(2, '0')}</div>
+            <div style={{
+              marginTop: 8, fontFamily: brFont, fontWeight: 900,
+              fontSize: 22, lineHeight: 1.15, letterSpacing: '-0.01em',
+              textTransform: 'uppercase', color: BR.ink,
+            }}>{f.q}</div>
+            <div style={{
+              marginTop: 10, fontFamily: brFont, fontSize: 15, lineHeight: 1.55,
+              color: '#222',
+            }}>{f.a}</div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+// ─── Sticky bottom CTA — slides in once you scroll past the hero ─────────
+function StickyPlayCTA() {
+  const [show, setShow] = useState(false)
+  useEffect(() => {
+    const hero = document.getElementById('top')
+    if (!hero) return
+    const obs = new IntersectionObserver(
+      ([entry]) => setShow(!entry.isIntersecting),
+      { threshold: 0.05 },
+    )
+    obs.observe(hero)
+    return () => obs.disconnect()
+  }, [])
+  return (
+    <div
+      aria-hidden={!show}
+      style={{
+        position: 'sticky', bottom: 0, zIndex: 4,
+        transform: show ? 'translateY(0)' : 'translateY(110%)',
+        transition: 'transform 280ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+        background: BR.ink, color: BR.bg,
+        borderTop: `2px solid ${BR.accent}`,
+        display: 'flex', alignItems: 'stretch',
+        fontFamily: brFont,
+      }}
+    >
+      <div style={{
+        padding: '12px 22px',
+        display: 'flex', alignItems: 'center', gap: 14,
+        fontFamily: brMono, fontSize: 11, color: '#aaa',
+        textTransform: 'uppercase', letterSpacing: '0.12em',
+        borderRight: `1px solid #333`, flex: 1,
+      }}>
+        <span style={{ color: BR.accent }}>●</span>
+        <span>STILL READING.</span>
+        <span style={{ color: BR.bg, fontWeight: 700 }}>YOU COULD JUST PLAY IT.</span>
+      </div>
+      <Link to="/play/blocked" style={{
+        background: BR.accent, color: '#000',
+        padding: '14px 28px',
+        fontFamily: brFont, fontWeight: 900, fontSize: 16,
+        textTransform: 'uppercase', letterSpacing: '0.04em',
+        textDecoration: 'none',
+        display: 'inline-flex', alignItems: 'center',
+      }}>▶ PLAY BLOCKED · FREE</Link>
+    </div>
   )
 }

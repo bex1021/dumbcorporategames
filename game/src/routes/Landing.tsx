@@ -38,6 +38,7 @@ export default function Landing() {
         ]}
       />
       <Portfolio />
+      <WhatsNext />
       <Ticker
         items={[
           'DO WHATEVER IT TAKES',
@@ -87,11 +88,11 @@ function Hero() {
       </div>
 
       {/* Mega headline */}
-      <div style={{ padding: '36px 28px 8px' }}>
+      <div style={{ padding: '20px 28px 4px' }}>
         <h1 style={{
           margin: 0, fontFamily: brFont, fontWeight: 900,
-          fontSize: 'clamp(64px, 16vw, 232px)',
-          lineHeight: 0.84, letterSpacing: '-0.055em',
+          fontSize: 'clamp(44px, 8.5vw, 124px)',
+          lineHeight: 0.86, letterSpacing: '-0.055em',
           textTransform: 'uppercase',
         }}>
           DUMB<br />
@@ -102,7 +103,7 @@ function Hero() {
 
       {/* Tagline + studio facts */}
       <div style={{
-        padding: '12px 28px 32px',
+        padding: '10px 28px 20px',
         display: 'grid', gridTemplateColumns: 'minmax(0, 1.6fr) minmax(280px, 1fr)',
         gap: 36, alignItems: 'flex-end',
       }}>
@@ -132,17 +133,19 @@ function Hero() {
         </div>
       </div>
 
-      {/* Actions */}
+      {/* Actions — PLAY is primary, accent orange, top of funnel */}
       <div style={{ display: 'flex', borderTop: `4px solid ${BR.ink}`, flexWrap: 'wrap' }}>
-        <a href="#games" style={ctaPrimary}>▼ SEE OUR GAMES</a>
+        <Link to="/play/blocked" style={{
+          ...ctaPrimary, background: BR.accent, color: '#000',
+        }}>▶ PLAY BLOCKED — FREE</Link>
+        <a href="#games" style={ctaSecondary}>▼ SEE OUR GAMES</a>
         <a href="#mission" style={ctaSecondary}>READ THE MISSION</a>
-        <a href="mailto:hello@dumbcorporategames.com" style={ctaSecondary}>HELLO@DUMBCORPORATEGAMES.COM</a>
         <div style={{
           marginLeft: 'auto', alignSelf: 'center', padding: '0 20px',
           fontFamily: brMono, fontSize: 11,
           textTransform: 'uppercase', color: BR.muted, letterSpacing: '0.08em',
         }}>
-          ALL GAMES FREE · BROWSER · NO INSTALL
+          <span style={{ color: BR.accent, fontWeight: 700 }}>▼ KEEP SCROLLING</span> · ALL FREE · BROWSER · NO INSTALL
         </div>
       </div>
     </section>
@@ -333,6 +336,109 @@ function GameCard({ g, i }: { g: Game; i: number }) {
         )}
       </div>
     </div>
+  )
+}
+
+// ─── WhatsNext — phase roadmap (Phase 1 live · 2 building · 3 brewing) ──
+function WhatsNext() {
+  type Phase = {
+    phase: string; state: string; tone: 'live' | 'wip' | 'idea'
+    title: string; blurb: string
+  }
+  const PHASES: Phase[] = [
+    {
+      phase: 'PHASE 1', state: 'LIVE', tone: 'live',
+      title: 'BLOCKED',
+      blurb:
+        'PRE-STANDUP ALIGNMENT. A PM HAS 75 MINUTES TO EXTRACT THE TRUTH FROM FIVE LIARS. SHIPPED. PLAYABLE NOW.',
+    },
+    {
+      phase: 'PHASE 2', state: 'IN DEVELOPMENT', tone: 'wip',
+      title: '4:30 EXECUTIVE REVIEW',
+      blurb:
+        'CODENAME. THE MEETING AFTER THE STANDUP. A DECK EXISTS. ITS PURPOSE DOES NOT. ESTIMATED LANDING: WHEN IT LANDS.',
+    },
+    {
+      phase: 'PHASE 3', state: 'PARKING LOT', tone: 'idea',
+      title: '[REDACTED]',
+      blurb:
+        'A THIRD TITLE IS IN THE PARKING LOT. THE PARKING LOT IS ITSELF A DEPENDENCY WE ARE ACTIVELY MANAGING.',
+    },
+  ]
+  return (
+    <section style={{ borderBottom: `4px solid ${BR.ink}`, background: BR.ink, color: BR.bg }}>
+      <div style={{
+        padding: '32px 32px 24px',
+        borderBottom: `1px solid #333`,
+        display: 'grid', gridTemplateColumns: '1fr auto', gap: 32, alignItems: 'end',
+      }}>
+        <div>
+          <div style={{
+            fontFamily: brMono, fontSize: 11, color: '#aaa',
+            textTransform: 'uppercase', letterSpacing: '0.16em', marginBottom: 10,
+          }}>
+            <span style={{ color: BR.accent, marginRight: 8 }}>●</span>
+            ROADMAP · PHASES 1 → 3 · LEAKED INTERNALLY
+          </div>
+          <h2 style={{
+            margin: 0, fontFamily: brFont, fontWeight: 900,
+            fontSize: 'clamp(40px, 6vw, 80px)',
+            lineHeight: 0.95, letterSpacing: '-0.03em', textTransform: 'uppercase',
+          }}>
+            WHAT'S NEXT<span style={{ color: BR.accent }}>.</span>
+          </h2>
+        </div>
+        <div style={{
+          fontFamily: brMono, fontSize: 11, color: '#aaa',
+          textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: 'right',
+          maxWidth: 280, lineHeight: 1.55,
+        }}>
+          THREE PHASES · ONE SHIPPED · ONE BUILDING · ONE BREWING
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)' }}>
+        {PHASES.map((p, i) => {
+          const live = p.tone === 'live'
+          const wip = p.tone === 'wip'
+          return (
+            <div key={p.phase} style={{
+              padding: '24px 24px 28px',
+              borderLeft: i ? `1px solid #333` : 'none',
+              background: live ? BR.accent : BR.ink,
+              color: live ? '#000' : BR.bg,
+              minHeight: 280,
+              display: 'flex', flexDirection: 'column',
+            }}>
+              <div style={{
+                fontFamily: brMono, fontSize: 11, fontWeight: 700,
+                textTransform: 'uppercase', letterSpacing: '0.16em',
+                color: live ? '#000' : (wip ? BR.accent : '#aaa'),
+              }}>{p.phase}</div>
+              <div style={{
+                marginTop: 10, fontFamily: brFont, fontWeight: 900,
+                fontSize: live ? 40 : 32, lineHeight: 0.95, letterSpacing: '-0.02em',
+                textTransform: 'uppercase',
+                color: live ? '#000' : (wip ? BR.bg : '#888'),
+              }}>{p.title}</div>
+              <div style={{
+                marginTop: 14, fontFamily: brFont, fontSize: 14, lineHeight: 1.5,
+                color: live ? '#000' : (wip ? '#ddd' : '#777'),
+                flex: 1,
+              }}>{p.blurb}</div>
+              <div style={{
+                marginTop: 18,
+                fontFamily: brMono, fontSize: 11, fontWeight: 700,
+                textTransform: 'uppercase', letterSpacing: '0.14em',
+                color: live ? '#000' : (wip ? BR.accent : '#aaa'),
+              }}>
+                ● {p.state}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </section>
   )
 }
 
