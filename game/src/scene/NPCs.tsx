@@ -62,7 +62,12 @@ export function NPCs() {
       {/* Workstations rendered separately so they stay put when NPCs stand up
           and move to the side of the chair. */}
       {NPCS.filter((n) => n.pose === 'sit').map((npc) => (
-        <NPCWorkstation key={`ws-${npc.id}`} x={npc.x} z={npc.z} />
+        <NPCWorkstation
+          key={`ws-${npc.id}`}
+          id={npc.id}
+          x={npc.x}
+          z={npc.z}
+        />
       ))}
     </group>
   )
@@ -374,13 +379,15 @@ function BarkEffectChips({ effects }: { effects: Effects }) {
   )
 }
 
-// Workstation (chair + desk + monitor) needs to stay at the original NPC
-// position even when the NPC has stood up and moved aside. So we render it
-// outside the NPC group, at the original (x, z) coords.
-function NPCWorkstation({ x, z }: { x: number; z: number }) {
+// Workstation (chair + desk + monitor + per-NPC desk personality) needs to
+// stay at the original NPC position even when the NPC has stood up and
+// moved aside. So we render it outside the NPC group, at the original
+// (x, z) coords. `id` is passed through to Workstation so the desk gets
+// NPC-specific accents (Brent's mug collection, Tasha's Wacom, etc).
+function NPCWorkstation({ id, x, z }: { id: string; x: number; z: number }) {
   return (
     <group position={[x, 0, z]}>
-      <Workstation showChair />
+      <Workstation showChair id={id} />
     </group>
   )
 }
