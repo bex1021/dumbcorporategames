@@ -246,7 +246,9 @@ export function EndingScreen() {
               </div>
             </div>
 
-            {/* Achievements */}
+            {/* Achievements — 3-column compact grid so all 12 fit without
+                scrolling. Each cell shows icon + title; hover the cell to
+                see the description via the native browser tooltip. */}
             <div>
               <SectionHeader>
                 Achievements
@@ -254,15 +256,16 @@ export function EndingScreen() {
                   {unlocked.size}/{ACHIEVEMENTS.length}
                 </span>
               </SectionHeader>
-              <div className="flex flex-col gap-1">
+              <div className="grid grid-cols-3 gap-1">
                 {ACHIEVEMENTS.map((a) => {
                   const isUnlocked = unlocked.has(a.id)
                   const isNew = justUnlockedSet.has(a.id)
                   return (
                     <div
                       key={a.id}
+                      title={`${a.title} — ${a.description}`}
                       className={[
-                        'flex items-start gap-2 px-2 py-1.5 rounded border text-[11px]',
+                        'relative flex items-center gap-1 px-1.5 py-1 rounded border text-[10px] leading-tight',
                         isUnlocked
                           ? isNew
                             ? 'border-[#f5cd47] bg-[#fff7d6] text-[#172b4d]'
@@ -270,20 +273,15 @@ export function EndingScreen() {
                           : 'border-[#dfe1e6] bg-[#f4f5f7] text-[#5e6c84]',
                       ].join(' ')}
                     >
-                      <span className="text-sm leading-none mt-0.5">
+                      <span className="text-xs leading-none flex-shrink-0">
                         {isUnlocked ? (isNew ? '★' : '✓') : '○'}
                       </span>
-                      <div className="flex-1">
-                        <div className="font-medium flex items-center gap-1.5">
-                          {a.title}
-                          {isNew && (
-                            <span className="text-[9px] uppercase tracking-widest text-[#7f5f01] bg-[#f5cd47] px-1 rounded">
-                              New
-                            </span>
-                          )}
-                        </div>
-                        <div className="opacity-80">{a.description}</div>
-                      </div>
+                      <span className="font-medium truncate">{a.title}</span>
+                      {isNew && (
+                        <span className="absolute -top-1 -right-1 text-[7px] uppercase tracking-wider text-[#7f5f01] bg-[#f5cd47] px-1 rounded-sm font-bold">
+                          New
+                        </span>
+                      )}
                     </div>
                   )
                 })}

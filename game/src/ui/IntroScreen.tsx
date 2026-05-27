@@ -95,59 +95,202 @@ function SlackDMScreen({ onDismiss }: { onDismiss: () => void }) {
       onClick={onDismiss}
       className="absolute inset-0 flex items-center justify-center bg-ink-900 cursor-pointer p-6"
     >
-      <div className="w-full max-w-md bg-[#1a1d21] border border-[#383a40] rounded-md shadow-2xl overflow-hidden">
-        {/* Slack channel header */}
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-[#383a40] bg-[#222529]">
-          <div className="w-2 h-2 rounded-full bg-[#2ebb77]" />
-          <div className="text-[#d1d2d3] text-sm font-medium">
-            Exec · Direct message
-          </div>
-          <div className="text-[#abadb1] text-xs ml-auto">8:58 AM</div>
-        </div>
-        {/* Message body */}
-        <div className="px-4 py-4">
-          <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded bg-[#4a154b] flex items-center justify-center text-[#f1f1f1] text-sm font-bold flex-shrink-0">
-              E
+      <div
+        className="w-full max-w-4xl bg-[#1a1d21] border border-[#383a40] rounded-md shadow-2xl overflow-hidden flex flex-col"
+        style={{ height: 560 }}
+      >
+        {/* Top app bar — workspace name + DM title + active indicator */}
+        <div className="flex items-stretch bg-[#19171d] border-b border-[#383a40] flex-shrink-0">
+          {/* Workspace switcher column (top icon) */}
+          <div className="w-12 flex items-center justify-center py-2 flex-shrink-0">
+            <div className="w-8 h-8 rounded-md bg-[#4a154b] flex items-center justify-center text-white font-bold text-sm">
+              A
             </div>
-            <div className="flex-1">
-              <div className="flex items-baseline gap-2">
-                <span className="text-[#d1d2d3] text-sm font-semibold">Exec</span>
-                <span className="text-[#abadb1] text-xs">8:58 AM</span>
-              </div>
-              <div className="text-[#d1d2d3] text-[15px] leading-relaxed mt-1 space-y-2">
-                <p>
-                  Hey 👋 wanted to touch base on the Customer Happiness
-                  vertical before standup.
-                </p>
-                <p>
-                  Need ownership clarity around our end-state. Quick favor —
-                  circle up with the stakeholders, drive alignment, surface any
-                  blockers (or lack thereof). Big morning ahead.
-                </p>
-                <p>
-                  Really leaning into impact this quarter. Looking forward to
-                  seeing some leadership presence in the standup conversation.
-                  Let&apos;s make sure we&apos;re all rowing in the same
-                  direction on this.
-                </p>
-                <p className="text-[#f4b800]">
-                  PS — status must remain{' '}
-                  <span className="font-bold text-[#2ebb77]">GREEN</span>. This
-                  is non-negotiable. Thx!
-                </p>
-              </div>
+          </div>
+          {/* Workspace name */}
+          <div
+            className="flex items-center gap-1.5 px-4 border-r border-[#383a40] flex-shrink-0"
+            style={{ width: 220 }}
+          >
+            <span className="text-white text-sm font-bold">alignly</span>
+            <span className="text-[#abadb1] text-[10px]">▾</span>
+          </div>
+          {/* Channel/DM title bar */}
+          <div className="flex items-center gap-2 px-4 flex-1 min-w-0">
+            <span className="text-[#abadb1] text-base">@</span>
+            <div className="text-[#d1d2d3] text-sm font-bold truncate">Exec</div>
+            <span className="text-[#2ebb77] text-[10px]">●</span>
+            <span className="text-[#abadb1] text-xs">Active</span>
+            <div className="ml-auto text-[#abadb1] text-xs flex-shrink-0">
+              Wed 8:58 AM
             </div>
           </div>
         </div>
-        <div className="px-4 py-2 border-t border-[#383a40] bg-[#222529] text-[#abadb1] text-xs">
-          Exec is typing…
+
+        {/* Body: workspace switcher + sidebar + main pane */}
+        <div className="flex flex-1 min-h-0">
+          {/* Workspace switcher column — 2 stacked icons */}
+          <div className="w-12 bg-[#19171d] border-r border-[#383a40] flex flex-col items-center py-2 gap-2 flex-shrink-0">
+            <div className="w-8 h-8 rounded-md bg-[#4a154b] flex items-center justify-center text-white font-bold text-sm ring-2 ring-white">
+              A
+            </div>
+            <div className="w-8 h-8 rounded-md bg-[#1a1d21] border border-[#383a40] flex items-center justify-center text-[#abadb1] text-base">
+              +
+            </div>
+          </div>
+
+          {/* Channels + DMs sidebar */}
+          <div
+            className="bg-[#19171d] border-r border-[#383a40] py-3 px-2 flex-shrink-0 overflow-y-auto"
+            style={{ width: 220 }}
+          >
+            <SidebarSection label="Channels">
+              <SidebarItem prefix="#" text="general" unread />
+              <SidebarItem prefix="#" text="engineering" />
+              <SidebarItem prefix="#" text="design" />
+              <SidebarItem prefix="#" text="random" />
+              <SidebarItem prefix="#" text="alignment-ops" />
+            </SidebarSection>
+            <SidebarSection label="Direct messages" className="mt-3">
+              <SidebarItem prefix="●" prefixColor="#2ebb77" text="Exec" active />
+              <SidebarItem prefix="○" text="Brent" />
+              <SidebarItem prefix="○" text="Tasha" />
+              <SidebarItem prefix="○" text="Priya" />
+              <SidebarItem prefix="○" text="Chad" />
+              <SidebarItem prefix="○" text="Diane (HR)" />
+            </SidebarSection>
+          </div>
+
+          {/* Main DM pane */}
+          <div className="flex-1 flex flex-col bg-[#1a1d21] min-w-0">
+            {/* "Today" divider */}
+            <div className="flex items-center gap-3 px-5 pt-3 flex-shrink-0">
+              <div className="flex-1 border-t border-[#383a40]" />
+              <div className="text-[#abadb1] text-[11px] font-semibold px-2 py-0.5 border border-[#383a40] rounded-full bg-[#19171d]">
+                Today
+              </div>
+              <div className="flex-1 border-t border-[#383a40]" />
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 py-3">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded bg-[#4a154b] flex items-center justify-center text-[#f1f1f1] text-sm font-bold flex-shrink-0">
+                  E
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline gap-2 mb-0.5">
+                    <span className="text-white text-[15px] font-bold">
+                      Exec
+                    </span>
+                    <span className="text-[#abadb1] text-[11px]">8:58 AM</span>
+                  </div>
+                  <div className="text-[#d1d2d3] text-[14px] leading-relaxed space-y-2">
+                    <p>
+                      Hey 👋 wanted to touch base on the Customer Happiness
+                      vertical before standup.
+                    </p>
+                    <p>
+                      Need ownership clarity around our end-state. Quick favor
+                      — circle up with the stakeholders, drive alignment,
+                      surface any blockers (or lack thereof). Big morning
+                      ahead.
+                    </p>
+                    <p>
+                      Really leaning into impact this quarter. Looking forward
+                      to seeing some leadership presence in the standup
+                      conversation. Let&apos;s make sure we&apos;re all rowing
+                      in the same direction on this.
+                    </p>
+                    <p className="text-[#f4b800]">
+                      PS — status must remain{' '}
+                      <span className="font-bold text-[#2ebb77]">GREEN</span>.
+                      This is non-negotiable. Thx!
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 pl-12 text-[#abadb1] text-xs italic">
+                Exec is typing…
+              </div>
+            </div>
+
+            {/* Message input (decorative — never actually used) */}
+            <div className="px-3 pb-3 flex-shrink-0">
+              <div className="bg-[#222529] border border-[#565856] rounded-md px-3 py-2 text-[#abadb1] text-sm flex items-center gap-2">
+                <span className="text-base">+</span>
+                <span className="flex-1">Message Exec</span>
+                <span className="text-[#565856] text-[11px]">⏎</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
       <div className="absolute bottom-8 text-beige-300 text-xs font-mono tracking-wider opacity-70">
         space · enter · click to continue
       </div>
+    </div>
+  )
+}
+
+// Slack sidebar "Channels" / "Direct messages" group with collapsing chevron.
+function SidebarSection({
+  label,
+  children,
+  className = '',
+}: {
+  label: string
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <div className={className}>
+      <div className="flex items-center gap-1 px-2 mb-0.5 text-[#abadb1] text-[11px]">
+        <span>▾</span>
+        <span className="font-medium">{label}</span>
+      </div>
+      <div className="flex flex-col">{children}</div>
+    </div>
+  )
+}
+
+// Single channel or DM row in the sidebar.
+function SidebarItem({
+  prefix,
+  prefixColor,
+  text,
+  active = false,
+  unread = false,
+}: {
+  prefix: string
+  prefixColor?: string
+  text: string
+  active?: boolean
+  unread?: boolean
+}) {
+  return (
+    <div
+      className={[
+        'flex items-center gap-2 px-2 py-1 rounded text-[13px] cursor-default',
+        active
+          ? 'bg-[#1164a3] text-white font-medium'
+          : unread
+          ? 'text-white font-medium'
+          : 'text-[#abadb1]',
+      ].join(' ')}
+    >
+      <span
+        className="text-[12px] w-3 text-center flex-shrink-0"
+        style={prefixColor ? { color: prefixColor } : undefined}
+      >
+        {prefix}
+      </span>
+      <span className="truncate">{text}</span>
+      {unread && (
+        <span className="ml-auto w-4 h-4 rounded-full bg-[#cd2553] text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+          3
+        </span>
+      )}
     </div>
   )
 }
