@@ -255,6 +255,10 @@ export function Player() {
     if (trigger > lastTriggerRef.current) {
       lastTriggerRef.current = trigger
       slapStartTimeRef.current = performance.now() / 1000
+      // Fire the SMACK sound at the moment of contact — end of the
+      // forward-sweep phase below (SWING_END = 0.25s into the slap).
+      // setTimeout delay is in ms so we multiply by 1000.
+      setTimeout(() => audio.playSlapImpact(), 250)
     }
 
     const start = slapStartTimeRef.current

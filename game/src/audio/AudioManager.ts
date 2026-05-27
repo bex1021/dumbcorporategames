@@ -381,6 +381,71 @@ class AudioManager {
     }
   }
 
+  /** Satisfying slap impact — fires the moment Leonard's hand connects
+   *  with the printer. Two-component synth:
+   *
+   *  Component 1 (transient): a 30ms burst of high-passed noise at 1.5kHz+
+   *    → the sharp "smack" of palm on plastic, what gives the impact its
+   *    perceived "crispness" and aggression.
+   *
+   *  Component 2 (body): a 150ms low-passed noise at 500Hz with slightly
+   *    longer decay → the "thud" of the plastic housing deflecting under
+   *    the slap. Together they read as a real impact, not a beep.
+   *
+   *  Volume is intentionally loud (0.35 peak) because this is a hit, not
+   *  ambient flavor — it should feel like a punctuation moment.
+   */
+  playSlapImpact(opts: { volume?: number } = {}) {
+    if (!this.ctx || this.muted) return
+    const ctx = this.ctx
+    const now = ctx.currentTime
+    const peak = opts.volume ?? 0.35
+
+    // Component 1: sharp transient (the smack)
+    const dur1 = 0.035
+    const buf1 = ctx.createBuffer(
+      1,
+      Math.floor(ctx.sampleRate * dur1),
+      ctx.sampleRate
+    )
+    const d1 = buf1.getChannelData(0)
+    for (let i = 0; i < d1.length; i++) d1[i] = Math.random() * 2 - 1
+    const src1 = ctx.createBufferSource()
+    src1.buffer = buf1
+    const hp = ctx.createBiquadFilter()
+    hp.type = 'highpass'
+    hp.frequency.value = 1600
+    hp.Q.value = 0.6
+    const g1 = ctx.createGain()
+    g1.gain.setValueAtTime(0.0001, now)
+    g1.gain.exponentialRampToValueAtTime(peak, now + 0.002)
+    g1.gain.exponentialRampToValueAtTime(0.0001, now + dur1)
+    src1.connect(hp).connect(g1).connect(ctx.destination)
+    src1.start(now)
+
+    // Component 2: low-frequency body (the plastic deflection thud)
+    const dur2 = 0.16
+    const buf2 = ctx.createBuffer(
+      1,
+      Math.floor(ctx.sampleRate * dur2),
+      ctx.sampleRate
+    )
+    const d2 = buf2.getChannelData(0)
+    for (let i = 0; i < d2.length; i++) d2[i] = Math.random() * 2 - 1
+    const src2 = ctx.createBufferSource()
+    src2.buffer = buf2
+    const lp = ctx.createBiquadFilter()
+    lp.type = 'lowpass'
+    lp.frequency.value = 480
+    lp.Q.value = 1.6
+    const g2 = ctx.createGain()
+    g2.gain.setValueAtTime(0.0001, now)
+    g2.gain.exponentialRampToValueAtTime(peak * 0.75, now + 0.004)
+    g2.gain.exponentialRampToValueAtTime(0.0001, now + dur2)
+    src2.connect(lp).connect(g2).connect(ctx.destination)
+    src2.start(now)
+  }
+
   /** A short high-frequency rustle — dry leaves brushing past each other.
    *  Used by PhyllisProximityAudio to fire occasional leaf sounds while
    *  the player is near the plant. The sound is intentionally subtle so
