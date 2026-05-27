@@ -9,6 +9,12 @@
   --color-ink-700: #3a3a3a;
 }
 
+/*
+ * Global lock for the 3D game route only.
+ * The marketing routes (Landing, Blocked) use <PageScroll> from
+ * src/brutalist.tsx, which mounts its own position:fixed scroll
+ * container so it works inside this locked viewport.
+ */
 html, body, #root {
   margin: 0;
   padding: 0;

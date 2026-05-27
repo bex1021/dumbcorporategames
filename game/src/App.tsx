@@ -1,15 +1,17 @@
 // Router root for dumbcorporategames.com.
 //
-// `/`         → portfolio landing page (Landing.tsx)
-// `/blocked`  → the Blocked game (Game.tsx — was the old App.tsx)
+// `/`              → studio portfolio landing (Landing.tsx)
+// `/blocked`       → Blocked product/info page (Blocked.tsx)
+// `/play/blocked`  → the actual Blocked 3D game (Game.tsx — was the old App.tsx)
 //
-// Game is lazy-loaded so the landing page is instant; the ~15 MB of GLBs
-// only fetch when someone clicks through to /blocked. Suspense fallback
-// shows a small loading splash during the JS chunk download.
+// Game is lazy-loaded so the marketing pages stay instant; the ~15 MB of
+// GLBs only fetch when someone clicks through to /play/blocked. Suspense
+// fallback shows a small splash during the JS chunk download.
 
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { Suspense, lazy } from 'react'
 import Landing from './routes/Landing'
+import Blocked from './routes/Blocked'
 
 const Game = lazy(() => import('./routes/Game'))
 
@@ -17,9 +19,10 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Landing />} />
+        <Route path="/"            element={<Landing />} />
+        <Route path="/blocked"     element={<Blocked />} />
         <Route
-          path="/blocked"
+          path="/play/blocked"
           element={
             <Suspense fallback={<RouteSplash />}>
               <Game />
@@ -34,11 +37,18 @@ export default function App() {
 }
 
 // Minimal splash shown while the Game route's JS chunk is downloading.
-// The full GLB loading screen takes over after the chunk lands.
 function RouteSplash() {
   return (
-    <div className="fixed inset-0 z-50 bg-[#f4f5f7] flex items-center justify-center">
-      <div className="text-[#5e6c84] text-sm font-mono">Loading workspace…</div>
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 50,
+        background: '#f1f0ec',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontFamily: '"IBM Plex Mono", "SF Mono", ui-monospace, Menlo, monospace',
+        color: '#5a5a5a', fontSize: 13, letterSpacing: '0.1em', textTransform: 'uppercase',
+      }}
+    >
+      LOADING WORKSPACE …
     </div>
   )
 }
