@@ -17,14 +17,7 @@
 import { useEffect, useState } from 'react'
 import { useGameStore } from '../state/gameStore'
 import { audio } from '../audio/AudioManager'
-import { NPCS } from '../config/constants'
-import {
-  EPIC,
-  TICKETS,
-  typeIcon,
-  priorityChip,
-  type Ticket,
-} from '../content/tickets'
+import { EPIC, TICKETS } from '../content/tickets'
 
 const FADE_OUT_MS = 500
 
@@ -300,161 +293,148 @@ function SidebarItem({
 // ============================================================
 
 function JiraEpicScreen({ onStart }: { onStart: () => void }) {
-  // Story points total — small flavor calc.
+  // Story points total — small flavor calc, still used in the title bar.
   const totalPoints = TICKETS.reduce((sum, t) => sum + t.storyPoints, 0)
 
-  // Single-viewport layout: root is h-screen with overflow-hidden. Nav strip
-  // + breadcrumb/title bar take fixed height; the body flex-1's into what's
-  // left. Both columns scroll independently if absolutely needed, but content
-  // is tuned to fit ~720px+ viewport heights without scrolling.
+  // Single-column, centered layout. The previous version had a 2-column
+  // dashboard feel with a wide Linked Issues table — now everything stacks
+  // in a narrow max-w-2xl container so the briefing reads as a focused
+  // mission card, not a project management dashboard.
   return (
     <div className="absolute inset-0 bg-[#f4f5f7] text-[#172b4d] flex flex-col overflow-hidden">
       <JiraNav />
 
-      {/* Header strip */}
+      {/* Header strip — breadcrumb + title + status pills */}
       <div className="px-6 pt-3 pb-2 flex-shrink-0">
-        <div className="text-[12px] text-[#5e6c84]">
-          Projects › {EPIC.title} › <span className="text-[#172b4d]">{EPIC.key}</span>
-        </div>
-        <div className="flex items-baseline gap-3 mt-0.5">
-          <span className="text-[#42526e] text-base" title="Epic">⚡</span>
-          <h1 className="text-[20px] font-semibold text-[#172b4d]">
-            {EPIC.title}
-          </h1>
-          <span className="text-[12px] text-[#5e6c84] font-mono">{EPIC.key}</span>
-          <span className="ml-2 flex items-center gap-2">
-            <StatusPill label="In Progress" tone="progress" />
-            <StatusPill label="🟢 GREEN" tone="done" />
-            <span className="text-[12px] text-[#5e6c84]">
-              · {totalPoints} pts
+        <div className="max-w-2xl mx-auto">
+          <div className="text-[12px] text-[#5e6c84]">
+            Projects › {EPIC.title} › <span className="text-[#172b4d]">{EPIC.key}</span>
+          </div>
+          <div className="flex items-baseline gap-3 mt-0.5 flex-wrap">
+            <span className="text-[#42526e] text-base" title="Epic">
+              ⚡
             </span>
-          </span>
+            <h1 className="text-[20px] font-semibold text-[#172b4d]">
+              {EPIC.title}
+            </h1>
+            <span className="text-[12px] text-[#5e6c84] font-mono">
+              {EPIC.key}
+            </span>
+            <span className="ml-1 flex items-center gap-2">
+              <StatusPill label="In Progress" tone="progress" />
+              <StatusPill label="🟢 GREEN" tone="done" />
+              <span className="text-[12px] text-[#5e6c84]">· {totalPoints} pts</span>
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Two-column body fills remaining viewport */}
-      <div className="flex-1 min-h-0 px-6 pb-4">
-        <div className="h-full grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-4">
-          {/* Left: description (combined w/ mission) + linked issues */}
-          <div className="flex flex-col gap-3 min-h-0">
-            {/* Description + Today's mission combined into one card */}
-            <div className="bg-white border border-[#dfe1e6] rounded p-3 text-[13px] leading-snug flex-shrink-0">
-              <div className="text-[10px] uppercase tracking-widest text-[#5e6c84] mb-1">
-                Description
-              </div>
-              <p className="mb-1.5">
-                The Refresh is a strategic enabler for the Customer Happiness
-                vertical. Mission-critical. ~80% defined.
-              </p>
-              <p>
-                <span className="font-semibold text-[#006644]">
-                  It must remain Green.
-                </span>{' '}
-                There are no plans to make it not-Green. Plans to make it
-                not-Green would themselves not be Green.
-              </p>
-
-              <div className="mt-3 pt-3 border-t border-[#f4f5f7]">
-                <div className="flex items-baseline gap-2 mb-1">
-                  <span className="text-[9px] uppercase tracking-widest text-[#5e6c84]">
-                    Today&apos;s mission · Phase 1 of 3
-                  </span>
-                  <span className="text-[14px] font-semibold text-[#172b4d]">
-                    Pre-Standup Alignment
-                  </span>
-                </div>
-                <p className="text-[#42526e]">
-                  Sync with each stakeholder before the 10:00 AM standup. You
-                  can&apos;t enter with surprises. You also can&apos;t enter
-                  with the actual truth. Find a third option.
-                </p>
-                <div className="mt-2 px-2.5 py-1.5 rounded bg-[#e3fcef] border border-[#abf5d1] text-[12px] text-[#006644] flex items-start gap-2">
-                  <span className="leading-none mt-0.5">◎</span>
-                  <div className="text-[#172b4d]">
-                    <span className="text-[#006644] font-semibold">Goal:</span>{' '}
-                    Talk to all 5 stakeholders. Keep your meters out of red.
-                  </div>
-                </div>
-              </div>
+      {/* Single-column centered body */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-4">
+        <div className="max-w-2xl mx-auto flex flex-col gap-3 pt-1">
+          {/* Description + Today's mission card */}
+          <div className="bg-white border border-[#dfe1e6] rounded p-4 text-[13px] leading-snug">
+            <div className="text-[10px] uppercase tracking-widest text-[#5e6c84] mb-1">
+              Description
             </div>
+            <p className="mb-1.5">
+              The Refresh is a strategic enabler for the Customer Happiness
+              vertical. Mission-critical. ~80% defined.
+            </p>
+            <p>
+              <span className="font-semibold text-[#006644]">
+                It must remain Green.
+              </span>{' '}
+              There are no plans to make it not-Green. Plans to make it
+              not-Green would themselves not be Green.
+            </p>
 
-            {/* Linked issues — takes the rest of the column */}
-            <div className="flex flex-col min-h-0 flex-1">
-              <div className="text-[10px] uppercase tracking-widest font-semibold text-[#5e6c84] mb-1 flex-shrink-0">
-                Linked issues
-                <span className="ml-2 text-[#5e6c84] font-normal">
-                  ({TICKETS.length})
+            <div className="mt-3 pt-3 border-t border-[#f4f5f7]">
+              <div className="flex items-baseline gap-2 mb-1 flex-wrap">
+                <span className="text-[9px] uppercase tracking-widest text-[#5e6c84]">
+                  Today&apos;s mission · Phase 1 of 3
+                </span>
+                <span className="text-[14px] font-semibold text-[#172b4d]">
+                  Pre-Standup Alignment
                 </span>
               </div>
-              <div className="bg-white border border-[#dfe1e6] rounded overflow-hidden flex-1 min-h-0 overflow-y-auto">
-                {TICKETS.map((t, i) => (
-                  <LinkedIssueRow
-                    key={t.key}
-                    ticket={t}
-                    isLast={i === TICKETS.length - 1}
-                  />
-                ))}
+              <p className="text-[#42526e]">
+                Sync with each stakeholder before the 10:00 AM standup. You
+                can&apos;t enter with surprises. You also can&apos;t enter
+                with the actual truth. Find a third option.
+              </p>
+              <div className="mt-2 px-2.5 py-1.5 rounded bg-[#e3fcef] border border-[#abf5d1] text-[12px] flex items-start gap-2">
+                <span className="leading-none mt-0.5 text-[#006644]">◎</span>
+                <div className="text-[#172b4d]">
+                  <span className="text-[#006644] font-semibold">Goal:</span>{' '}
+                  Talk to all 5 stakeholders. Keep your meters out of red.
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Right: details sidebar */}
-          <div className="flex flex-col gap-3 min-h-0">
-            <div className="flex-shrink-0">
-              <SectionHeader>Details</SectionHeader>
-              <div className="bg-white border border-[#dfe1e6] rounded px-2.5 py-1.5 text-[12px]">
-                <DetailRow label="Assignee">
-                  <Avatar text="LC" color="#0052cc" />
-                  <span>Leonard Chen</span>
-                </DetailRow>
-                <DetailRow label="Reporter">
-                  <Avatar text="E" color="#4a154b" />
-                  <span>Exec</span>
-                </DetailRow>
-                <DetailRow label="Status">
-                  <span className="px-1.5 py-0.5 rounded bg-[#e3fcef] text-[#006644] text-[10px] font-semibold uppercase">
-                    🟢 GREEN
-                  </span>
-                </DetailRow>
-                <DetailRow label="Sprint">Sprint 47</DetailRow>
-                <DetailRow label="Story points">{totalPoints}</DetailRow>
-                <DetailRow label="Target ship">EOD today</DetailRow>
+          {/* Details — compact horizontal strip with the essentials */}
+          <div className="bg-white border border-[#dfe1e6] rounded p-3">
+            <div className="text-[10px] uppercase tracking-widest text-[#5e6c84] mb-1.5">
+              Details
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[12px]">
+              <DetailRow label="Assignee">
+                <Avatar text="LC" color="#0052cc" />
+                <span>Leonard Chen</span>
+              </DetailRow>
+              <DetailRow label="Reporter">
+                <Avatar text="E" color="#4a154b" />
+                <span>Exec</span>
+              </DetailRow>
+              <DetailRow label="Sprint">Sprint 47</DetailRow>
+              <DetailRow label="Target ship">EOD today</DetailRow>
+            </div>
+          </div>
+
+          {/* Controls quick-reference */}
+          <div className="bg-white border border-[#dfe1e6] rounded p-3">
+            <div className="text-[10px] uppercase tracking-widest text-[#5e6c84] mb-1.5">
+              Controls
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[12px] font-mono">
+              <div>
+                <span className="text-[#5e6c84]">↑ ↓</span>
+                <span className="text-[#172b4d] ml-2">walk fwd / back</span>
+              </div>
+              <div>
+                <span className="text-[#5e6c84]">← →</span>
+                <span className="text-[#172b4d] ml-2">turn</span>
+              </div>
+              <div>
+                <span className="text-[#5e6c84]">E</span>
+                <span className="text-[#172b4d] ml-3">talk / interact</span>
+              </div>
+              <div>
+                <span className="text-[#5e6c84]">1–4</span>
+                <span className="text-[#172b4d] ml-2">pick dialogue</span>
+              </div>
+              <div>
+                <span className="text-[#5e6c84]">Esc</span>
+                <span className="text-[#172b4d] ml-2">close dialog</span>
+              </div>
+              <div>
+                <span className="text-[#5e6c84]">Enter</span>
+                <span className="text-[#172b4d] ml-2">continue</span>
               </div>
             </div>
+          </div>
 
-            <div className="flex-shrink-0">
-              <SectionHeader>Controls</SectionHeader>
-              <div className="bg-white border border-[#dfe1e6] rounded px-3 py-2 text-[12px] font-mono space-y-0.5">
-                <div>
-                  <span className="text-[#5e6c84]">↑ ↓</span>
-                  <span className="text-[#172b4d] ml-2">walk forward / back</span>
-                </div>
-                <div>
-                  <span className="text-[#5e6c84]">← →</span>
-                  <span className="text-[#172b4d] ml-2">turn</span>
-                </div>
-                <div>
-                  <span className="text-[#5e6c84]">E</span>
-                  <span className="text-[#172b4d] ml-3">talk to a stakeholder</span>
-                </div>
-                <div>
-                  <span className="text-[#5e6c84]">Esc</span>
-                  <span className="text-[#172b4d] ml-2">close any open dialog</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Push CTA to bottom of sidebar column */}
-            <div className="mt-auto flex-shrink-0">
-              <button
-                onClick={onStart}
-                className="w-full px-4 py-2.5 rounded bg-[#0052cc] text-white text-[14px] font-medium hover:bg-[#0747a6] transition shadow-sm"
-              >
-                Start sprint →
-              </button>
-              <div className="text-center mt-1 text-[11px] text-[#5e6c84]">
-                space · enter · click button
-              </div>
+          {/* CTA */}
+          <div>
+            <button
+              onClick={onStart}
+              className="w-full px-4 py-3 rounded bg-[#0052cc] text-white text-[14px] font-medium hover:bg-[#0747a6] transition shadow-sm"
+            >
+              Start sprint →
+            </button>
+            <div className="text-center mt-1.5 text-[11px] text-[#5e6c84]">
+              space · enter · click button
             </div>
           </div>
         </div>
@@ -492,21 +472,6 @@ function JiraNav() {
   )
 }
 
-function SectionHeader({
-  children,
-  className = '',
-}: {
-  children: React.ReactNode
-  className?: string
-}) {
-  return (
-    <div
-      className={`text-[11px] uppercase tracking-widest font-semibold text-[#5e6c84] mb-1.5 ${className}`}
-    >
-      {children}
-    </div>
-  )
-}
 
 type StatusTone = 'progress' | 'done' | 'todo' | 'blocked'
 const STATUS_STYLE: Record<StatusTone, { bg: string; fg: string }> = {
@@ -548,36 +513,3 @@ function Avatar({ text, color }: { text: string; color: string }) {
   )
 }
 
-function LinkedIssueRow({ ticket, isLast }: { ticket: Ticket; isLast: boolean }) {
-  const npc = NPCS.find((n) => n.id === ticket.npcId)
-  const prio = priorityChip(ticket.priority)
-  return (
-    <div
-      className={`flex items-center gap-2 px-3 py-1.5 text-[12px] ${
-        isLast ? '' : 'border-b border-[#dfe1e6]'
-      } hover:bg-[#f4f5f7]`}
-    >
-      <span className="text-sm leading-none" title={ticket.type}>
-        {typeIcon(ticket.type)}
-      </span>
-      <span className="text-[#5e6c84] font-mono w-16 text-[11px]">
-        {ticket.key}
-      </span>
-      <span className="text-[#172b4d] flex-1 truncate">{ticket.title}</span>
-      <span className="text-[11px] font-semibold" style={{ color: prio.color }}>
-        {prio.icon}
-      </span>
-      <span className="w-4 h-4 rounded-full bg-[#dfe1e6] text-[#42526e] text-[9px] font-bold flex items-center justify-center">
-        {ticket.storyPoints}
-      </span>
-      <span
-        className="w-5 h-5 rounded-full text-white text-[9px] font-bold flex items-center justify-center"
-        style={{ backgroundColor: npc?.color ?? '#5e6c84' }}
-        title={ticket.reporter}
-      >
-        {ticket.reporter.slice(0, 1)}
-      </span>
-      <StatusPill label="To Do" tone="todo" />
-    </div>
-  )
-}
