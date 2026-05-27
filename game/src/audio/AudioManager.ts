@@ -169,6 +169,67 @@ class AudioManager {
     src.start()
   }
 
+  /**
+   * Printer jam noise — a low filtered noise burst (mechanical whirring
+   * struggling against itself), with a small high-frequency click at the
+   * end. Triggered randomly when the player is near the printer to give
+   * the printer some "presence" without it being a constant audio source.
+   *
+   * Composition:
+   *   - 0.45s of band-passed noise centered at ~120Hz → reads as motor
+   *     trying and failing to advance paper
+   *   - Last 50ms: a sharp square-wave click → the dreaded paper-jam clack
+   */
+  playPrinterJam() {
+    if (!this.ctx || this.muted) return
+    const ctx = this.ctx
+    const now = ctx.currentTime
+
+    // Whirring buzz — noise filtered to a tight low band, slight tremolo
+    // via a low-frequency oscillator on the gain so it sounds "stressed"
+    // rather than smooth.
+    const dur = 0.45
+    const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate)
+    const data = buf.getChannelData(0)
+    for (let i = 0; i < data.length; i++) {
+      data[i] = (Math.random() * 2 - 1) * 0.35
+    }
+    const src = ctx.createBufferSource()
+    src.buffer = buf
+
+    const filter = ctx.createBiquadFilter()
+    filter.type = 'bandpass'
+    filter.frequency.value = 130
+    filter.Q.value = 6
+
+    const gain = ctx.createGain()
+    gain.gain.setValueAtTime(0.0001, now)
+    gain.gain.exponentialRampToValueAtTime(0.08, now + 0.04)
+    // Wobble: brief dip in the middle to read as "struggling"
+    gain.gain.exponentialRampToValueAtTime(0.04, now + 0.22)
+    gain.gain.exponentialRampToValueAtTime(0.07, now + 0.32)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + dur)
+
+    src.connect(filter).connect(gain).connect(ctx.destination)
+    src.start(now)
+
+    // Click clack at the end — the moment the jam mechanism gives up.
+    // Use a quick square-wave blip, low-passed so it's a "clunk" not a beep.
+    const clackOsc = ctx.createOscillator()
+    clackOsc.type = 'square'
+    clackOsc.frequency.value = 220
+    const clackFilter = ctx.createBiquadFilter()
+    clackFilter.type = 'lowpass'
+    clackFilter.frequency.value = 600
+    const clackGain = ctx.createGain()
+    clackGain.gain.setValueAtTime(0.0001, now + dur - 0.04)
+    clackGain.gain.exponentialRampToValueAtTime(0.12, now + dur - 0.035)
+    clackGain.gain.exponentialRampToValueAtTime(0.0001, now + dur + 0.02)
+    clackOsc.connect(clackFilter).connect(clackGain).connect(ctx.destination)
+    clackOsc.start(now + dur - 0.04)
+    clackOsc.stop(now + dur + 0.05)
+  }
+
   /** Short high blip — Slack ping (synth fallback). */
   private playSlack() {
     this.playTone({ freq: 880, dur: 0.12, vol: 0.18, type: 'sine' })

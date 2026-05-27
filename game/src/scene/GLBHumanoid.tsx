@@ -11,7 +11,7 @@
 
 import { useEffect, useMemo, useRef } from 'react'
 import { useGLTF, useAnimations } from '@react-three/drei'
-import { Group } from 'three'
+import { AnimationClip, Group } from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 
 type Props = {
@@ -27,7 +27,27 @@ export function GLBHumanoid({ url, visible = true, scale = 0.01 }: Props) {
   // Per-instance clone so multiple NPCs from the same GLB don't share state.
   const clonedScene = useMemo(() => cloneSkinned(scene), [scene])
 
-  const { actions, names } = useAnimations(animations, group)
+  // Strip Head bone tracks from the animations so callers (e.g. the NPC
+  // head-turn useFrame in NPCs.tsx) can manipulate the head bone without
+  // the AnimationMixer overwriting their changes on the next frame.
+  //
+  // The Mixamo Sitting/Idle clips include slight head motion that nobody
+  // notices anyway — removing it costs nothing and unlocks player-reactive
+  // head behavior. Track names look like "mixamorig12Head.quaternion" or
+  // "mixamorig12Head.position"; we match by checking for "Head" in the
+  // target node portion (everything up to the first dot).
+  const filteredAnimations = useMemo(() => {
+    return animations.map((clip) => {
+      const cloned = clip.clone()
+      cloned.tracks = cloned.tracks.filter((track) => {
+        const nodeName = track.name.split('.')[0]
+        return !nodeName.endsWith('Head') && !nodeName.endsWith('HeadTop_End')
+      })
+      return cloned
+    }) as AnimationClip[]
+  }, [animations])
+
+  const { actions, names } = useAnimations(filteredAnimations, group)
 
   useEffect(() => {
     if (!names.length) return

@@ -5,6 +5,7 @@ import type { Group, Object3D } from 'three'
 import { NPCS, OBJECT_INTERACTIONS } from '../config/constants'
 import { useGameStore, type Effects } from '../state/gameStore'
 import { playerPosition } from '../state/playerState'
+import { audio } from '../audio/AudioManager'
 import { GLBHumanoid } from './GLBHumanoid'
 import { Workstation } from './Furniture'
 
@@ -440,9 +441,15 @@ function ObjectNPC({
   bark?: string
   showLabels: boolean
 }) {
+  // Per-role label heights — labels float above the tallest geometry.
+  const labelY =
+    role === 'Plant' ? 1.9 : role === 'Coffee' ? 1.7 : 1.6
+  const barkY =
+    role === 'Plant' ? 2.5 : role === 'Coffee' ? 2.3 : 2.1
+
   return (
     <group position={[x, 0, z]}>
-      {role === 'Plant' ? (
+      {role === 'Plant' && (
         <group>
           {/* Pot — static, never sways */}
           <mesh position={[0, 0.3, 0]} castShadow>
@@ -454,7 +461,10 @@ function ObjectNPC({
               like a real plant disturbed by someone brushing past. */}
           <SwayingFoliage worldX={x} worldZ={z} color={color} />
         </group>
-      ) : (
+      )}
+      {role === 'Coffee' && <CoffeeMachine />}
+      {role !== 'Plant' && role !== 'Coffee' && (
+        // Default: printer geometry (white box body + dark monitor + thin slot).
         <group>
           <mesh position={[0, 0.5, 0]} castShadow receiveShadow>
             <boxGeometry args={[0.9, 1.0, 0.7]} />
@@ -470,23 +480,88 @@ function ObjectNPC({
           </mesh>
         </group>
       )}
+
+      {/* Printer ambient audio — random jam/clack noises when PM is nearby.
+          Kept in its own component so the useFrame only mounts for the
+          printer NPC, not every ObjectNPC. */}
+      {id === 'printer' && <PrinterProximityAudio worldX={x} worldZ={z} />}
+
       {showLabels && (
         <>
-          <Label name={name} role={role} y={role === 'Plant' ? 1.9 : 1.6} />
-          {/* Bark bubble for object interactions (Printer / Phyllis).
-              `bark` is the FALLBACK; the store's recentBarkText overrides
-              it for the rotating per-press lines from OBJECT_INTERACTIONS. */}
-          {bark && (
-            <BarkBubble
-              id={id}
-              text={bark}
-              y={role === 'Plant' ? 2.5 : 2.1}
-            />
-          )}
+          <Label name={name} role={role} y={labelY} />
+          {bark && <BarkBubble id={id} text={bark} y={barkY} />}
         </>
       )}
     </group>
   )
+}
+
+// Coffee station — moved here from Office.tsx so it can participate in the
+// ObjectNPC interaction system (E to "Grab a coffee", rotating barks, meter
+// effects). Visual identical to the previous Office.tsx CoffeeMachine.
+function CoffeeMachine() {
+  return (
+    <group>
+      {/* Counter — sterile gray */}
+      <mesh position={[0, 0.45, 0]} castShadow receiveShadow>
+        <boxGeometry args={[1.2, 0.9, 0.6]} />
+        <meshStandardMaterial color="#8a9499" />
+      </mesh>
+      {/* Coffee machine on top — gloss black */}
+      <mesh position={[0, 1.15, 0]} castShadow>
+        <boxGeometry args={[0.5, 0.5, 0.4]} />
+        <meshStandardMaterial color="#3d4549" />
+      </mesh>
+      {/* Spout */}
+      <mesh position={[0, 0.95, 0.18]} castShadow>
+        <cylinderGeometry args={[0.04, 0.04, 0.1, 8]} />
+        <meshStandardMaterial color="#1a1a1a" />
+      </mesh>
+      {/* Tiny teal status LED on the machine — Lumon-y detail */}
+      <mesh position={[0.18, 1.18, 0.21]}>
+        <boxGeometry args={[0.04, 0.02, 0.01]} />
+        <meshStandardMaterial
+          color="#4fa9a3"
+          emissive="#4fa9a3"
+          emissiveIntensity={0.8}
+        />
+      </mesh>
+    </group>
+  )
+}
+
+// Plays a randomized printer-jam noise when the player is within ~4m of the
+// printer, with closer = more frequent. Quiet enough to be background flavor
+// — never overlaps with itself thanks to the per-firing interval reset.
+function PrinterProximityAudio({
+  worldX,
+  worldZ,
+}: {
+  worldX: number
+  worldZ: number
+}) {
+  // Initial cooldown so we don't fire the moment PM spawns even if they
+  // happen to spawn near the printer. Subsequent intervals are picked
+  // randomly inside the useFrame.
+  const nextFireAtRef = useRef(performance.now() / 1000 + 4)
+  useFrame(() => {
+    const dx = playerPosition.x - worldX
+    const dz = playerPosition.z - worldZ
+    const distSq = dx * dx + dz * dz
+    // 4m proximity ring — matches the dialogue-prompt distance, so the
+    // printer "wakes up" right as the player gets close enough to interact.
+    if (distSq > 16) return
+    const now = performance.now() / 1000
+    if (now < nextFireAtRef.current) return
+    audio.playPrinterJam()
+    // Pick next interval: closer = more frequent (2.5–5s), farther (4–8s).
+    const dist = Math.sqrt(distSq)
+    const closeness = 1 - dist / 4 // 0..1
+    const minGap = 2.5 + (1 - closeness) * 1.5
+    const maxGap = 5 + (1 - closeness) * 3
+    nextFireAtRef.current = now + minGap + Math.random() * (maxGap - minGap)
+  })
+  return null
 }
 
 // Phyllis's leaves rock gently when the player gets close. The pivot group
@@ -494,9 +569,54 @@ function ObjectNPC({
 // rather than rotating around its own center — looks like a real plant
 // reacting to someone brushing past.
 //
+// Geometry: a cluster of 8 elongated ellipsoid "leaves" radiating outward
+// at varied angles, with slight per-leaf color variation. This reads as a
+// real houseplant (think pothos / mini palm) instead of the previous green
+// sphere blob.
+//
 // Intensity ramps linearly from 1.0 at touch to 0 at 4m, then the rotation
 // smoothly returns to neutral. We never snap; ramps are 0.15-step lerps so
 // the sway has visible inertia (it keeps swaying briefly after you stop).
+const PHYLLIS_LEAVES: Array<{
+  pos: [number, number, number]
+  scale: [number, number, number]
+  rot: [number, number, number]
+  tint: number // -1..1 darkness offset relative to base color
+}> = [
+  // Center, tallest leaf — base color
+  { pos: [0, 0.55, 0], scale: [0.18, 0.55, 0.35], rot: [0, 0, 0], tint: 0 },
+  // Right-front, slightly drooping
+  { pos: [0.22, 0.4, 0.18], scale: [0.16, 0.45, 0.3], rot: [0.3, 0.8, 0.35], tint: 0.1 },
+  // Left-front, drooping the other way
+  { pos: [-0.22, 0.4, 0.15], scale: [0.16, 0.45, 0.3], rot: [0.25, -0.7, -0.35], tint: -0.05 },
+  // Back-right
+  { pos: [0.18, 0.35, -0.22], scale: [0.15, 0.42, 0.28], rot: [-0.4, 0.4, 0.4], tint: 0.05 },
+  // Back-left
+  { pos: [-0.18, 0.4, -0.2], scale: [0.15, 0.42, 0.28], rot: [-0.3, -0.5, -0.4], tint: -0.1 },
+  // Mid-right, lower & curving out
+  { pos: [0.3, 0.25, 0.0], scale: [0.13, 0.35, 0.25], rot: [0, 0.9, 0.7], tint: 0.15 },
+  // Mid-left
+  { pos: [-0.3, 0.28, -0.05], scale: [0.13, 0.35, 0.25], rot: [0, -0.9, -0.7], tint: 0.0 },
+  // Front-low droopy leaf
+  { pos: [0.05, 0.2, 0.25], scale: [0.13, 0.32, 0.22], rot: [0.7, 0.2, 0.1], tint: -0.05 },
+]
+
+// Mix a hex color toward black (negative tint) or toward white (positive tint).
+// Used to give each leaf a slightly different green so the plant doesn't look
+// monochrome.
+function tintColor(hex: string, amount: number): string {
+  const h = hex.replace('#', '')
+  const r = parseInt(h.slice(0, 2), 16)
+  const g = parseInt(h.slice(2, 4), 16)
+  const b = parseInt(h.slice(4, 6), 16)
+  const mix = (c: number) => {
+    const target = amount > 0 ? 255 : 0
+    const blended = Math.round(c + (target - c) * Math.abs(amount))
+    return Math.max(0, Math.min(255, blended))
+  }
+  return `#${mix(r).toString(16).padStart(2, '0')}${mix(g).toString(16).padStart(2, '0')}${mix(b).toString(16).padStart(2, '0')}`
+}
+
 function SwayingFoliage({
   worldX,
   worldZ,
@@ -527,19 +647,32 @@ function SwayingFoliage({
   })
   return (
     <group ref={swayRef} position={[0, 0.6, 0]}>
-      {/* Main leaf bulb — local-coord positions are original world Y minus
-          the 0.6 pivot offset. */}
-      <mesh position={[0, 0.35, 0]} castShadow>
-        <sphereGeometry args={[0.5, 14, 12]} />
-        <meshStandardMaterial color={color} />
+      {PHYLLIS_LEAVES.map((leaf, i) => (
+        <mesh
+          key={i}
+          position={leaf.pos}
+          rotation={leaf.rot}
+          scale={leaf.scale}
+          castShadow
+        >
+          {/* Sphere is scaled into an ellipsoid by the parent mesh scale,
+              giving an elongated leaf shape. 12×8 segments keep tris low. */}
+          <sphereGeometry args={[1, 12, 8]} />
+          <meshStandardMaterial
+            color={tintColor(color, leaf.tint)}
+            roughness={0.85}
+          />
+        </mesh>
+      ))}
+      {/* A few small "tip" highlights — tiny brighter spheres clustered at
+          the top to suggest fresh young leaves catching light. */}
+      <mesh position={[0.05, 0.85, 0]} scale={[0.06, 0.1, 0.06]}>
+        <sphereGeometry args={[1, 8, 6]} />
+        <meshStandardMaterial color={tintColor(color, 0.25)} roughness={0.7} />
       </mesh>
-      <mesh position={[0.15, 0.6, 0.1]} castShadow>
-        <sphereGeometry args={[0.3, 12, 10]} />
-        <meshStandardMaterial color={color} />
-      </mesh>
-      <mesh position={[-0.18, 0.55, -0.05]} castShadow>
-        <sphereGeometry args={[0.25, 12, 10]} />
-        <meshStandardMaterial color={color} />
+      <mesh position={[-0.08, 0.82, -0.05]} scale={[0.05, 0.09, 0.05]}>
+        <sphereGeometry args={[1, 8, 6]} />
+        <meshStandardMaterial color={tintColor(color, 0.2)} roughness={0.7} />
       </mesh>
     </group>
   )

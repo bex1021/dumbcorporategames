@@ -129,6 +129,18 @@ export const NPCS = [
     required: false,
     bark: '…',
   },
+  {
+    id: 'coffee',
+    name: 'Coffee',
+    role: 'Coffee',
+    color: '#8a9499',
+    glb: null,
+    x: 0,
+    z: 9,
+    pose: 'object' as const,
+    required: false,
+    bark: 'It is warm. That is its main accomplishment.',
+  },
 ] as const
 
 // ---- Object-NPC interactions ----
@@ -190,13 +202,28 @@ export const OBJECT_INTERACTIONS: Record<string, ObjectInteraction> = {
     exhaustedBark: 'Phyllis is requesting boundaries.',
     achievementHint: 'plant-friend',
   },
+  coffee: {
+    actionLabel: 'Grab a coffee',
+    maxUses: 5,
+    // 5min per cup, slight calming effect (caffeine + ritual), tiny alignment
+    // tax because you went for coffee instead of producing work.
+    effects: { time: 5, pissedOff: -3, alignment: -1 },
+    barks: [
+      'Mediocre coffee. Aggressive ceramic mug.',
+      'The pot was empty. Of course it was. You made a new one. For everyone else.',
+      'You drink it standing, like a real American.',
+      'Caffeine and existential dread, roughly equal proportions.',
+      'Five cups in. You ARE the coffee now.',
+    ],
+    exhaustedBark: 'The coffee machine has logged your dependency. HR has been notified.',
+  },
 }
 
 // Zones are floor markers + signs. Desks come from NPC positions (each NPC has
 // a desk behind them). Rooms (HR, SYNERGY 2A) get partition walls.
 export const ZONES = [
   { id: 'pm-desk', label: 'PM Desk', kind: 'desk', x: -9, z: 9 },
-  { id: 'coffee', label: 'Coffee', kind: 'coffee', x: 0, z: 9 },
+  // Coffee moved to NPCS roster as an interactive object NPC. See OBJECT_INTERACTIONS.
   { id: 'bathroom', label: 'Bathroom', kind: 'door', x: 9, z: 9 },
   { id: 'hr', label: 'HR Office', kind: 'room', x: -10, z: -10, w: 6, d: 4 },
   { id: 'meeting', label: 'SYNERGY 2A', kind: 'room', x: 10, z: -10, w: 6, d: 4 },

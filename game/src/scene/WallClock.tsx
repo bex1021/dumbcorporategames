@@ -3,14 +3,10 @@
 // in 5/10/15-minute chunks per player action, not continuously, so a ticking
 // second hand would look fake.
 //
-// Mounting: the back wall (z = -halfDepth) has windows at x=-12, 0, +12.
-// The left segment between window -12 and window 0 holds the mission mural
-// (centered x=-6). The right segment (x=+3..+9) is currently empty — that's
-// where this clock goes, centered at x=+6.
-//
-// Visual reference: stark white face, thin black hands, 12 minimal tick
-// marks (slightly longer at 12/3/6/9). Reads at-a-glance from anywhere in
-// the room, but doesn't shout.
+// Geometry note (v2): the rim is a TorusGeometry, NOT a solid cylinder. The
+// previous version used a solid cylinder for the rim, which occluded the
+// white face cylinder behind it — the clock appeared as a black dot. A torus
+// is a donut shape, so the face is visible through the central hole.
 
 import { useFrame } from '@react-three/fiber'
 import { useRef } from 'react'
@@ -22,19 +18,22 @@ const RIM_COLOR = '#1a1f23'
 const HAND_COLOR = '#15191c'
 const TICK_COLOR = '#15191c'
 
-const FACE_RADIUS = 0.36
-const RIM_RADIUS = 0.40
-const RIM_DEPTH = 0.06
-const FACE_DEPTH = 0.012
+// Visible footprint (bigger than v1 — reads better from across the room).
+// Face is the white disc seen through the rim. Torus rim is a thin ring on
+// top of the face.
+const FACE_RADIUS = 0.42
+const TORUS_RING_RADIUS = 0.44 // distance from clock center to tube centerline
+const TORUS_TUBE_RADIUS = 0.028 // half-thickness of the ring "pipe"
 
-// Z offsets within the clock's local frame. The rim sits centered (extends
-// ± RIM_DEPTH/2 from origin). The face is recessed slightly so the rim
-// reads as a frame around it. Hands float just in front of the face.
-const FACE_Z = RIM_DEPTH / 2 - FACE_DEPTH / 2 - 0.001
+// Z layering — looking from +Z toward -Z (player POV), larger Z is closer.
+// Face sits slightly proud of the rim so it's clearly the main surface.
+// Hands stack in front of face with hair-thin offsets to prevent z-fighting.
+const FACE_Z = 0.012 // face cylinder center
+const FACE_DEPTH = 0.006
 const TICK_Z = FACE_Z + FACE_DEPTH / 2 + 0.002
-const HOUR_HAND_Z = TICK_Z + 0.003
-const MINUTE_HAND_Z = HOUR_HAND_Z + 0.003
-const CAP_Z = MINUTE_HAND_Z + 0.002
+const HOUR_HAND_Z = TICK_Z + 0.004
+const MINUTE_HAND_Z = HOUR_HAND_Z + 0.004
+const CAP_Z = MINUTE_HAND_Z + 0.003
 
 export function WallClock({ position }: { position: [number, number, number] }) {
   const hourHandRef = useRef<Group>(null)
@@ -59,24 +58,29 @@ export function WallClock({ position }: { position: [number, number, number] }) 
 
   return (
     <group position={position}>
-      {/* Rim — dark cylinder forming the watch-bezel frame */}
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[RIM_RADIUS, RIM_RADIUS, RIM_DEPTH, 32]} />
-        <meshStandardMaterial color={RIM_COLOR} roughness={0.4} />
-      </mesh>
-
-      {/* Face — white disc recessed inside the rim */}
+      {/* Face — white disc, seen through the rim's central hole. Slightly
+          proud of the rim so it reads as the main surface. */}
       <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, FACE_Z]}>
-        <cylinderGeometry args={[FACE_RADIUS, FACE_RADIUS, FACE_DEPTH, 32]} />
+        <cylinderGeometry args={[FACE_RADIUS, FACE_RADIUS, FACE_DEPTH, 48]} />
         <meshStandardMaterial color={FACE_COLOR} roughness={0.7} />
       </mesh>
 
-      {/* 12 tick marks. Position around a circle of radius 0.30; the box's
+      {/* Rim — TorusGeometry, NOT a solid cylinder. Default orientation has
+          the ring lying in the XY plane (axis along Z), which is exactly
+          what we want for a wall-mounted clock viewed from +Z. */}
+      <mesh position={[0, 0, 0]}>
+        <torusGeometry
+          args={[TORUS_RING_RADIUS, TORUS_TUBE_RADIUS, 12, 48]}
+        />
+        <meshStandardMaterial color={RIM_COLOR} roughness={0.4} />
+      </mesh>
+
+      {/* 12 tick marks. Position around a circle of radius ~0.36; the box's
           default +Y axis points outward radially after the matched -angle
           rotation. Major ticks at 12/3/6/9 are thicker and longer. */}
       {Array.from({ length: 12 }, (_, i) => {
         const angle = (i / 12) * Math.PI * 2
-        const r = 0.305
+        const r = 0.36
         const tx = Math.sin(angle) * r
         const ty = Math.cos(angle) * r
         const isMajor = i % 3 === 0
@@ -88,9 +92,9 @@ export function WallClock({ position }: { position: [number, number, number] }) 
           >
             <boxGeometry
               args={[
-                isMajor ? 0.024 : 0.014,
-                isMajor ? 0.06 : 0.04,
-                0.004,
+                isMajor ? 0.028 : 0.016,
+                isMajor ? 0.072 : 0.048,
+                0.005,
               ]}
             />
             <meshStandardMaterial color={TICK_COLOR} />
@@ -102,23 +106,23 @@ export function WallClock({ position }: { position: [number, number, number] }) 
           upward by half its length so the bottom sits at the clock center
           and rotation pivots about the center. */}
       <group ref={hourHandRef} position={[0, 0, HOUR_HAND_Z]}>
-        <mesh position={[0, 0.085, 0]}>
-          <boxGeometry args={[0.032, 0.17, 0.008]} />
+        <mesh position={[0, 0.105, 0]}>
+          <boxGeometry args={[0.036, 0.21, 0.01]} />
           <meshStandardMaterial color={HAND_COLOR} />
         </mesh>
       </group>
 
       {/* Minute hand — longer, thinner */}
       <group ref={minuteHandRef} position={[0, 0, MINUTE_HAND_Z]}>
-        <mesh position={[0, 0.135, 0]}>
-          <boxGeometry args={[0.02, 0.27, 0.008]} />
+        <mesh position={[0, 0.16, 0]}>
+          <boxGeometry args={[0.022, 0.32, 0.01]} />
           <meshStandardMaterial color={HAND_COLOR} />
         </mesh>
       </group>
 
       {/* Center cap — small dark sphere covering the hand pivots */}
       <mesh position={[0, 0, CAP_Z]}>
-        <sphereGeometry args={[0.025, 16, 16]} />
+        <sphereGeometry args={[0.03, 16, 16]} />
         <meshStandardMaterial color={HAND_COLOR} />
       </mesh>
     </group>
