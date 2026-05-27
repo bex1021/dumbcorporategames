@@ -1,6 +1,7 @@
 import { Text } from '@react-three/drei'
 import { OFFICE, ZONES, WINDOWS } from '../config/constants'
 import { Bathroom } from './Bathroom'
+import { HROffice, MeetingRoom } from './Rooms'
 import { WallClock } from './WallClock'
 
 // ---- Office palette ----
@@ -76,6 +77,13 @@ export function Office() {
           Bathroom" is clicked on the coping bar. See Bathroom.tsx and
           ROOM_COLLIDERS in constants.ts. */}
       <Bathroom />
+
+      {/* HR Office + SYNERGY 2A meeting room contents — desk, chair,
+          satirical HR posters / meeting table + chairs + whiteboard.
+          The room walls themselves come from the Zone() render above
+          via kind='room'; this just fills them in. */}
+      <HROffice />
+      <MeetingRoom />
     </group>
   )
 }
