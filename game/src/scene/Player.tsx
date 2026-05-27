@@ -224,15 +224,17 @@ export function Player() {
   // Triggered by gameStore.interactObject('printer') — i.e. only when the
   // player presses E near the printer to "Unjam the printer". When the
   // slap is NOT active, this useFrame leaves the bone alone so the
-  // AnimationMixer's normal Idle/Walk arm motion plays. During a slap
-  // (~0.7s), we ADDITIVELY rotate the bone:
-  //   0–0.18s   raise   (arm cocks back/up)
-  //   0.18–0.32 slam    (arm swings forward+down rapidly)
-  //   0.32–0.7  recover (arm drifts back to neutral)
+  // AnimationMixer's normal Idle/Walk arm motion plays.
   //
-  // Additive rotation: we add to whatever the mixer set this frame, so
-  // the arm slap "rides on top of" the idle/walk arm motion. Once the
-  // slap ends, we stop touching the bone entirely.
+  // Motion: horizontal "side-to-front" swat. Arm starts at the body's
+  // side (rest), winds back briefly, then swings forward across the body
+  // toward the printer, then returns. Rotation around the bone's Z axis
+  // (perpendicular to the arm length, in the body's transverse plane)
+  // gives that horizontal swat instead of an overhead chop.
+  //
+  // Additive rotation: we ADD to whatever the mixer set this frame, so
+  // the slap rides on top of the idle/walk arm motion. Once the slap
+  // ends, we stop touching the bone entirely.
   useFrame(() => {
     // Lazy-find the right arm bone the first time we have a skeleton.
     if (!rightArmBoneRef.current && animRef.current) {
@@ -261,7 +263,7 @@ export function Player() {
       // AnimationMixer animate the arm normally via Idle/Walk clips.
       return
     }
-    const SLAP_DUR = 0.7
+    const SLAP_DUR = 0.6
     const elapsed = performance.now() / 1000 - start
     if (elapsed >= SLAP_DUR) {
       // Slap done — relinquish control back to the mixer.
@@ -269,22 +271,27 @@ export function Player() {
       return
     }
 
-    // Three-phase ease: raise → slam → recover. Additive on top of the
-    // mixer's current rotation.x (which the mixer already set this frame).
-    const RAISE_END = 0.18
-    const SLAM_END = 0.32
+    // Three-phase ease for a horizontal swat:
+    //   0–0.10s   wind back  (arm gathers slightly to the outside)
+    //   0.10–0.25 swing       (arm sweeps forward across body)
+    //   0.25–0.60 recover     (arm drifts back to rest)
+    //
+    // Sign of rotDelta determines which direction the arm swings — if the
+    // empirical result swings backward instead of forward, flip the sign.
+    const WIND_END = 0.1
+    const SWING_END = 0.25
     let rotDelta: number
-    if (elapsed < RAISE_END) {
-      const t = elapsed / RAISE_END
-      rotDelta = -1.4 * t
-    } else if (elapsed < SLAM_END) {
-      const t = (elapsed - RAISE_END) / (SLAM_END - RAISE_END)
-      rotDelta = -1.4 + (0.5 - -1.4) * t
+    if (elapsed < WIND_END) {
+      const t = elapsed / WIND_END
+      rotDelta = 0.35 * t // small wind-back
+    } else if (elapsed < SWING_END) {
+      const t = (elapsed - WIND_END) / (SWING_END - WIND_END)
+      rotDelta = 0.35 + (-1.6 - 0.35) * t // big sweep forward (negative side)
     } else {
-      const t = (elapsed - SLAM_END) / (SLAP_DUR - SLAM_END)
-      rotDelta = 0.5 * (1 - t)
+      const t = (elapsed - SWING_END) / (SLAP_DUR - SWING_END)
+      rotDelta = -1.6 * (1 - t) // recover to rest
     }
-    bone.rotation.x += rotDelta
+    bone.rotation.z += rotDelta
   })
 
   return (
