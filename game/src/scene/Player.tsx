@@ -29,10 +29,15 @@ import { useGameStore } from '../state/gameStore'
 import { slapState } from '../state/slapState'
 import { audio } from '../audio/AudioManager'
 
-// How often to fire a footstep while moving. Tuned to Leonard's walk-cycle
-// cadence (~2.6 steps/sec at full speed). At slower speed the player
-// auto-tween the gait by stretching the interval (see step-rate scaling).
-const STEP_BASE_INTERVAL_S = 0.42
+// How often to fire a footstep while moving. The Mixamo Walk animation
+// plays at a FIXED cadence (timeScale=1) regardless of player movement
+// speed — so the visual foot strikes happen at a constant rate, even when
+// PM walks backward (which uses the same clip just covering less ground).
+//
+// Standard Mixamo Walk cycle is ~1.07s for a full 2-step cycle, so one
+// step = ~0.53s. We use 0.55 to slightly stagger ahead of perfect sync,
+// which sounds more natural than a tight metronome lock.
+const STEP_BASE_INTERVAL_S = 0.55
 
 useGLTF.preload('/models/Player_Idle.glb')
 useGLTF.preload('/models/Player_Walking.glb')
@@ -58,15 +63,17 @@ export function Player() {
   //
   // We also drop the root-motion position track (Hips.position) from Walk so
   // it walks in place rather than translating the skeleton off-screen.
-  // AND we strip Right-arm-chain rotation tracks so the printer-slap
-  // useFrame below can drive that bone without the mixer overwriting it.
+  //
+  // Note: previously we also stripped right-arm tracks here so the slap
+  // animation could drive the bone without mixer interference — but that
+  // left the arm stuck in T-pose when not slapping (Mixamo's bind pose has
+  // arms straight out). Now we let the mixer animate the arm normally and
+  // only override bone.rotation.x during an active slap.
   const combinedAnimations = useMemo(() => {
     const idleClip = pickAndRename(idle.animations, IDLE_NAME)
     const walkClipRaw = pickAndRename(walking.animations, WALK_NAME)
     const walkClip = walkClipRaw ? stripRootMotion(walkClipRaw) : null
-    return [idleClip, walkClip]
-      .filter((c): c is AnimationClip => c !== null)
-      .map(stripRightArmTracks)
+    return [idleClip, walkClip].filter((c): c is AnimationClip => c !== null)
   }, [idle.animations, walking.animations])
 
   const { actions } = useAnimations(combinedAnimations, animRef)
@@ -183,14 +190,14 @@ export function Player() {
     // Crossfade Idle ↔ Walk on speed threshold crossing only.
     const speed = Math.hypot(playerVelocity.x, playerVelocity.z)
 
-    // Footstep audio: fire a step every ~0.42s of actual walking, scaled by
-    // velocity so backward / slowed motion ticks slightly slower (feels more
-    // natural). Alternate pitch each step so the rhythm doesn't sound robotic.
-    if (speed > 0.4) {
+    // Footstep audio: fire a step every STEP_BASE_INTERVAL_S while moving.
+    // No speed scaling — the Mixamo Walk animation plays at a fixed cadence
+    // regardless of actual movement velocity (backward walking uses the
+    // same clip just covering less ground per cycle). Alternate pitch each
+    // step so the rhythm doesn't sound robotic.
+    if (speed > 0.2) {
       const now = performance.now() / 1000
-      const speedScale = Math.min(1, speed / PLAYER.walkSpeed)
-      const interval = STEP_BASE_INTERVAL_S / Math.max(0.4, speedScale)
-      if (now - lastStepRef.current >= interval) {
+      if (now - lastStepRef.current >= STEP_BASE_INTERVAL_S) {
         lastStepRef.current = now
         const pitch = stepParityRef.current === 0 ? 1.0 : 0.92
         audio.playFootstep({ pitch })
@@ -214,14 +221,18 @@ export function Player() {
 
   // ---- Slap-the-printer animation ----
   //
-  // Watches slapState.printerSlapTrigger every frame. On increment, kicks
-  // off a ~0.7s slap arc on Leonard's right upper-arm bone:
+  // Triggered by gameStore.interactObject('printer') — i.e. only when the
+  // player presses E near the printer to "Unjam the printer". When the
+  // slap is NOT active, this useFrame leaves the bone alone so the
+  // AnimationMixer's normal Idle/Walk arm motion plays. During a slap
+  // (~0.7s), we ADDITIVELY rotate the bone:
   //   0–0.18s   raise   (arm cocks back/up)
   //   0.18–0.32 slam    (arm swings forward+down rapidly)
   //   0.32–0.7  recover (arm drifts back to neutral)
   //
-  // Arm tracks were stripped from the Mixamo Idle/Walk clips by
-  // stripRightArmTracks above, so this rotation isn't fighting the mixer.
+  // Additive rotation: we add to whatever the mixer set this frame, so
+  // the arm slap "rides on top of" the idle/walk arm motion. Once the
+  // slap ends, we stop touching the bone entirely.
   useFrame(() => {
     // Lazy-find the right arm bone the first time we have a skeleton.
     if (!rightArmBoneRef.current && animRef.current) {
@@ -237,46 +248,43 @@ export function Player() {
     const bone = rightArmBoneRef.current
     if (!bone) return
 
-    // React to slap triggers from PrinterProximityAudio.
+    // React to slap triggers from the gameStore (interactObject('printer')).
     const trigger = slapState.printerSlapTrigger
     if (trigger > lastTriggerRef.current) {
       lastTriggerRef.current = trigger
       slapStartTimeRef.current = performance.now() / 1000
     }
 
-    // Drive the animation if a slap is in flight.
-    const SLAP_DUR = 0.7
     const start = slapStartTimeRef.current
     if (start <= 0) {
-      // No slap in flight — keep the bone at rest.
-      bone.rotation.x = 0
+      // No slap in flight — DO NOT touch bone.rotation. Let the
+      // AnimationMixer animate the arm normally via Idle/Walk clips.
       return
     }
+    const SLAP_DUR = 0.7
     const elapsed = performance.now() / 1000 - start
     if (elapsed >= SLAP_DUR) {
-      bone.rotation.x = 0
+      // Slap done — relinquish control back to the mixer.
       slapStartTimeRef.current = 0
       return
     }
 
-    // Three-phase ease: raise → slam → recover. Rotation is around the
-    // arm's local X axis, which (for a Mixamo skeleton in T-pose with
-    // arms held at the sides) swings the arm forward/back like a hammer
-    // strike. If the direction looks wrong empirically, flip the signs.
+    // Three-phase ease: raise → slam → recover. Additive on top of the
+    // mixer's current rotation.x (which the mixer already set this frame).
     const RAISE_END = 0.18
     const SLAM_END = 0.32
-    let rotX: number
+    let rotDelta: number
     if (elapsed < RAISE_END) {
       const t = elapsed / RAISE_END
-      rotX = -1.4 * t // raise up
+      rotDelta = -1.4 * t
     } else if (elapsed < SLAM_END) {
       const t = (elapsed - RAISE_END) / (SLAM_END - RAISE_END)
-      rotX = -1.4 + (0.5 - -1.4) * t // slam forward+down (overshoot to +0.5)
+      rotDelta = -1.4 + (0.5 - -1.4) * t
     } else {
       const t = (elapsed - SLAM_END) / (SLAP_DUR - SLAM_END)
-      rotX = 0.5 * (1 - t) // recover to neutral
+      rotDelta = 0.5 * (1 - t)
     }
-    bone.rotation.x = rotX
+    bone.rotation.x += rotDelta
   })
 
   return (
@@ -321,18 +329,3 @@ function stripRootMotion(clip: AnimationClip): AnimationClip {
   return cloned
 }
 
-// Strip tracks targeting Leonard's right-arm chain (upper arm, forearm,
-// hand, fingers). The printer-slap animation in useFrame drives the right
-// upper arm bone manually; if the AnimationMixer also writes to those
-// bones from Idle/Walk clips, our rotation gets overwritten each frame.
-//
-// Left arm + everything else stays animated as normal.
-function stripRightArmTracks(clip: AnimationClip): AnimationClip {
-  const cloned = clip.clone() as AnimationClip
-  cloned.tracks = cloned.tracks.filter((t) => {
-    const nodeName = t.name.split('.')[0]
-    // Matches mixamorig*RightArm, *RightForeArm, *RightHand (incl. fingers).
-    return !/^mixamorig\d*Right(Arm|ForeArm|Hand)/.test(nodeName)
-  })
-  return cloned
-}

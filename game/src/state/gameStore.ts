@@ -7,6 +7,7 @@ import {
 } from '../content/achievements'
 import { STARTER_PINGS } from '../content/slack'
 import { OBJECT_INTERACTIONS } from '../config/constants'
+import { slapState } from './slapState'
 
 // ---- Meter thresholds (named tiers from blueprint v0.3) ----
 
@@ -521,6 +522,13 @@ export const useGameStore: GameStoreHook =
       recentBarkNPC: npcId,
       recentBarkText: config.barks[uses] ?? config.barks[config.barks.length - 1],
     })
+    // Printer-specific: Leonard physically slaps the printer when the
+    // player chooses "Unjam the printer". Player.tsx watches this counter
+    // and runs a ~0.7s slap arc on the right arm. Other object NPCs
+    // (Phyllis, Coffee) don't get the slap.
+    if (npcId === 'printer') {
+      slapState.printerSlapTrigger++
+    }
     setTimeout(() => {
       if (get().recentBarkNPC === npcId) {
         set({ recentBarkNPC: null, recentBarkText: null })
