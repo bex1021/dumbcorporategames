@@ -21,11 +21,12 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF, useAnimations } from '@react-three/drei'
-import { Group, AnimationClip } from 'three'
+import { Group, AnimationClip, type Object3D } from 'three'
 import { useKeyboard } from '../hooks/useKeyboard'
 import { OFFICE, PLAYER, ROOM_COLLIDERS } from '../config/constants'
 import { playerPosition, playerVelocity, playerFacing } from '../state/playerState'
 import { useGameStore } from '../state/gameStore'
+import { slapState } from '../state/slapState'
 import { audio } from '../audio/AudioManager'
 
 // How often to fire a footstep while moving. Tuned to Leonard's walk-cycle
@@ -57,11 +58,15 @@ export function Player() {
   //
   // We also drop the root-motion position track (Hips.position) from Walk so
   // it walks in place rather than translating the skeleton off-screen.
+  // AND we strip Right-arm-chain rotation tracks so the printer-slap
+  // useFrame below can drive that bone without the mixer overwriting it.
   const combinedAnimations = useMemo(() => {
     const idleClip = pickAndRename(idle.animations, IDLE_NAME)
     const walkClipRaw = pickAndRename(walking.animations, WALK_NAME)
     const walkClip = walkClipRaw ? stripRootMotion(walkClipRaw) : null
-    return [idleClip, walkClip].filter((c): c is AnimationClip => c !== null)
+    return [idleClip, walkClip]
+      .filter((c): c is AnimationClip => c !== null)
+      .map(stripRightArmTracks)
   }, [idle.animations, walking.animations])
 
   const { actions } = useAnimations(combinedAnimations, animRef)
@@ -73,6 +78,16 @@ export function Player() {
   // Kept in refs so they don't trigger React re-renders every frame.
   const lastStepRef = useRef(0)
   const stepParityRef = useRef(0)
+
+  // Right-arm slap animation state. The right upper-arm bone is located
+  // lazily on the first frame the skeleton is mounted (animRef.traverse).
+  // slapStartTimeRef holds the start time of the current slap animation;
+  // 0 means "no slap currently playing". lastTriggerRef tracks the last
+  // observed slapState.printerSlapTrigger value so we only react to
+  // increments.
+  const rightArmBoneRef = useRef<Object3D | null>(null)
+  const slapStartTimeRef = useRef(0)
+  const lastTriggerRef = useRef(0)
 
   useEffect(() => {
     const idleAction = actions[IDLE_NAME]
@@ -197,6 +212,73 @@ export function Player() {
     }
   })
 
+  // ---- Slap-the-printer animation ----
+  //
+  // Watches slapState.printerSlapTrigger every frame. On increment, kicks
+  // off a ~0.7s slap arc on Leonard's right upper-arm bone:
+  //   0–0.18s   raise   (arm cocks back/up)
+  //   0.18–0.32 slam    (arm swings forward+down rapidly)
+  //   0.32–0.7  recover (arm drifts back to neutral)
+  //
+  // Arm tracks were stripped from the Mixamo Idle/Walk clips by
+  // stripRightArmTracks above, so this rotation isn't fighting the mixer.
+  useFrame(() => {
+    // Lazy-find the right arm bone the first time we have a skeleton.
+    if (!rightArmBoneRef.current && animRef.current) {
+      animRef.current.traverse((obj) => {
+        if (
+          !rightArmBoneRef.current &&
+          /^mixamorig\d*RightArm$/.test(obj.name)
+        ) {
+          rightArmBoneRef.current = obj
+        }
+      })
+    }
+    const bone = rightArmBoneRef.current
+    if (!bone) return
+
+    // React to slap triggers from PrinterProximityAudio.
+    const trigger = slapState.printerSlapTrigger
+    if (trigger > lastTriggerRef.current) {
+      lastTriggerRef.current = trigger
+      slapStartTimeRef.current = performance.now() / 1000
+    }
+
+    // Drive the animation if a slap is in flight.
+    const SLAP_DUR = 0.7
+    const start = slapStartTimeRef.current
+    if (start <= 0) {
+      // No slap in flight — keep the bone at rest.
+      bone.rotation.x = 0
+      return
+    }
+    const elapsed = performance.now() / 1000 - start
+    if (elapsed >= SLAP_DUR) {
+      bone.rotation.x = 0
+      slapStartTimeRef.current = 0
+      return
+    }
+
+    // Three-phase ease: raise → slam → recover. Rotation is around the
+    // arm's local X axis, which (for a Mixamo skeleton in T-pose with
+    // arms held at the sides) swings the arm forward/back like a hammer
+    // strike. If the direction looks wrong empirically, flip the signs.
+    const RAISE_END = 0.18
+    const SLAM_END = 0.32
+    let rotX: number
+    if (elapsed < RAISE_END) {
+      const t = elapsed / RAISE_END
+      rotX = -1.4 * t // raise up
+    } else if (elapsed < SLAM_END) {
+      const t = (elapsed - RAISE_END) / (SLAM_END - RAISE_END)
+      rotX = -1.4 + (0.5 - -1.4) * t // slam forward+down (overshoot to +0.5)
+    } else {
+      const t = (elapsed - SLAM_END) / (SLAP_DUR - SLAM_END)
+      rotX = 0.5 * (1 - t) // recover to neutral
+    }
+    bone.rotation.x = rotX
+  })
+
   return (
     <group ref={outerRef}>
       {/* Static Mixamo correction: 0.01 scale (cm → m), π Y-rotation to make
@@ -235,6 +317,22 @@ function stripRootMotion(clip: AnimationClip): AnimationClip {
     const isPosition = t.name.endsWith('.position')
     if (!isPosition) return true
     return !/(?:mixamorig\d*Hips|Hips|Root|Armature)\.position$/.test(t.name)
+  })
+  return cloned
+}
+
+// Strip tracks targeting Leonard's right-arm chain (upper arm, forearm,
+// hand, fingers). The printer-slap animation in useFrame drives the right
+// upper arm bone manually; if the AnimationMixer also writes to those
+// bones from Idle/Walk clips, our rotation gets overwritten each frame.
+//
+// Left arm + everything else stays animated as normal.
+function stripRightArmTracks(clip: AnimationClip): AnimationClip {
+  const cloned = clip.clone() as AnimationClip
+  cloned.tracks = cloned.tracks.filter((t) => {
+    const nodeName = t.name.split('.')[0]
+    // Matches mixamorig*RightArm, *RightForeArm, *RightHand (incl. fingers).
+    return !/^mixamorig\d*Right(Arm|ForeArm|Hand)/.test(nodeName)
   })
   return cloned
 }

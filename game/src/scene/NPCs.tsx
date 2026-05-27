@@ -5,6 +5,7 @@ import type { Group, Object3D } from 'three'
 import { NPCS, OBJECT_INTERACTIONS } from '../config/constants'
 import { useGameStore, type Effects } from '../state/gameStore'
 import { playerPosition } from '../state/playerState'
+import { slapState } from '../state/slapState'
 import { audio } from '../audio/AudioManager'
 import { GLBHumanoid } from './GLBHumanoid'
 import { Workstation } from './Furniture'
@@ -703,6 +704,12 @@ function PrinterProximityAudio({
     const minGap = 2.5 + (1 - closeness) * 1.5
     const maxGap = 5 + (1 - closeness) * 3
     nextFireAtRef.current = now + minGap + Math.random() * (maxGap - minGap)
+
+    // If PM is right up at the printer (within 2.5m), trigger a slap on
+    // Leonard's right arm. Player.tsx watches this counter each frame.
+    if (dist < 2.5) {
+      slapState.printerSlapTrigger++
+    }
   })
   return null
 }
