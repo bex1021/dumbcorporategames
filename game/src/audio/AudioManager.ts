@@ -129,44 +129,67 @@ class AudioManager {
   }
 
   /**
-   * Footstep — short low-pass-filtered noise burst, ~60ms. Synth-only (no
-   * asset needed). Called by the Player on a step interval while moving;
-   * alternates `pitch` ~1.0 / ~0.92 for L/R variety so it doesn't sound
-   * like a mechanical metronome.
+   * Footstep — two-component synthesis so it's audible on laptop speakers
+   * (which roll off everything under ~150Hz). Synth-only, no asset needed.
    *
-   * Volume is intentionally low (default 0.06) so it sits underneath the
-   * HVAC drone without competing with Slack pings or dialogue.
+   * Component 1: low-passed noise body (~400Hz cutoff) → the foot-on-wood thump.
+   * Component 2: brief band-passed click around 1.2kHz → the shoe/floor contact
+   *              that gives the step character on cheap speakers.
+   *
+   * Called by the Player on a step interval while moving; alternates `pitch`
+   * ~1.0 / ~0.92 for L/R variety so it doesn't sound like a metronome.
    */
   playFootstep(opts: { pitch?: number; volume?: number } = {}) {
     if (!this.ctx || this.muted) return
     const ctx = this.ctx
-    // Generate noise buffer once and reuse it for every step.
+    const now = ctx.currentTime
+    const pitch = opts.pitch ?? 1.0
+    const peak = opts.volume ?? 0.18 // louder than v1 (0.06) — barely audible before
+
+    // Reusable noise buffer for the thump body.
     if (!this.footstepBuffer) {
-      const dur = 0.08 // 80ms — long enough to envelope without artifacts
+      const dur = 0.1
       const len = Math.floor(ctx.sampleRate * dur)
       const buf = ctx.createBuffer(1, len, ctx.sampleRate)
       const data = buf.getChannelData(0)
       for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1
       this.footstepBuffer = buf
     }
+
+    // ----- Component 1: low thump body -----
     const src = ctx.createBufferSource()
     src.buffer = this.footstepBuffer
-    src.playbackRate.value = opts.pitch ?? 1.0
-    // Low-pass filter knocks the noise into "thump" territory — the high
-    // frequencies that would sound like static get cut, leaving body around
-    // 80-180Hz which reads as foot-on-wood.
-    const filter = ctx.createBiquadFilter()
-    filter.type = 'lowpass'
-    filter.frequency.value = 220
-    filter.Q.value = 1.2
-    const gain = ctx.createGain()
-    const peak = opts.volume ?? 0.06
-    // Quick attack, exponential decay — like a real step transient.
-    gain.gain.setValueAtTime(0.0001, ctx.currentTime)
-    gain.gain.exponentialRampToValueAtTime(peak, ctx.currentTime + 0.004)
-    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.08)
-    src.connect(filter).connect(gain).connect(ctx.destination)
-    src.start()
+    src.playbackRate.value = pitch
+    const bodyFilter = ctx.createBiquadFilter()
+    bodyFilter.type = 'lowpass'
+    bodyFilter.frequency.value = 450
+    bodyFilter.Q.value = 1.5
+    const bodyGain = ctx.createGain()
+    bodyGain.gain.setValueAtTime(0.0001, now)
+    bodyGain.gain.exponentialRampToValueAtTime(peak, now + 0.005)
+    bodyGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.1)
+    src.connect(bodyFilter).connect(bodyGain).connect(ctx.destination)
+    src.start(now)
+
+    // ----- Component 2: short mid-frequency click -----
+    // Helps the footstep punch through on laptop speakers / low-end audio.
+    const clickLen = Math.floor(ctx.sampleRate * 0.025)
+    const clickBuf = ctx.createBuffer(1, clickLen, ctx.sampleRate)
+    const clickData = clickBuf.getChannelData(0)
+    for (let i = 0; i < clickLen; i++) clickData[i] = Math.random() * 2 - 1
+    const clickSrc = ctx.createBufferSource()
+    clickSrc.buffer = clickBuf
+    clickSrc.playbackRate.value = pitch
+    const clickFilter = ctx.createBiquadFilter()
+    clickFilter.type = 'bandpass'
+    clickFilter.frequency.value = 1200
+    clickFilter.Q.value = 2.5
+    const clickGain = ctx.createGain()
+    clickGain.gain.setValueAtTime(0.0001, now)
+    clickGain.gain.exponentialRampToValueAtTime(peak * 0.45, now + 0.002)
+    clickGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.025)
+    clickSrc.connect(clickFilter).connect(clickGain).connect(ctx.destination)
+    clickSrc.start(now)
   }
 
   /**
