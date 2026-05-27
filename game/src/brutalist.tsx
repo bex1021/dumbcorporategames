@@ -278,8 +278,8 @@ export function Mission() {
   )
 }
 
-// ─── About Rebecca ───────────────────────────────────────────────────────
-export function AboutRebecca() {
+// ─── About the studio ────────────────────────────────────────────────────
+export function AboutTheStudio() {
   return (
     <section id="about" style={{
       borderBottom: `4px solid ${BR.ink}`, background: BR.ink, color: BR.bg,
@@ -294,18 +294,18 @@ export function AboutRebecca() {
             fontFamily: brMono, fontSize: 11, color: '#aaa',
             textTransform: 'uppercase', letterSpacing: '0.16em', marginBottom: 10,
           }}>
-            <span style={{ color: BR.accent, marginRight: 8 }}>●</span>OFF THE RECORD · ONE (1) STRAIGHT LINE FOLLOWS
+            <span style={{ color: BR.accent, marginRight: 8 }}>●</span>ANONYMOUS · STILL EMPLOYED ELSEWHERE · DO NOT FORWARD TO HR
           </div>
           <h2 style={{
             margin: 0, fontFamily: brFont, fontWeight: 900,
             fontSize: 72, lineHeight: 0.95, letterSpacing: '-0.03em', textTransform: 'uppercase',
-          }}>BUILT BY REBECCA LEUNG.</h2>
+          }}>BUILT BY A CORPORATE SLAVE.</h2>
         </div>
         <div style={{
           fontFamily: brMono, fontSize: 11, color: '#aaa', textAlign: 'right',
           textTransform: 'uppercase', letterSpacing: '0.1em', maxWidth: 280, lineHeight: 1.55,
         }}>
-          STUDIO HEAD · DESIGNER · SOLE EMPLOYEE
+          DAY JOB · WITHHELD · NDA WITH SELF
         </div>
       </div>
 
@@ -317,26 +317,31 @@ export function AboutRebecca() {
           margin: 0, fontFamily: brFont, fontSize: 22, lineHeight: 1.4,
           color: BR.bg, fontWeight: 500, maxWidth: 760,
         }}>
-          I'M A DESIGNER WHO HAS BEEN TO A LOT OF STANDUPS. <i>BLOCKED</i> IS THE GAME I WOULD HAVE
-          WANTED TO PLAY AT EVERY SINGLE ONE OF THEM. DROP ME A LINE AT{' '}
+          I HAVE A REAL JOB. <i>THIS IS NOT IT.</i> THE STANDUPS THAT INSPIRED <i>BLOCKED</i> ARE
+          NOT NECESSARILY THE STANDUPS I AM CURRENTLY ATTENDING — FOR HOPEFULLY OBVIOUS REASONS.
+          ANY RESEMBLANCE TO YOUR COWORKERS IS A COINCIDENCE WE ARE ALL EXPERIENCING TOGETHER.
+          ANONYMOUS TIPS, BUG REPORTS, AND HR COMPLAINTS WELCOME AT{' '}
           <a href="mailto:hello@dumbcorporategames.com" style={{ color: BR.accent, textDecoration: 'underline' }}>
             HELLO@DUMBCORPORATEGAMES.COM
           </a>.
         </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
           {[
-            { l: 'EMAIL →',     href: 'mailto:hello@dumbcorporategames.com' },
-            { l: 'LINKEDIN →',  href: 'https://www.linkedin.com/' },
-            { l: 'GITHUB →',    href: 'https://github.com/' },
-            { l: 'POST (IF YOU MUST) →', href: '#' },
+            { l: 'EMAIL → HELLO@DUMBCORPORATEGAMES.COM', href: 'mailto:hello@dumbcorporategames.com' },
+            { l: 'LINKEDIN → ACCOUNT PENDING DELETION',  href: '#' },
+            { l: 'GITHUB → COMMITS UNDER PSEUDONYM',     href: '#' },
+            { l: 'DM → PLEASE DO NOT',                   href: '#' },
           ].map((a, i) => (
             <a key={a.l} href={a.href} style={{
               color: BR.bg, border: `1px solid ${BR.bg}`, padding: '14px 18px',
-              fontFamily: brMono, fontWeight: 700, fontSize: 13, letterSpacing: '0.14em',
+              fontFamily: brMono, fontWeight: 700, fontSize: 12, letterSpacing: '0.12em',
               textTransform: 'uppercase', textDecoration: 'none',
               borderTop: i ? 'none' : `1px solid ${BR.bg}`,
-              display: 'flex', justifyContent: 'space-between',
-            }}>{a.l}<span style={{ color: BR.accent }}>·0{i + 1}</span></a>
+              display: 'flex', justifyContent: 'space-between', gap: 12,
+            }}>
+              <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.l}</span>
+              <span style={{ color: BR.accent, flexShrink: 0 }}>·0{i + 1}</span>
+            </a>
           ))}
         </div>
       </div>

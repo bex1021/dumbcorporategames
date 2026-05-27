@@ -11,7 +11,7 @@
 import { Link } from 'react-router-dom'
 import {
   PageScroll, BR, brFont, brMono,
-  Nav, Ticker, Mission, AboutRebecca, Signup, Closer, Footer,
+  Nav, Ticker, Mission, AboutTheStudio, Signup, Closer, Footer,
   ctaPrimary, ctaSecondary,
   type NavLink,
 } from '../brutalist'
@@ -54,7 +54,7 @@ export default function Landing() {
         speed={50}
       />
       <Mission />
-      <AboutRebecca />
+      <AboutTheStudio />
       <Closer />
       <Signup />
       <Footer />

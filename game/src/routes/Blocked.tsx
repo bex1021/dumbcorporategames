@@ -6,13 +6,13 @@
 // Sections, top to bottom:
 //   Nav · Hero · Ticker · Vital Signs · Portfolio · How It Plays · Cast ·
 //   Screenshots · Raw Log · Ticker · Mission · Endorsements ·
-//   About Rebecca · Closer · Signup · Footer
+//   About the studio · Closer · Signup · Footer
 
 import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import {
   PageScroll, BR, brFont, brMono,
-  Nav, Ticker, SectionStarter, Mission, AboutRebecca, Signup, Closer, Footer,
+  Nav, Ticker, SectionStarter, Mission, AboutTheStudio, Signup, Closer, Footer,
   ctaPrimary, ctaSecondary,
   type NavLink,
 } from '../brutalist'
@@ -61,7 +61,7 @@ export default function Blocked() {
       <Mission />
       <Endorsements />
       <FAQ />
-      <AboutRebecca />
+      <AboutTheStudio />
       <Closer />
       <Signup />
       <Footer />
