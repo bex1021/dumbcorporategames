@@ -36,36 +36,44 @@ export function OfficeDecor() {
 // ============================================================
 
 function MissionMural() {
-  // Back wall is at z = -halfDepth. Windows sit at x = -12, 0, +12 with
-  // 5m width each. Clear wall segments are at roughly x = -9..-3 and
-  // x = +3..+9 (each 6m wide), full wall height 3.5m.
-  // We mount the mural on the LEFT segment (centered at x = -6).
-  // Slight z-offset so it pokes proud of the wall, not flush with it.
-  const z = -OFFICE.halfDepth + 0.12
+  // FRONT wall mount — the teal accent wall behind PM at spawn (z = +halfDepth).
+  // PM has to turn around to see it, which makes it a deliberate "hero" beat
+  // instead of something they walk past on the way to NPCs. The whole front
+  // wall is unobstructed (just the bathroom door at x=+9, z=+9 well in front
+  // of the wall plane) so we get the full 36m to play with — easy to size
+  // the panel large enough that text doesn't crop at close range.
+  //
+  // Rotation π around Y so the panel's text-side (default +Z in Drei <Text>)
+  // faces back into the room (-Z direction). Without this, text would render
+  // backward when viewed from the room.
+  //
+  // Offset 0.14m off the wall plane to avoid z-fighting with the front wall.
+  const z = OFFICE.halfDepth - 0.14
 
   return (
-    <group position={[-6, 0, z]}>
-      {/* Backing panel — slightly off-white so the mural reads as a mounted
-          board rather than wall paint */}
+    <group position={[0, 0, z]} rotation={[0, Math.PI, 0]}>
+      {/* Backing panel — wider than before (6.4m vs 5.6m) so the hero line
+          has breathing room and never crops. Stays off-white so it reads as
+          a mounted board against the teal wall rather than blending in. */}
       <mesh position={[0, 1.75, 0]} receiveShadow>
-        <boxGeometry args={[5.6, 3.2, 0.04]} />
+        <boxGeometry args={[6.4, 3.2, 0.04]} />
         <meshStandardMaterial color={PANEL_BG} />
       </mesh>
-      {/* Teal accent stripe at the top of the mural panel — Lumon header band */}
+      {/* Teal top stripe — matches new panel width */}
       <mesh position={[0, 3.25, 0.025]}>
-        <boxGeometry args={[5.6, 0.08, 0.04]} />
+        <boxGeometry args={[6.4, 0.08, 0.04]} />
         <meshStandardMaterial color={TEAL} emissive={TEAL} emissiveIntensity={0.2} />
       </mesh>
       {/* Bottom stripe to balance */}
       <mesh position={[0, 0.18, 0.025]}>
-        <boxGeometry args={[5.6, 0.04, 0.04]} />
+        <boxGeometry args={[6.4, 0.04, 0.04]} />
         <meshStandardMaterial color={TEAL} emissive={TEAL} emissiveIntensity={0.15} />
       </mesh>
 
       {/* Tiny "company motto" label above the main text */}
       <Text
         position={[0, 2.9, 0.03]}
-        fontSize={0.18}
+        fontSize={0.16}
         color={TEAL_DEEP}
         anchorX="center"
         anchorY="middle"
@@ -76,14 +84,16 @@ function MissionMural() {
         OUR MISSION
       </Text>
 
-      {/* Main mural text — split across two lines for impact */}
+      {/* Main mural text — split across two lines for impact. Shrunk from
+          0.42 → 0.34 so the longest line ("WE DON'T BUILD") fits comfortably
+          within maxWidth and never sneaks past the panel edges. */}
       <Text
         position={[0, 2.05, 0.03]}
-        fontSize={0.42}
+        fontSize={0.34}
         color={TEXT_DARK}
         anchorX="center"
         anchorY="middle"
-        maxWidth={5.2}
+        maxWidth={6.0}
         textAlign="center"
         fontWeight={700}
         letterSpacing={0.02}
@@ -94,11 +104,11 @@ function MissionMural() {
       </Text>
       <Text
         position={[0, 1.1, 0.03]}
-        fontSize={0.5}
+        fontSize={0.42}
         color={TEAL_DEEP}
         anchorX="center"
         anchorY="middle"
-        maxWidth={5.2}
+        maxWidth={6.0}
         textAlign="center"
         fontWeight={700}
         letterSpacing={0.03}
@@ -111,7 +121,7 @@ function MissionMural() {
       {/* Tiny attribution line — fake founder quote credit */}
       <Text
         position={[0, 0.46, 0.03]}
-        fontSize={0.13}
+        fontSize={0.12}
         color={TEAL_DEEP}
         anchorX="center"
         anchorY="middle"
