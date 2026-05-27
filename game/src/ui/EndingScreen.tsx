@@ -96,7 +96,13 @@ export function EndingScreen() {
   const time = useGameStore(selectFormattedTime)
   const reset = useGameStore((s) => s.reset)
   const unlocked = useGameStore((s) => s.unlockedAchievements)
+  // First-time-ever unlocks this run — drives the small yellow "NEW" badge
+  // on the card.
   const justUnlocked = useGameStore((s) => s.lastUnlockedAchievements)
+  // Every achievement the player actually earned this run (regardless of
+  // whether they had it before). Drives the pop-in animation so the
+  // celebration fires even on replays.
+  const earnedThisRun = useGameStore((s) => s.earnedThisRun)
   const timeMinutes = useGameStore((s) => s.timeMinutes)
   const rating = computeRating({
     ending,
@@ -108,17 +114,19 @@ export function EndingScreen() {
     npcsHandled: handledCount,
   })
 
-  // Schedule a rising-pitch ding for each just-unlocked achievement, one
+  // Schedule a rising-pitch ding for each achievement earned this run, one
   // every POP_STAGGER_MS so the audio cascade lines up with the CSS
-  // scale-bounce on the cards. Runs once per ended run.
+  // scale-bounce on the cards. Uses earnedThisRun (not lastUnlocked) so
+  // the celebration still fires on replays after every achievement has
+  // already been first-time-unlocked.
   // Effect must live above the conditional return — hooks can't be skipped.
   useEffect(() => {
-    if (phase !== 'ended' || justUnlocked.length === 0) return
-    const timers = justUnlocked.map((_, i) =>
+    if (phase !== 'ended' || earnedThisRun.length === 0) return
+    const timers = earnedThisRun.map((_, i) =>
       setTimeout(() => audio.playAchievementPop(i), i * POP_STAGGER_MS)
     )
     return () => timers.forEach(clearTimeout)
-  }, [phase, justUnlocked])
+  }, [phase, earnedThisRun])
 
   if (phase !== 'ended' || !ending) return null
   const copy = ENDING_COPY[ending as EndingKey]
@@ -135,9 +143,10 @@ export function EndingScreen() {
   const ticketSummary = `${ticketsByColumn.done.length} done · ${ticketsByColumn.progress.length} in progress · ${ticketsByColumn.blocked.length} blocked · ${ticketsByColumn.todo.length} to do`
 
   const justUnlockedSet = new Set(justUnlocked)
-  // Map id → its position in the just-unlocked list, so each card knows its
-  // own cascade index for the animation-delay.
-  const newOrderMap = new Map(justUnlocked.map((id, i) => [id, i]))
+  const earnedThisRunSet = new Set(earnedThisRun)
+  // Map id → its position in the earned-this-run list, so each card knows
+  // its own cascade index for the animation-delay.
+  const popOrderMap = new Map(earnedThisRun.map((id, i) => [id, i]))
   const ratingStyle = RATING_STYLE[rating.tier]
 
   return (
@@ -271,7 +280,8 @@ export function EndingScreen() {
             {ACHIEVEMENTS.map((a) => {
               const isUnlocked = unlocked.has(a.id)
               const isNew = justUnlockedSet.has(a.id)
-              const popIndex = newOrderMap.get(a.id)
+              const earnedNow = earnedThisRunSet.has(a.id)
+              const popIndex = popOrderMap.get(a.id)
               return (
                 <div
                   key={a.id}
@@ -282,10 +292,10 @@ export function EndingScreen() {
                         ? 'border-[#f5cd47] bg-[#fff7d6] text-[#172b4d]'
                         : 'border-[#dfe1e6] bg-white text-[#172b4d]'
                       : 'border-[#dfe1e6] bg-[#f4f5f7] text-[#5e6c84]',
-                    isNew ? 'achievement-pop' : '',
+                    earnedNow ? 'achievement-pop' : '',
                   ].join(' ')}
                   style={
-                    isNew && popIndex !== undefined
+                    earnedNow && popIndex !== undefined
                       ? { animationDelay: `${popIndex * POP_STAGGER_MS}ms` }
                       : undefined
                   }

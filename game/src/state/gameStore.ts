@@ -166,9 +166,14 @@ type State = {
 
   // Persisted across runs via localStorage. Set of achievement IDs ever
   // unlocked by this player. Newly-unlocked IDs from the most recent run
-  // are tracked in lastUnlockedAchievements for toast/celebration surfaces.
+  // are tracked in lastUnlockedAchievements (only the *first-time-ever*
+  // unlocks — used for the "NEW" badge). earnedThisRun captures *every*
+  // achievement whose condition was met by the run that just ended, even
+  // ones the player already had — that's what drives the ending-screen
+  // pop-in celebration so it fires on every replay.
   unlockedAchievements: Set<string>
   lastUnlockedAchievements: string[]
+  earnedThisRun: string[]
 
   // Slack panel — ambient flavor pings + delayed-effect notifications all
   // flow through this single feed. unreadCount = messages added while
@@ -260,6 +265,7 @@ const INITIAL: Omit<
   // empty set so the reset() spread doesn't wipe achievements.
   unlockedAchievements: new Set<string>(),
   lastUnlockedAchievements: [],
+  earnedThisRun: [],
   slackMessages: [],
   slackOpen: false,
   unreadSlack: 0,
@@ -810,11 +816,22 @@ function clamp(v: number, lo: number, hi: number) {
 function finalizeAchievements(
   snap: RunSnapshot,
   prior: Set<string>
-): { unlockedAchievements: Set<string>; lastUnlockedAchievements: string[] } {
+): {
+  unlockedAchievements: Set<string>
+  lastUnlockedAchievements: string[]
+  earnedThisRun: string[]
+} {
   const earned = evaluateAchievements(snap)
   const newlyUnlocked = earned.filter((id) => !prior.has(id))
   const merged = new Set(prior)
   for (const id of newlyUnlocked) merged.add(id)
   saveUnlocked(merged)
-  return { unlockedAchievements: merged, lastUnlockedAchievements: newlyUnlocked }
+  // earnedThisRun = every achievement whose condition the snapshot meets,
+  // regardless of whether the player already had it. Drives the pop-in
+  // celebration on the ending screen so replays still feel rewarding.
+  return {
+    unlockedAchievements: merged,
+    lastUnlockedAchievements: newlyUnlocked,
+    earnedThisRun: earned,
+  }
 }
