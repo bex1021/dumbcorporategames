@@ -56,7 +56,10 @@ export function DialoguePanel() {
     const npcId = activeDialogue
     markHandled(npcId)
     closeDialogue()
-    triggerBark(npcId)
+    // Stagger the bark bubble ~280ms after the panel closes so the
+    // player's eye has time to return to the world before being asked to
+    // read again. Audit caught the back-to-back close+bark as abrupt.
+    setTimeout(() => triggerBark(npcId), 280)
   }
 
   // ---- Keyboard shortcuts ----

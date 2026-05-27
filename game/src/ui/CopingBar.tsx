@@ -8,7 +8,7 @@
 // Locked (visible but non-interactive) during dialogue or recovery — the PM
 // can't ghost a 1:1 to go cry.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useGameStore, type Effects } from '../state/gameStore'
 import { audio } from '../audio/AudioManager'
 import { playerPosition, playerFacing, playerVelocity } from '../state/playerState'
@@ -74,6 +74,16 @@ function pissedOffScale(uses: number): number {
   return 0.1
 }
 
+// Flavor barks for an exhausted coping action — instead of dead-buttoning
+// the player out, we keep buttons clickable past the 4-use cap and return
+// a small "the bit no longer lands" message. No mechanical effect.
+const EXHAUSTED_BARKS: Record<string, string> = {
+  vent: 'You DM the same friend. They send a 👍 and immediately go offline.',
+  coffee: 'You stand at the kettle. The water is already warm.',
+  bathroom: 'You sit in the stall. Nothing comes. HR has the timestamp.',
+  meme: 'You post. The thread is dead. Even the bot scrolls past.',
+}
+
 function scaledEffects(action: CopingAction, uses: number): Effects {
   const scale = pissedOffScale(uses)
   const out: Effects = {}
@@ -113,12 +123,33 @@ export function CopingBar() {
   if (phase !== 'playing') return null
   const locked = activeDialogue !== null || pendingRecovery !== null
 
+  // Floating "the bit no longer lands" message shown briefly when the
+  // player clicks an exhausted coping action. Self-clears after 2.4s.
+  const [exhaustedBark, setExhaustedBark] = useState<string | null>(null)
+  useEffect(() => {
+    if (!exhaustedBark) return
+    const t = setTimeout(() => setExhaustedBark(null), 2400)
+    return () => clearTimeout(t)
+  }, [exhaustedBark])
+
   const handleClick = (action: CopingAction) => {
     const uses = copingUseCounts[action.id] ?? 0
+    // Past the 4-use cap, the action still "clicks" — no mechanical effect,
+    // but we surface a flavor message so the player gets a small narrative
+    // beat. Audit caught that dead-buttoning the bar made it feel like the
+    // game was confiscating toys.
+    if (uses >= 4) {
+      audio.playUITick()
+      setExhaustedBark(EXHAUSTED_BARKS[action.id] ?? 'No effect. The bit has worn through.')
+      return
+    }
     const effects = scaledEffects(action, uses)
     applyEffects(effects)
     incrementCoping(action.id)
-    audio.play('slack') // soft ping for any coping action
+    // Coping actions used to play the full Slack knock — too loud, too
+    // similar to a real notification (audit flag). Use a quiet UI tick
+    // instead so coping reads as "small private action," not "broadcast."
+    audio.playUITick()
 
     // Cry in Bathroom teleports the PM to the actual bathroom room
     // carved out of the front-right corner. Mutate the shared transform
@@ -139,8 +170,20 @@ export function CopingBar() {
 
   return (
     <div
-      className={`pointer-events-${locked ? 'none' : 'auto'} fixed bottom-4 left-4 z-20`}
+      className={`pointer-events-${locked ? 'none' : 'auto'} fixed bottom-4 left-4 z-20 transition-opacity duration-200 ${
+        locked ? 'opacity-30' : 'opacity-100'
+      }`}
+      aria-hidden={locked}
     >
+      {/* Floating exhausted-action message — small narrative beat shown
+          when the player clicks a maxed-out coping button. Auto-clears
+          after 2.4s. Sits above the tooltip so the two don't collide. */}
+      {exhaustedBark && (
+        <div className="mb-2 max-w-xs bg-amber-950/95 backdrop-blur-sm border border-amber-500/40 rounded-md shadow-2xl px-3 py-2 text-amber-100 text-[12px] italic leading-snug">
+          {exhaustedBark}
+        </div>
+      )}
+
       {/* Tooltip — appears above the bar when an action is hovered.
           Shows the action's flavor + the effects that the NEXT click would
           actually apply (already scaled for diminishing returns). */}
@@ -197,11 +240,15 @@ export function CopingBar() {
                 onMouseLeave={() => setHoveredId((cur) => (cur === a.id ? null : cur))}
                 onFocus={() => setHoveredId(a.id)}
                 onBlur={() => setHoveredId((cur) => (cur === a.id ? null : cur))}
-                disabled={locked || exhausted}
+                disabled={locked}
                 className={[
                   'flex flex-col items-center px-2 py-1 rounded border text-xs transition',
+                  // Exhausted buttons stay clickable (return a flavor bark)
+                  // but visually mute so the player understands no real
+                  // effect will land. Cursor stays as pointer to telegraph
+                  // "this still does *something*."
                   exhausted
-                    ? 'border-beige-300/10 bg-ink-700/20 text-beige-300/40 cursor-not-allowed'
+                    ? 'border-beige-300/10 bg-ink-700/20 text-beige-300/50 cursor-pointer hover:bg-ink-700/30'
                     : 'border-beige-300/20 bg-ink-700/40 hover:bg-ink-700/70 hover:border-beige-300/50 text-beige-100 cursor-pointer',
                 ].join(' ')}
               >

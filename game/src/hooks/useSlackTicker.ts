@@ -50,9 +50,11 @@ export function useSlackTicker() {
           isDelayed: false,
         })
 
-        // Every ambient ping plays the Slack knock — no rate limit. Overlap
-        // is fine: AudioBufferSourceNode handles concurrent plays cleanly.
-        audio.play('slack')
+        // Ambient pings play at reduced volume (35%) so they sit *under*
+        // the louder notifications from the player's own delayed effects.
+        // Audit caught that every Slack source was at the same volume,
+        // making real consequences indistinguishable from background noise.
+        audio.play('slack', 0.35)
       }
       if (!cancelled) {
         timer = setTimeout(tick, randomInterval())

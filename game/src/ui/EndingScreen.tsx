@@ -115,6 +115,12 @@ export function EndingScreen() {
   // celebration fires even on replays.
   const earnedThisRun = useGameStore((s) => s.earnedThisRun)
   const timeMinutes = useGameStore((s) => s.timeMinutes)
+  // Run-scoped counters used to pick a "defining move" line so the
+  // ending feels like THIS run, not the generic-rating run.
+  const copingUseCounts = useGameStore((s) => s.copingUseCounts)
+  const runRecoveryTriggered = useGameStore((s) => s.runRecoveryTriggered)
+  const runDelayedFireCount = useGameStore((s) => s.runDelayedFireCount)
+  const runSlackOpened = useGameStore((s) => s.runSlackOpened)
   const rating = computeRating({
     ending,
     projectStatus,
@@ -157,6 +163,17 @@ export function EndingScreen() {
   const copy = ENDING_COPY[ending as EndingKey]
   if (!copy) return null
 
+  // For losses (full-escalation, calendar-apocalypse), inject a 1-line
+  // diagnosis identifying the meter that actually tripped — otherwise the
+  // ending feels arbitrary compared to the multi-paragraph win endings.
+  // Returns null for wins (where the body copy carries its own meaning).
+  const failureDiagnosis = diagnoseFailure(
+    ending,
+    pissedOff,
+    projectStatus,
+    meetingLoad
+  )
+
   // Bucket tickets by their final column so we can show a 1-line ticket
   // summary in the sprint metrics (without rendering a full Kanban board).
   const ticketsByColumn = bucketTickets(TICKETS, npcChoices)
@@ -169,6 +186,17 @@ export function EndingScreen() {
 
   const justUnlockedSet = new Set(justUnlocked)
   const earnedThisRunSet = new Set(earnedThisRun)
+  // One personalized line identifying the player's defining move this run.
+  // Falls back to a generic line if nothing stood out.
+  const definingMove = pickDefiningMove({
+    copingUseCounts,
+    runRecoveryTriggered,
+    runDelayedFireCount,
+    runSlackOpened,
+    npcChoices,
+    alignment,
+    pissedOff,
+  })
   // Map id → its position in the earned-this-run list, so each card knows
   // its own cascade index for the animation-delay.
   const popOrderMap = new Map(earnedThisRun.map((id, i) => [id, i]))
@@ -231,6 +259,21 @@ export function EndingScreen() {
               <div className="text-[13px] text-[#42526e] mt-2 whitespace-pre-line leading-relaxed">
                 {copy.body}
               </div>
+              {failureDiagnosis && (
+                <div
+                  className="mt-3 px-3 py-2 rounded border text-[12px] font-mono"
+                  style={{
+                    backgroundColor: '#fff5f2',
+                    borderColor: '#ffbdad',
+                    color: '#8a1b00',
+                  }}
+                >
+                  <span className="uppercase tracking-widest font-semibold mr-2">
+                    Diagnosis
+                  </span>
+                  {failureDiagnosis}
+                </div>
+              )}
             </div>
 
             {/* Sprint metrics — 2-col grid + ticket outcome summary line */}
@@ -282,6 +325,12 @@ export function EndingScreen() {
                   )}
                 </div>
                 <div className="italic mt-0.5 leading-snug">{rating.critique}</div>
+                {definingMove && (
+                  <div className="text-[11px] mt-1.5 opacity-80 leading-snug not-italic">
+                    <span className="font-semibold mr-1.5">Defining move:</span>
+                    {definingMove}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -391,6 +440,100 @@ export function EndingScreen() {
 }
 
 // ---- Helpers ----
+
+// Pick a one-line "defining move" sentence that calls out something
+// specific to THIS run — what they did a lot of, or the most distinctive
+// thing about their decision pattern. Priority order is roughly: rare
+// events first (recovery panel, delayed effects), then habitual
+// coping patterns, then dialogue dominance, with a fallback so the
+// sentence always renders. Keeps the ending personal without needing
+// per-permutation copy.
+function pickDefiningMove(s: {
+  copingUseCounts: Record<string, number>
+  runRecoveryTriggered: boolean
+  runDelayedFireCount: number
+  runSlackOpened: boolean
+  npcChoices: Record<string, string>
+  alignment: number
+  pissedOff: number
+}): string | null {
+  const c = s.copingUseCounts
+  // Rare events first — these are the most "specific" things that
+  // happened, so they earn the call-out when present.
+  if (s.runRecoveryTriggered) {
+    return 'You triggered the Calendar Apocalypse panel and made it out the other side.'
+  }
+  if (s.runDelayedFireCount >= 2) {
+    return `${s.runDelayedFireCount} of your earlier decisions came back during the run. The phrase "as I flagged earlier" is now haunted.`
+  }
+  if (s.runDelayedFireCount === 1) {
+    return 'One of your earlier choices fired a follow-up during the run. Reputation: developing.'
+  }
+  // Heavy coping patterns.
+  if ((c.printer ?? 0) >= 5) {
+    return 'You hit the printer 5 times. It now ranks third on your team.'
+  }
+  if ((c.phyllis ?? 0) >= 5) {
+    return 'You held five separate 1:1s with a plant. Phyllis remains professional about it.'
+  }
+  if ((c.bathroom ?? 0) >= 3) {
+    return 'You cried in the bathroom 3+ times. HR has the timestamps.'
+  }
+  if ((c.coffee ?? 0) >= 4) {
+    return 'You went on four coffee runs. The kettle now refers to you by first name.'
+  }
+  // Dialogue dominance — count how often "C" / "D" choices came up.
+  // These are the high-cost choices.
+  const choices = Object.values(s.npcChoices)
+  const cCount = choices.filter((c) => c === 'C').length
+  const dCount = choices.filter((c) => c === 'D').length
+  if (dCount >= 3) {
+    return 'You picked the worst available option on three or more stakeholders. A bold read of "doing the standup."'
+  }
+  if (cCount >= 3) {
+    return 'You took the path of least resistance with most of your team. They noticed.'
+  }
+  // Engagement extremes.
+  if (!s.runSlackOpened) {
+    return 'You never opened Slack. The red dot remains, in solidarity.'
+  }
+  if (s.alignment >= 8) {
+    return 'You produced an aggressive volume of artifacts. The Strategy Doc may be summoned.'
+  }
+  if (s.pissedOff >= 60) {
+    return 'You finished with the team this close to drafting Glassdoor reviews. Choices were made.'
+  }
+  return null
+}
+
+// Generate a 1-line diagnosis for the player when they hit a failure
+// ending. Picks the meter that actually tripped the failure condition and
+// names it with the actual final value — so "Full Escalation" stops
+// feeling arbitrary and reads as "the team's pissed-off climbed to 78".
+// Returns null for win endings (their multi-paragraph body copy carries
+// its own meaning).
+function diagnoseFailure(
+  ending: string,
+  pissedOff: number,
+  projectStatus: number,
+  meetingLoad: number
+): string | null {
+  if (ending === 'full-escalation') {
+    // Two trigger meters: pissedOff >= 75 OR projectStatus < 45.
+    // Whichever crossed harder wins the call-out.
+    if (pissedOff >= 75) {
+      return `Team Pissed-Off hit ${pissedOff} — past the Glassdoor tier (75). Three of your reports have updated their LinkedIn headlines.`
+    }
+    if (projectStatus < 45) {
+      return `Project Status dropped to ${projectStatus}. The Refresh has slipped past Yellow into a color leadership doesn't have a chip for.`
+    }
+    return 'Multiple meters cratered simultaneously. Impressive, in a way.'
+  }
+  if (ending === 'calendar-apocalypse') {
+    return `Meeting Load reached ${meetingLoad}. Your calendar consumed itself. No one can find an available 15-minute slot to discuss why.`
+  }
+  return null
+}
 
 function bucketTickets(
   tickets: Ticket[],

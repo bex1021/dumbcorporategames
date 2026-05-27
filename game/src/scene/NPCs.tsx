@@ -1,10 +1,11 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { Html } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
-import type { Group, Object3D } from 'three'
+import type { Group, Object3D, MeshStandardMaterial } from 'three'
 import { NPCS, OBJECT_INTERACTIONS } from '../config/constants'
 import { useGameStore, type Effects } from '../state/gameStore'
 import { playerPosition } from '../state/playerState'
+import { slapState } from '../state/slapState'
 import { audio } from '../audio/AudioManager'
 import { GLBHumanoid } from './GLBHumanoid'
 import { Workstation } from './Furniture'
@@ -471,21 +472,7 @@ function ObjectNPC({
       )}
       {role === 'Coffee' && <CoffeeMachine />}
       {role !== 'Plant' && role !== 'Coffee' && (
-        // Default: printer geometry (white box body + dark monitor + thin slot).
-        <group>
-          <mesh position={[0, 0.5, 0]} castShadow receiveShadow>
-            <boxGeometry args={[0.9, 1.0, 0.7]} />
-            <meshStandardMaterial color={color} />
-          </mesh>
-          <mesh position={[0, 1.05, 0.36]}>
-            <boxGeometry args={[0.5, 0.2, 0.04]} />
-            <meshStandardMaterial color="#2a2a2a" />
-          </mesh>
-          <mesh position={[0, 0.7, 0.36]}>
-            <boxGeometry args={[0.7, 0.04, 0.02]} />
-            <meshStandardMaterial color="#1a1a1a" />
-          </mesh>
-        </group>
+        <PrinterMesh color={color} isPrinter={id === 'printer'} />
       )}
 
       {/* Printer ambient audio — random Xerox-style noises when PM is
@@ -675,6 +662,91 @@ function CoffeeMachine() {
       <mesh position={[-0.5, 0.89, 0.13]} castShadow>
         <cylinderGeometry args={[0.045, 0.045, 0.085, 14]} />
         <meshStandardMaterial color="#c8b89a" roughness={0.6} />
+      </mesh>
+    </group>
+  )
+}
+
+// Printer 3D mesh + slap-impact animation. The audit caught that Leonard's
+// slap (audio + arm swing) didn't visually move the printer at all — most
+// satisfying single moment in the build was audio-only.
+//
+// Watches `slapState.printerSlapTrigger` (incremented by gameStore.interactObject
+// on E-key press). When it changes, runs a ~400ms damped-sine shake on the
+// printer body group and pulses a warm-yellow emissive flash on the
+// body material — reads as "the printer just took a hit."
+function PrinterMesh({
+  color,
+  isPrinter,
+}: {
+  color: string
+  isPrinter: boolean
+}) {
+  const groupRef = useRef<Group>(null)
+  const bodyMatRef = useRef<MeshStandardMaterial>(null)
+  // Last trigger value we acted on. Slap fires whenever the live trigger
+  // diverges from this.
+  const lastTriggerRef = useRef(slapState.printerSlapTrigger)
+  // performance.now() of the active slap, or 0 when idle.
+  const slapStartedAtRef = useRef(0)
+
+  useFrame(() => {
+    if (!isPrinter || !groupRef.current) return
+
+    // New slap?
+    if (slapState.printerSlapTrigger !== lastTriggerRef.current) {
+      lastTriggerRef.current = slapState.printerSlapTrigger
+      slapStartedAtRef.current = performance.now()
+    }
+
+    if (slapStartedAtRef.current === 0) return
+
+    const SHAKE_MS = 400
+    const elapsed = performance.now() - slapStartedAtRef.current
+    if (elapsed > SHAKE_MS) {
+      // Reset to rest, clear active slap.
+      groupRef.current.position.x = 0
+      groupRef.current.position.z = 0
+      groupRef.current.rotation.z = 0
+      if (bodyMatRef.current) {
+        bodyMatRef.current.emissiveIntensity = 0
+      }
+      slapStartedAtRef.current = 0
+      return
+    }
+
+    // Damped sine shake on the body + small tilt. Amplitude scales down with
+    // elapsed time so the printer settles back to rest naturally.
+    const t = elapsed / SHAKE_MS
+    const damp = 1 - t
+    groupRef.current.position.x = Math.sin(elapsed * 0.07) * damp * 0.05
+    groupRef.current.position.z = Math.cos(elapsed * 0.055) * damp * 0.025
+    groupRef.current.rotation.z = Math.sin(elapsed * 0.06) * damp * 0.04
+
+    // Warm yellow emissive pulse — peaks at impact, fades to 0.
+    if (bodyMatRef.current) {
+      const flash = damp * 0.55
+      bodyMatRef.current.emissive.setRGB(flash, flash * 0.85, flash * 0.2)
+      bodyMatRef.current.emissiveIntensity = flash
+    }
+  })
+
+  return (
+    <group ref={groupRef}>
+      {/* Body — gets the shake transform + emissive flash. */}
+      <mesh position={[0, 0.5, 0]} castShadow receiveShadow>
+        <boxGeometry args={[0.9, 1.0, 0.7]} />
+        <meshStandardMaterial ref={bodyMatRef} color={color} />
+      </mesh>
+      {/* Top monitor strip. */}
+      <mesh position={[0, 1.05, 0.36]}>
+        <boxGeometry args={[0.5, 0.2, 0.04]} />
+        <meshStandardMaterial color="#2a2a2a" />
+      </mesh>
+      {/* Paper output slot. */}
+      <mesh position={[0, 0.7, 0.36]}>
+        <boxGeometry args={[0.7, 0.04, 0.02]} />
+        <meshStandardMaterial color="#1a1a1a" />
       </mesh>
     </group>
   )

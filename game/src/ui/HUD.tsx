@@ -54,7 +54,13 @@ export function HUD() {
             <div className="text-beige-100 text-sm font-medium font-mono">{handledCount}/5 aligned</div>
           </div>
           <div
-            className={`bg-ink-900/75 backdrop-blur-sm px-3 py-2 rounded text-right border ${tone.border} min-w-[110px]`}
+            className={`bg-ink-900/75 backdrop-blur-sm px-3 py-2 rounded text-right border ${tone.border} min-w-[110px] ${
+              // Pulse the whole chip when within 10 minutes of the deadline
+              // so the player feels the squeeze, not just sees a color shift.
+              // Past-deadline pulses too — the run is still salvageable but
+              // the rating penalty is mounting.
+              remaining > 0 && remaining < 10 ? 'animate-pulse' : ''
+            }`}
           >
             <div className="text-beige-300 text-[10px] uppercase tracking-widest">Standup</div>
             <div className={`text-sm font-medium font-mono ${tone.text}`}>

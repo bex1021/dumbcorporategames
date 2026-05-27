@@ -117,10 +117,10 @@ class AudioManager {
     this.hvacOsc.frequency.linearRampToValueAtTime(target, this.ctx.currentTime + 0.5)
   }
 
-  play(cue: SoundCue) {
+  play(cue: SoundCue, volumeScale: number = 1) {
     if (cue === 'none' || cue === undefined) return
     // Prefer the real-audio sample if loaded; fall back to the synth pings.
-    if (this.playSample(cue)) return
+    if (this.playSample(cue, volumeScale)) return
     if (cue === 'slack') this.playSlack()
     else if (cue === 'gmail') this.playGmail()
     else if (cue === 'calendar') this.playCalendar()
@@ -132,8 +132,12 @@ class AudioManager {
    * to the synth tones). Each call creates a fresh BufferSourceNode so
    * overlapping plays work (e.g. two delayed effects firing in the same
    * markHandled).
+   *
+   * `volumeScale` lets callers tone down a specific play — the ambient
+   * Slack ticker uses 0.35 so background pings don't punch as hard as the
+   * delayed-effect notifications that come from the player's actual choices.
    */
-  private playSample(cue: SoundCue): boolean {
+  private playSample(cue: SoundCue, volumeScale: number = 1): boolean {
     if (!this.ctx || this.muted) return false
     const buf = this.buffers[cue]
     if (!buf) return false
@@ -143,7 +147,7 @@ class AudioManager {
     const gain = ctx.createGain()
     // Real-file samples are louder than our synth tones — knock the volume
     // down a bit so it sits well alongside the HVAC drone.
-    gain.gain.value = 0.5
+    gain.gain.value = 0.5 * volumeScale
     src.connect(gain).connect(ctx.destination)
     src.start()
     return true

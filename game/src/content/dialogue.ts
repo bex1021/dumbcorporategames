@@ -122,7 +122,7 @@ export const DIALOGUE: Record<string, NPCDialogue> = {
         label: 'Suggest "make it pop"',
         effects: { time: 5, projectStatus: -6, pissedOff: 18, alignment: -1 },
         resultCopy:
-          'You have said the forbidden words.\n\nThe Designer smiles with only the bottom half of their face.',
+          'You have said the forbidden words.\n\nThe Designer acknowledges the input. They will quietly redo the file from scratch and log the time as "iteration."',
         sound: 'none',
       },
       {

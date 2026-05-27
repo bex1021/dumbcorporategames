@@ -70,6 +70,30 @@ export function Bathroom() {
         <meshStandardMaterial color={C.floor} roughness={0.7} />
       </mesh>
 
+      {/* Mood light — cool blue-gray point light inside the bathroom bounds.
+          The narrative point of "Cry in Bathroom" is *escape* from the
+          fluorescent office — so the room should feel different when the
+          PM teleports in. Low intensity + tight distance keeps it
+          contained to the bathroom; the cool color contrasts with the
+          warmer office ambient. */}
+      <pointLight
+        position={[BATH_CENTER_X, OFFICE.wallHeight - 0.8, BATH_CENTER_Z]}
+        intensity={0.55}
+        color="#9ab2c4"
+        distance={5.5}
+        decay={1.6}
+      />
+      {/* Subtle ceiling source — a small darker patch above the bathroom
+          that occludes a bit of the office's overhead ceiling-panel glow
+          and underlines the "clinical, not cheery" vibe. */}
+      <mesh
+        position={[BATH_CENTER_X, OFFICE.wallHeight - 0.04, BATH_CENTER_Z]}
+        rotation={[Math.PI / 2, 0, 0]}
+      >
+        <planeGeometry args={[BATH_WIDTH - 0.1, BATH_DEPTH - 0.1]} />
+        <meshStandardMaterial color="#cdd5dc" roughness={0.4} />
+      </mesh>
+
       {/* ---------- Partition walls ---------- */}
       {/* Front partition at z=10, full width across bathroom */}
       <PartitionWall
