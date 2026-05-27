@@ -382,6 +382,29 @@ class AudioManager {
   }
 
   /**
+   * Quiet UI tick — 25ms percussive blip for click confirmation on dialogue
+   * choices and other UI buttons that don't have their own narrative sound.
+   * Sits at -24dB so it doesn't compete with bigger cues. The audit caught
+   * that choices with `sound: 'none'` had ZERO auditory feedback on click.
+   */
+  playUITick() {
+    if (!this.ctx || this.muted) return
+    const ctx = this.ctx
+    const now = ctx.currentTime
+    const osc = ctx.createOscillator()
+    osc.type = 'square'
+    osc.frequency.setValueAtTime(1600, now)
+    osc.frequency.exponentialRampToValueAtTime(900, now + 0.025)
+    const gain = ctx.createGain()
+    gain.gain.setValueAtTime(0.0001, now)
+    gain.gain.exponentialRampToValueAtTime(0.035, now + 0.002)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.04)
+    osc.connect(gain).connect(ctx.destination)
+    osc.start(now)
+    osc.stop(now + 0.05)
+  }
+
+  /**
    * Achievement-unlock chord-ding — three stacked sines forming a major
    * triad (root + major 3rd + perfect 5th) for a richer, sparklier
    * "you won this" sound than a single sine. Each chord rises +2 semitones

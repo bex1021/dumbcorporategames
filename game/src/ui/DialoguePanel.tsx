@@ -33,6 +33,11 @@ export function DialoguePanel() {
   const handleChoice = (choice: DialogueChoice) => {
     if (!activeDialogue) return
     applyEffects(choice.effects)
+    // Always fire a quiet UI tick so every click has *some* auditory
+    // confirmation — many choices have `sound: 'none'` (audit caught
+    // those clicks felt broken). The narrative cue (slack/gmail/calendar)
+    // plays right after, layered on top.
+    audio.playUITick()
     audio.play(choice.sound)
     // Queue any delayed punishment to fire after N more NPCs are handled.
     // The toast surfaces via DelayedToast — see Build 2b.
@@ -90,8 +95,8 @@ export function DialoguePanel() {
   if (!activeDialogue || !dialogue || !npc) return null
 
   return (
-    <div className="pointer-events-auto fixed inset-y-0 right-0 w-full max-w-md z-40 flex items-center">
-      <div className="m-4 w-full bg-ink-900/95 backdrop-blur-md border border-beige-300/30 rounded-lg shadow-2xl text-beige-100 overflow-hidden">
+    <div className="pointer-events-auto fixed inset-y-0 right-0 w-full max-w-md z-40 flex items-center sm:max-w-md max-w-[92vw]">
+      <div className="m-4 w-full max-h-[88vh] overflow-y-auto bg-ink-900/95 backdrop-blur-md border border-beige-300/30 rounded-lg shadow-2xl text-beige-100">
         {/* Header */}
         <div className="px-5 py-3 border-b border-beige-300/20 flex items-center gap-3">
           <div
@@ -191,12 +196,21 @@ function ChoiceButton({
 
 // Ambiguous "consequences later" indicator. We don't reveal the specific
 // delayed effects — the uncertainty is the dynamic we want.
+//
+// Visually telegraphed: brighter amber + a pulsing dot icon + slow
+// fade-pulse on the chip itself. The audit flagged the previous quiet
+// "?? later" tag as too easy to skim past — this mechanic is the
+// strongest replay hook so it deserves real visual weight.
 function LaterChip() {
   return (
     <span
-      className="inline-block text-[10px] font-mono tracking-wider px-1.5 py-0.5 rounded border bg-amber-900/40 text-amber-200 border-amber-700/40"
-      title="Has consequences later in the standup"
+      className="inline-flex items-center gap-1 text-[10px] font-mono tracking-wider px-1.5 py-0.5 rounded border bg-amber-600/30 text-amber-100 border-amber-400/60 animate-pulse"
+      title="This choice has delayed consequences that fire later in the run"
     >
+      <span
+        aria-hidden
+        className="inline-block w-1.5 h-1.5 rounded-full bg-amber-300"
+      />
       ?? later
     </span>
   )

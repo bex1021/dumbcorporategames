@@ -161,3 +161,31 @@ html, body, #root {
   background: #fff8d0;
   box-shadow: 0 0 4px rgba(255, 248, 208, 1);
 }
+
+/*
+ * Reduced-motion fallback. When the OS / browser reports
+ * prefers-reduced-motion: reduce, every part of the achievement cascade
+ * is short-circuited: no scale overshoot, no rotation wiggle, no
+ * shimmer sweep, no breathing glow, no sparkle bursts. Cards fade in
+ * gently and the gold border lands statically — the celebratory
+ * AUDIO still plays (chord-dings + finale) because reduced-motion is
+ * a vestibular setting, not an audio setting.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .achievement-pop {
+    /* Quick opacity fade only; honour the same per-card --pop-delay so
+       cards still appear in cascade order, just without any transform. */
+    animation:
+      achievement-pop-fade 0.25s ease-out var(--pop-delay, 0ms) backwards;
+  }
+  .achievement-shimmer::before,
+  .achievement-sparkle {
+    /* Hide the moving decorations entirely — they're pure ornament. */
+    display: none;
+  }
+}
+
+@keyframes achievement-pop-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}

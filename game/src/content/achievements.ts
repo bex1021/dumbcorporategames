@@ -162,9 +162,14 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     id: 'inbox-zero',
     title: 'Inbox Zero',
-    description: 'Opened Slack and finished the run with fewer than 5 unread.',
+    description: 'Opened Slack and finished the run with fewer than 8 unread.',
     emoji: '📭',
-    condition: (s) => s.slackOpenedAtAll && s.finalUnreadSlack < 5,
+    // Bumped threshold 5 → 8 after the audit: with ambient pings landing
+    // throughout the run, <5 unread required a very specific "open Slack
+    // right before the last NPC" maneuver. <8 lets the player open Slack
+    // somewhere in the middle of the run and still qualify if they're
+    // reasonably attentive.
+    condition: (s) => s.slackOpenedAtAll && s.finalUnreadSlack < 8,
     flavor:
       'You read every message that came in. We are obligated to consider whether this was a good use of your time.',
   },

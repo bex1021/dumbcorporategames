@@ -66,9 +66,11 @@ export function SlackPanel() {
         )}
       </button>
 
-      {/* Sliding panel */}
+      {/* Sliding panel. Width caps at 380px desktop but shrinks to viewport
+          on narrow screens so it doesn't blanket the whole game on mobile.
+          Audit caught it covering the entire <640px viewport when open. */}
       <div
-        className={`fixed top-0 right-0 h-full w-[380px] z-30 bg-[#1a1d21] border-l border-[#383a40] shadow-2xl flex flex-col transition-transform duration-300 ${
+        className={`fixed top-0 right-0 h-full w-[min(380px,92vw)] z-30 bg-[#1a1d21] border-l border-[#383a40] shadow-2xl flex flex-col transition-transform duration-300 ${
           open ? 'translate-x-0' : 'translate-x-full'
         }`}
       >

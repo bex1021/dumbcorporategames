@@ -12,8 +12,14 @@ import { AMBIENT_POOL } from '../content/slack'
 import { useGameStore } from '../state/gameStore'
 import { audio } from '../audio/AudioManager'
 
-const MIN_INTERVAL_MS = 25_000
-const MAX_INTERVAL_MS = 45_000
+// Slowed from 25-45s → 45-90s after the audit flagged that ambient pings
+// were too frequent: a 5-minute run got 10+ Slack knocks, making the
+// "Permanent Lurker" achievement (never open Slack) feel like a denial-of-
+// service rather than a play style, and pushing "Inbox Zero" (<5 unread)
+// out of reach without deliberate Slack-flicking. Doubling the interval
+// roughly halves the per-run ping count.
+const MIN_INTERVAL_MS = 45_000
+const MAX_INTERVAL_MS = 90_000
 const REPEAT_AVOIDANCE = 6
 
 export function useSlackTicker() {

@@ -359,7 +359,7 @@ function JiraEpicScreen({ onStart }: { onStart: () => void }) {
                 </span>
               </div>
               <p className="text-[#42526e]">
-                Sync with each stakeholder before the 10:00 AM standup. You
+                Sync with each stakeholder before the 10:15 AM standup. You
                 can&apos;t enter with surprises. You also can&apos;t enter
                 with the actual truth. Find a third option.
               </p>

@@ -20,7 +20,7 @@ export const STARTER_PINGS: SlackTemplate[] = [
     npcId: 'system',
     npcName: 'Slack',
     channel: '#announcements',
-    text: 'Reminder: standup at 10:00 AM sharp. Please be aligned by then. 💚',
+    text: 'Reminder: standup at 10:15 AM sharp. Please be aligned by then. 💚',
   },
   {
     npcId: 'chad',
