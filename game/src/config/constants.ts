@@ -21,8 +21,15 @@ export const PLAYER = {
   rotationSpeed: 2.6, // rad/s when turning with left/right (≈ 150°/sec)
   radius: 0.4,
   height: 1.85,
-  spawnX: -9,
-  spawnZ: 9, // PM desk position, front-left of office
+  // Spawn position: standing next to his chair, just clear of the chair's
+  // right side and the desk's footprint. PM-desk zone is at (-9, _, 9), the
+  // chair is behind it at (-9, _, 9.65). Putting PM at (-8, _, 10.3) places
+  // him to the right of the chair (his left side faces it) and clear of the
+  // desk's z-range (8.6 to 9.4) and the chair's z-range (9.4 to 9.9).
+  // Facing y=0 keeps him looking toward the office interior (-Z), ready to
+  // walk into the room.
+  spawnX: -8,
+  spawnZ: 10.3,
   shirtColor: '#5b6b8a', // muted blazer blue
   pantsColor: '#2c2c33',
 } as const
