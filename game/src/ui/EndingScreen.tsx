@@ -141,132 +141,142 @@ export function EndingScreen() {
         </div>
       </div>
 
-      {/* Single-column centered body */}
+      {/* Body: centered main content + dedicated right-side achievements
+          panel. Center column stays max-w-2xl so it doesn't stretch when
+          the achievements panel is visible. On screens narrower than lg,
+          the panel falls below the main content. */}
       <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-4">
-        <div className="max-w-2xl mx-auto flex flex-col gap-3 pt-1">
-          {/* Outcome banner — green/red based on goal met. Big narrative
-              card; primary focal point of the screen. */}
-          <div
-            className="rounded border px-4 py-3"
-            style={{
-              backgroundColor: copy.goalMet ? '#e3fcef' : '#ffebe6',
-              borderColor: copy.goalMet ? '#abf5d1' : '#ffbdad',
-            }}
-          >
+        <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 pt-1">
+          {/* Center: outcome + metrics + performance + CTA */}
+          <div className="max-w-2xl w-full mx-auto flex flex-col gap-3">
+            {/* Outcome banner — green/red based on goal met. Hero element. */}
             <div
-              className="text-[10px] uppercase tracking-widest font-semibold"
-              style={{ color: copy.goalMet ? '#006644' : '#bf2600' }}
+              className="rounded border px-4 py-3"
+              style={{
+                backgroundColor: copy.goalMet ? '#e3fcef' : '#ffebe6',
+                borderColor: copy.goalMet ? '#abf5d1' : '#ffbdad',
+              }}
             >
-              Sprint goal · {copy.goalMet ? '✓ Met' : '✗ Missed'}
+              <div
+                className="text-[10px] uppercase tracking-widest font-semibold"
+                style={{ color: copy.goalMet ? '#006644' : '#bf2600' }}
+              >
+                Sprint goal · {copy.goalMet ? '✓ Met' : '✗ Missed'}
+              </div>
+              <div className="text-[20px] font-semibold mt-0.5 text-[#172b4d]">
+                {copy.title}
+              </div>
+              <div className="text-[13px] text-[#42526e] mt-2 whitespace-pre-line leading-relaxed">
+                {copy.body}
+              </div>
             </div>
-            <div className="text-[20px] font-semibold mt-0.5 text-[#172b4d]">
-              {copy.title}
-            </div>
-            <div className="text-[13px] text-[#42526e] mt-2 whitespace-pre-line leading-relaxed">
-              {copy.body}
-            </div>
-          </div>
 
-          {/* Sprint metrics — 2-col grid + ticket outcome summary line */}
-          <div className="bg-white border border-[#dfe1e6] rounded p-3">
-            <div className="text-[10px] uppercase tracking-widest text-[#5e6c84] mb-1.5">
-              Sprint metrics
-            </div>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-0.5 text-[12px]">
-              <MetricRow label="Velocity" value={`${completedPoints}/${totalPoints} pts`} />
-              <MetricRow label="Project status" value={String(projectStatus)} />
-              <MetricRow
-                label="Team sentiment"
-                value={`${pissedOff} pissed-off`}
-                bad={pissedOff >= 60}
-              />
-              <MetricRow
-                label="Meeting load"
-                value={String(meetingLoad)}
-                bad={meetingLoad >= 60}
-              />
-              <MetricRow label="Alignment" value={String(alignment)} />
-              {timeMinutes > STANDUP_TIME_MINUTES && (
+            {/* Sprint metrics — 2-col grid + ticket outcome summary line */}
+            <div className="bg-white border border-[#dfe1e6] rounded p-3">
+              <div className="text-[10px] uppercase tracking-widest text-[#5e6c84] mb-1.5">
+                Sprint metrics
+              </div>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-0.5 text-[12px]">
+                <MetricRow label="Velocity" value={`${completedPoints}/${totalPoints} pts`} />
+                <MetricRow label="Project status" value={String(projectStatus)} />
                 <MetricRow
-                  label="Standup arrival"
-                  value={`${timeMinutes - STANDUP_TIME_MINUTES}m late`}
-                  bad
+                  label="Team sentiment"
+                  value={`${pissedOff} pissed-off`}
+                  bad={pissedOff >= 60}
                 />
-              )}
-            </div>
-            {/* Ticket outcome summary — replaces the dropped Kanban board */}
-            <div className="mt-2 pt-2 border-t border-[#f4f5f7] text-[11px] text-[#5e6c84]">
-              <span className="uppercase tracking-widest font-semibold mr-2">
-                Tickets
-              </span>
-              <span>{ticketSummary}</span>
-            </div>
-          </div>
-
-          {/* Performance review — color-tier chip */}
-          <div
-            className={`rounded border px-3 py-2 text-[12px] ${ratingStyle.chip} flex items-start gap-2`}
-          >
-            <span className="text-base leading-none mt-0.5">{ratingStyle.icon}</span>
-            <div className="flex-1">
-              <div className="font-semibold uppercase tracking-wide text-[11px]">
-                Performance review · {ratingStyle.label}
-                {rating.tier !== 'none' && (
-                  <span className="ml-2 font-mono opacity-70">Score {rating.score}</span>
+                <MetricRow
+                  label="Meeting load"
+                  value={String(meetingLoad)}
+                  bad={meetingLoad >= 60}
+                />
+                <MetricRow label="Alignment" value={String(alignment)} />
+                {timeMinutes > STANDUP_TIME_MINUTES && (
+                  <MetricRow
+                    label="Standup arrival"
+                    value={`${timeMinutes - STANDUP_TIME_MINUTES}m late`}
+                    bad
+                  />
                 )}
               </div>
-              <div className="italic mt-0.5 leading-snug">{rating.critique}</div>
+              {/* Ticket outcome summary — replaces the dropped Kanban board */}
+              <div className="mt-2 pt-2 border-t border-[#f4f5f7] text-[11px] text-[#5e6c84]">
+                <span className="uppercase tracking-widest font-semibold mr-2">
+                  Tickets
+                </span>
+                <span>{ticketSummary}</span>
+              </div>
             </div>
+
+            {/* Performance review — color-tier chip */}
+            <div
+              className={`rounded border px-3 py-2 text-[12px] ${ratingStyle.chip} flex items-start gap-2`}
+            >
+              <span className="text-base leading-none mt-0.5">{ratingStyle.icon}</span>
+              <div className="flex-1">
+                <div className="font-semibold uppercase tracking-wide text-[11px]">
+                  Performance review · {ratingStyle.label}
+                  {rating.tier !== 'none' && (
+                    <span className="ml-2 font-mono opacity-70">Score {rating.score}</span>
+                  )}
+                </div>
+                <div className="italic mt-0.5 leading-snug">{rating.critique}</div>
+              </div>
+            </div>
+
+            {/* Start new sprint CTA */}
+            <button
+              onClick={() => reset()}
+              className="w-full px-4 py-3 rounded bg-[#0052cc] text-white text-[14px] font-medium hover:bg-[#0747a6] transition shadow-sm"
+            >
+              Start new sprint →
+            </button>
           </div>
 
-          {/* Achievements — 3-column compact grid. All 12 visible at once,
-              tooltip on hover shows the description. */}
-          <div>
-            <div className="text-[10px] uppercase tracking-widest text-[#5e6c84] mb-1.5">
+          {/* Right: dedicated achievements list with full descriptions.
+              Every achievement is visible at once with its title +
+              description — no truncation, no tooltip required. */}
+          <div className="flex flex-col gap-1.5">
+            <div className="text-[10px] uppercase tracking-widest text-[#5e6c84] mb-0.5">
               Achievements
               <span className="ml-2 font-normal">
                 {unlocked.size}/{ACHIEVEMENTS.length}
               </span>
             </div>
-            <div className="grid grid-cols-3 gap-1.5">
-              {ACHIEVEMENTS.map((a) => {
-                const isUnlocked = unlocked.has(a.id)
-                const isNew = justUnlockedSet.has(a.id)
-                return (
-                  <div
-                    key={a.id}
-                    title={`${a.title} — ${a.description}`}
-                    className={[
-                      'relative flex items-center gap-1.5 px-2 py-1.5 rounded border text-[11px] leading-tight',
-                      isUnlocked
-                        ? isNew
-                          ? 'border-[#f5cd47] bg-[#fff7d6] text-[#172b4d]'
-                          : 'border-[#dfe1e6] bg-white text-[#172b4d]'
-                        : 'border-[#dfe1e6] bg-[#f4f5f7] text-[#5e6c84]',
-                    ].join(' ')}
-                  >
-                    <span className="text-xs leading-none flex-shrink-0">
-                      {isUnlocked ? (isNew ? '★' : '✓') : '○'}
-                    </span>
-                    <span className="font-medium truncate">{a.title}</span>
-                    {isNew && (
-                      <span className="absolute -top-1 -right-1 text-[7px] uppercase tracking-wider text-[#7f5f01] bg-[#f5cd47] px-1 rounded-sm font-bold">
-                        New
-                      </span>
-                    )}
+            {ACHIEVEMENTS.map((a) => {
+              const isUnlocked = unlocked.has(a.id)
+              const isNew = justUnlockedSet.has(a.id)
+              return (
+                <div
+                  key={a.id}
+                  className={[
+                    'relative flex items-start gap-2 px-2.5 py-1.5 rounded border',
+                    isUnlocked
+                      ? isNew
+                        ? 'border-[#f5cd47] bg-[#fff7d6] text-[#172b4d]'
+                        : 'border-[#dfe1e6] bg-white text-[#172b4d]'
+                      : 'border-[#dfe1e6] bg-[#f4f5f7] text-[#5e6c84]',
+                  ].join(' ')}
+                >
+                  <span className="text-sm leading-none flex-shrink-0 mt-0.5">
+                    {isUnlocked ? (isNew ? '★' : '✓') : '○'}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[12px] font-medium leading-tight">
+                      {a.title}
+                    </div>
+                    <div className="text-[11px] opacity-80 leading-snug mt-0.5">
+                      {a.description}
+                    </div>
                   </div>
-                )
-              })}
-            </div>
+                  {isNew && (
+                    <span className="absolute -top-1 -right-1 text-[8px] uppercase tracking-wider text-[#7f5f01] bg-[#f5cd47] px-1 rounded-sm font-bold">
+                      New
+                    </span>
+                  )}
+                </div>
+              )
+            })}
           </div>
-
-          {/* Start new sprint CTA */}
-          <button
-            onClick={() => reset()}
-            className="w-full px-4 py-3 rounded bg-[#0052cc] text-white text-[14px] font-medium hover:bg-[#0747a6] transition shadow-sm"
-          >
-            Start new sprint →
-          </button>
         </div>
       </div>
     </div>
