@@ -1,4 +1,4 @@
-import { Suspense } from 'react'
+import { Suspense, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { Office } from '../scene/Office'
 import { OfficeDecor } from '../scene/OfficeDecor'
@@ -27,15 +27,39 @@ export default function Game() {
   useInteractKey()
   useSlackTicker()
 
+  // WebGL context-lost recovery: when the underlying GL context dies (driver
+  // crash, GPU resource exhaustion, OS sleep, tab backgrounding), Three.js
+  // does not auto-restore — the canvas stays permanently white. We listen
+  // for the `webglcontextlost` event and bump a key so React fully remounts
+  // <Canvas>, which creates a fresh context and re-uploads all GPU resources.
+  // The 250ms delay gives the browser a moment to release the old context
+  // before we ask for a new one.
+  const [canvasKey, setCanvasKey] = useState(0)
+
   return (
     <div className="relative w-full h-full">
       <Canvas
+        key={canvasKey}
         shadows
         camera={{
           position: [PLAYER.spawnX, CAMERA.height, PLAYER.spawnZ + CAMERA.distance],
           fov: CAMERA.fov,
         }}
         gl={{ antialias: true }}
+        onCreated={({ gl }) => {
+          gl.domElement.addEventListener(
+            'webglcontextlost',
+            (e) => {
+              // preventDefault tells the browser we WANT to try to restore.
+              // Without it, the context stays lost permanently.
+              e.preventDefault()
+              // eslint-disable-next-line no-console
+              console.warn('[Blocked] WebGL context lost — remounting Canvas')
+              setTimeout(() => setCanvasKey((k) => k + 1), 250)
+            },
+            { once: true }
+          )
+        }}
       >
         <color attach="background" args={['#181818']} />
         <fog attach="fog" args={['#181818', 30, 60]} />
