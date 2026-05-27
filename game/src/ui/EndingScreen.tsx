@@ -9,6 +9,7 @@
 // performance review, achievements grid (all 12 visible at once), and
 // the "Start new sprint" CTA.
 
+import { useEffect } from 'react'
 import {
   useGameStore,
   selectFormattedTime,
@@ -16,12 +17,19 @@ import {
   STANDUP_TIME_MINUTES,
 } from '../state/gameStore'
 import { ACHIEVEMENTS } from '../content/achievements'
+import { audio } from '../audio/AudioManager'
 import {
   TICKETS,
   ticketOutcome,
   type Ticket,
   type TicketColumn,
 } from '../content/tickets'
+
+// Cascade timing for the just-unlocked achievement pop-in animation.
+// Must match the inline animation-delay = index * POP_STAGGER_MS in the
+// achievement card render below, and the matching audio.playAchievementPop
+// scheduled inside the useEffect.
+const POP_STAGGER_MS = 150
 
 // ---- Per-ending narrative copy (kept from the previous EndingScreen) ----
 
@@ -100,6 +108,18 @@ export function EndingScreen() {
     npcsHandled: handledCount,
   })
 
+  // Schedule a rising-pitch ding for each just-unlocked achievement, one
+  // every POP_STAGGER_MS so the audio cascade lines up with the CSS
+  // scale-bounce on the cards. Runs once per ended run.
+  // Effect must live above the conditional return — hooks can't be skipped.
+  useEffect(() => {
+    if (phase !== 'ended' || justUnlocked.length === 0) return
+    const timers = justUnlocked.map((_, i) =>
+      setTimeout(() => audio.playAchievementPop(i), i * POP_STAGGER_MS)
+    )
+    return () => timers.forEach(clearTimeout)
+  }, [phase, justUnlocked])
+
   if (phase !== 'ended' || !ending) return null
   const copy = ENDING_COPY[ending as EndingKey]
   if (!copy) return null
@@ -115,6 +135,9 @@ export function EndingScreen() {
   const ticketSummary = `${ticketsByColumn.done.length} done · ${ticketsByColumn.progress.length} in progress · ${ticketsByColumn.blocked.length} blocked · ${ticketsByColumn.todo.length} to do`
 
   const justUnlockedSet = new Set(justUnlocked)
+  // Map id → its position in the just-unlocked list, so each card knows its
+  // own cascade index for the animation-delay.
+  const newOrderMap = new Map(justUnlocked.map((id, i) => [id, i]))
   const ratingStyle = RATING_STYLE[rating.tier]
 
   return (
@@ -238,31 +261,39 @@ export function EndingScreen() {
           </div>
 
           {/* Right: 2-column grid of compact achievement cards. Each
-              card stacks an emoji + title row on top and a 2-line
-              description below in a smaller font. Sizing is tuned so
-              all 12 fit a typical viewport (1024×640+) without scroll.
-              Descriptions stay visible so the player can read what
-              each win actually was. */}
-          <div className="grid grid-cols-2 gap-1.5 self-start">
+              card stacks an emoji + title row on top and the full
+              description below in a smaller font. Titles wrap, descriptions
+              wrap — nothing is truncated, so the player sees the full text
+              of what they won. Just-unlocked cards cascade in with the
+              `achievement-pop` keyframes + an audio ding (see useEffect
+              above). */}
+          <div className="grid grid-cols-2 gap-2 self-start">
             {ACHIEVEMENTS.map((a) => {
               const isUnlocked = unlocked.has(a.id)
               const isNew = justUnlockedSet.has(a.id)
+              const popIndex = newOrderMap.get(a.id)
               return (
                 <div
                   key={a.id}
                   className={[
-                    'relative px-2 py-1.5 rounded border',
+                    'relative px-2.5 py-2 rounded border',
                     isUnlocked
                       ? isNew
                         ? 'border-[#f5cd47] bg-[#fff7d6] text-[#172b4d]'
                         : 'border-[#dfe1e6] bg-white text-[#172b4d]'
                       : 'border-[#dfe1e6] bg-[#f4f5f7] text-[#5e6c84]',
+                    isNew ? 'achievement-pop' : '',
                   ].join(' ')}
+                  style={
+                    isNew && popIndex !== undefined
+                      ? { animationDelay: `${popIndex * POP_STAGGER_MS}ms` }
+                      : undefined
+                  }
                 >
-                  {/* Title row: emoji + name, single line, truncates */}
-                  <div className="flex items-center gap-1.5">
+                  {/* Title row: emoji + name. Title wraps to 2 lines if needed. */}
+                  <div className="flex items-start gap-1.5">
                     <span
-                      className="text-sm leading-none flex-shrink-0"
+                      className="text-sm leading-none flex-shrink-0 mt-0.5"
                       style={
                         !isUnlocked
                           ? { filter: 'grayscale(1)', opacity: 0.45 }
@@ -271,21 +302,13 @@ export function EndingScreen() {
                     >
                       {a.emoji}
                     </span>
-                    <span className="text-[11px] font-semibold leading-tight flex-1 min-w-0 truncate">
+                    <span className="text-[11px] font-semibold leading-tight flex-1 min-w-0">
                       {a.title}
                     </span>
                   </div>
-                  {/* Description — 2-line clamp keeps every card the same
-                      height regardless of how long the description text is. */}
-                  <div
-                    className="text-[10px] leading-snug mt-1 opacity-80 overflow-hidden"
-                    style={{
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                    }}
-                    title={a.description}
-                  >
+                  {/* Description — full text, wraps freely so nothing
+                      gets cut off. */}
+                  <div className="text-[10px] leading-snug mt-1 opacity-80">
                     {a.description}
                   </div>
                   {isNew && (

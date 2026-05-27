@@ -25,3 +25,25 @@ html, body, #root {
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color: #ede5d0;
 }
+
+/*
+ * Achievement pop-in animation — used on the EndingScreen for cards that
+ * were just unlocked in the run that ended. Each card uses inline
+ * animation-delay so they cascade one after another with a 150ms stagger.
+ *
+ *   0%   — scale 0, invisible
+ *   60%  — overshoot to 1.15
+ *   100% — settle at 1.0
+ */
+@keyframes achievement-pop-in {
+  0%   { transform: scale(0); opacity: 0; }
+  60%  { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.achievement-pop {
+  /* Default backwards fill so the card stays invisible until its delay
+     elapses — otherwise we'd see all new cards at full size before the
+     animation starts, then watch them all snap to scale 0 simultaneously. */
+  animation: achievement-pop-in 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+}

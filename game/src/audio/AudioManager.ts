@@ -381,6 +381,42 @@ class AudioManager {
     }
   }
 
+  /**
+   * Achievement-unlock ding — short sine ping with a tiny upward chirp.
+   * Pitch rises across consecutive pops to feel like a building melody:
+   *   pop 0  →  660 Hz   (E5)
+   *   pop 1  →  741 Hz   (F#5)  (+2 semitones)
+   *   pop 2  →  831 Hz   (G#5)  (+4 semitones)
+   *   ...etc
+   *
+   * The caller (EndingScreen) passes the achievement's index in the
+   * just-unlocked list as `popIndex`, and we convert to semitones.
+   */
+  playAchievementPop(popIndex: number = 0) {
+    if (!this.ctx || this.muted) return
+    const ctx = this.ctx
+    const now = ctx.currentTime
+    // Base 660Hz, +2 semitones per pop. Cap at 8 semitones so very long
+    // unlock streaks don't ascend into uncomfortable territory.
+    const semitones = Math.min(popIndex * 2, 8)
+    const freq = 660 * Math.pow(2, semitones / 12)
+
+    const osc = ctx.createOscillator()
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(freq, now)
+    // Small upward chirp for that "ding" brightness
+    osc.frequency.exponentialRampToValueAtTime(freq * 1.06, now + 0.06)
+
+    const gain = ctx.createGain()
+    gain.gain.setValueAtTime(0.0001, now)
+    gain.gain.exponentialRampToValueAtTime(0.16, now + 0.008)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.32)
+
+    osc.connect(gain).connect(ctx.destination)
+    osc.start(now)
+    osc.stop(now + 0.36)
+  }
+
   /** Satisfying slap impact — fires the moment Leonard's hand connects
    *  with the printer. Two-component synth:
    *
