@@ -193,64 +193,189 @@ class AudioManager {
   }
 
   /**
-   * Printer jam noise — a low filtered noise burst (mechanical whirring
-   * struggling against itself), with a small high-frequency click at the
-   * end. Triggered randomly when the player is near the printer to give
-   * the printer some "presence" without it being a constant audio source.
-   *
-   * Composition:
-   *   - 0.45s of band-passed noise centered at ~120Hz → reads as motor
-   *     trying and failing to advance paper
-   *   - Last 50ms: a sharp square-wave click → the dreaded paper-jam clack
+   * Plays a random printer noise — picks one of 5 variants per call. The
+   * caller (PrinterProximityAudio) fires this on a random interval when
+   * the player is nearby, so over time you hear the full vocabulary of
+   * Xerox-era misery: warm-up pings, paper rustles, gears whirring,
+   * mechanism clacks, and error beep sequences.
    */
-  playPrinterJam() {
+  playPrinterNoise() {
     if (!this.ctx || this.muted) return
+    // Weighted variety: clacks + gears are most common (mechanical body),
+    // paper shifts mid, pings + errors least frequent (cleaner sounds).
+    const r = Math.random()
+    if (r < 0.28) this.playPrinterClack()
+    else if (r < 0.55) this.playPrinterGears()
+    else if (r < 0.78) this.playPrinterPaperShift()
+    else if (r < 0.92) this.playPrinterPing()
+    else this.playPrinterError()
+  }
+
+  /** Long warm-up "ready" ping — sine 800Hz with slow decay, ~0.55s. */
+  private playPrinterPing() {
+    if (!this.ctx) return
     const ctx = this.ctx
     const now = ctx.currentTime
+    const osc = ctx.createOscillator()
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(840, now)
+    osc.frequency.linearRampToValueAtTime(820, now + 0.55)
+    const gain = ctx.createGain()
+    gain.gain.setValueAtTime(0.0001, now)
+    gain.gain.exponentialRampToValueAtTime(0.09, now + 0.04)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.55)
+    osc.connect(gain).connect(ctx.destination)
+    osc.start(now)
+    osc.stop(now + 0.6)
+  }
 
-    // Whirring buzz — noise filtered to a tight low band, slight tremolo
-    // via a low-frequency oscillator on the gain so it sounds "stressed"
-    // rather than smooth.
-    const dur = 0.45
-    const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate)
+  /** Paper shifting / rustling — high-passed noise with tremolo amplitude
+   *  modulation that sounds like sheets being fed through a roller. */
+  private playPrinterPaperShift() {
+    if (!this.ctx) return
+    const ctx = this.ctx
+    const now = ctx.currentTime
+    const dur = 0.7
+    const len = Math.floor(ctx.sampleRate * dur)
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate)
     const data = buf.getChannelData(0)
-    for (let i = 0; i < data.length; i++) {
-      data[i] = (Math.random() * 2 - 1) * 0.35
-    }
+    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1
     const src = ctx.createBufferSource()
     src.buffer = buf
+    const filter = ctx.createBiquadFilter()
+    filter.type = 'highpass'
+    filter.frequency.value = 2400 // crisp paper-scrape range
+    filter.Q.value = 0.7
+    // Tremolo: a slow LFO modulates the gain to read as "rustle ... rustle"
+    const gain = ctx.createGain()
+    const lfo = ctx.createOscillator()
+    lfo.frequency.value = 9
+    const lfoGain = ctx.createGain()
+    lfoGain.gain.value = 0.025
+    gain.gain.setValueAtTime(0.0001, now)
+    gain.gain.exponentialRampToValueAtTime(0.06, now + 0.05)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + dur)
+    lfo.connect(lfoGain).connect(gain.gain)
+    src.connect(filter).connect(gain).connect(ctx.destination)
+    src.start(now)
+    lfo.start(now)
+    lfo.stop(now + dur)
+  }
 
+  /** Mechanical gears whirring — low band-passed noise with slow LFO
+   *  modulation, ~1.2s. The dominant "old printer" sound. */
+  private playPrinterGears() {
+    if (!this.ctx) return
+    const ctx = this.ctx
+    const now = ctx.currentTime
+    const dur = 1.15
+    const len = Math.floor(ctx.sampleRate * dur)
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate)
+    const data = buf.getChannelData(0)
+    for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * 0.5
+    const src = ctx.createBufferSource()
+    src.buffer = buf
+    const filter = ctx.createBiquadFilter()
+    filter.type = 'bandpass'
+    filter.frequency.value = 180
+    filter.Q.value = 5
+    // LFO grinds the volume slightly — a struggling motor cycling on/off.
+    const gain = ctx.createGain()
+    gain.gain.setValueAtTime(0.0001, now)
+    gain.gain.exponentialRampToValueAtTime(0.09, now + 0.06)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + dur)
+    const lfo = ctx.createOscillator()
+    lfo.frequency.value = 7
+    const lfoGain = ctx.createGain()
+    lfoGain.gain.value = 0.04
+    lfo.connect(lfoGain).connect(gain.gain)
+    src.connect(filter).connect(gain).connect(ctx.destination)
+    src.start(now)
+    lfo.start(now)
+    lfo.stop(now + dur)
+  }
+
+  /** Mechanism click-clack — the original jam sound. Short impact + clack. */
+  private playPrinterClack() {
+    if (!this.ctx) return
+    const ctx = this.ctx
+    const now = ctx.currentTime
+    // Initial thunk — filtered noise pulse
+    const dur = 0.35
+    const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate)
+    const data = buf.getChannelData(0)
+    for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * 0.4
+    const src = ctx.createBufferSource()
+    src.buffer = buf
     const filter = ctx.createBiquadFilter()
     filter.type = 'bandpass'
     filter.frequency.value = 130
     filter.Q.value = 6
-
     const gain = ctx.createGain()
     gain.gain.setValueAtTime(0.0001, now)
-    gain.gain.exponentialRampToValueAtTime(0.08, now + 0.04)
-    // Wobble: brief dip in the middle to read as "struggling"
-    gain.gain.exponentialRampToValueAtTime(0.04, now + 0.22)
-    gain.gain.exponentialRampToValueAtTime(0.07, now + 0.32)
+    gain.gain.exponentialRampToValueAtTime(0.1, now + 0.03)
     gain.gain.exponentialRampToValueAtTime(0.0001, now + dur)
-
     src.connect(filter).connect(gain).connect(ctx.destination)
     src.start(now)
-
-    // Click clack at the end — the moment the jam mechanism gives up.
-    // Use a quick square-wave blip, low-passed so it's a "clunk" not a beep.
+    // Trailing clack — square wave thwack
     const clackOsc = ctx.createOscillator()
     clackOsc.type = 'square'
     clackOsc.frequency.value = 220
     const clackFilter = ctx.createBiquadFilter()
     clackFilter.type = 'lowpass'
-    clackFilter.frequency.value = 600
+    clackFilter.frequency.value = 700
     const clackGain = ctx.createGain()
-    clackGain.gain.setValueAtTime(0.0001, now + dur - 0.04)
-    clackGain.gain.exponentialRampToValueAtTime(0.12, now + dur - 0.035)
+    clackGain.gain.setValueAtTime(0.0001, now + dur - 0.05)
+    clackGain.gain.exponentialRampToValueAtTime(0.14, now + dur - 0.045)
     clackGain.gain.exponentialRampToValueAtTime(0.0001, now + dur + 0.02)
     clackOsc.connect(clackFilter).connect(clackGain).connect(ctx.destination)
-    clackOsc.start(now + dur - 0.04)
+    clackOsc.start(now + dur - 0.05)
     clackOsc.stop(now + dur + 0.05)
+  }
+
+  /** Error beep sequence — 3 rapid square-wave beeps at 1200Hz. The "I
+   *  can't believe this is happening again" sound. */
+  private playPrinterError() {
+    if (!this.ctx) return
+    const ctx = this.ctx
+    const now = ctx.currentTime
+    for (let i = 0; i < 3; i++) {
+      const t = now + i * 0.13
+      const osc = ctx.createOscillator()
+      osc.type = 'square'
+      osc.frequency.value = 1200
+      const gain = ctx.createGain()
+      gain.gain.setValueAtTime(0.0001, t)
+      gain.gain.exponentialRampToValueAtTime(0.06, t + 0.005)
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.08)
+      osc.connect(gain).connect(ctx.destination)
+      osc.start(t)
+      osc.stop(t + 0.1)
+    }
+  }
+
+  /** A single "bloop" — low-pitched sine with downward pitch glide. Used
+   *  by CoffeeProximityAudio to fire a stream of bubble pops while the
+   *  player is near the coffee station, like a percolator brewing. */
+  playCoffeeBubble() {
+    if (!this.ctx || this.muted) return
+    const ctx = this.ctx
+    const now = ctx.currentTime
+    // Random start frequency 130-220Hz gives variety across pops.
+    const startFreq = 130 + Math.random() * 90
+    const osc = ctx.createOscillator()
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(startFreq, now)
+    // Downward glide is what makes it sound like a bubble rising and popping
+    // rather than a beep.
+    osc.frequency.exponentialRampToValueAtTime(startFreq * 0.55, now + 0.13)
+    const gain = ctx.createGain()
+    gain.gain.setValueAtTime(0.0001, now)
+    gain.gain.exponentialRampToValueAtTime(0.07, now + 0.008)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.16)
+    osc.connect(gain).connect(ctx.destination)
+    osc.start(now)
+    osc.stop(now + 0.2)
   }
 
   /** Short high blip — Slack ping (synth fallback). */

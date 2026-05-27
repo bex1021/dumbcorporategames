@@ -481,10 +481,14 @@ function ObjectNPC({
         </group>
       )}
 
-      {/* Printer ambient audio — random jam/clack noises when PM is nearby.
-          Kept in its own component so the useFrame only mounts for the
-          printer NPC, not every ObjectNPC. */}
+      {/* Printer ambient audio — random Xerox-style noises when PM is
+          nearby. Kept in its own component so the useFrame only mounts
+          for the printer NPC, not every ObjectNPC. */}
       {id === 'printer' && <PrinterProximityAudio worldX={x} worldZ={z} />}
+
+      {/* Coffee bubbling — percolator pops fire at short intervals when
+          PM is near the coffee station. */}
+      {id === 'coffee' && <CoffeeProximityAudio worldX={x} worldZ={z} />}
 
       {showLabels && (
         <>
@@ -553,13 +557,41 @@ function PrinterProximityAudio({
     if (distSq > 16) return
     const now = performance.now() / 1000
     if (now < nextFireAtRef.current) return
-    audio.playPrinterJam()
+    audio.playPrinterNoise()
     // Pick next interval: closer = more frequent (2.5–5s), farther (4–8s).
     const dist = Math.sqrt(distSq)
     const closeness = 1 - dist / 4 // 0..1
     const minGap = 2.5 + (1 - closeness) * 1.5
     const maxGap = 5 + (1 - closeness) * 3
     nextFireAtRef.current = now + minGap + Math.random() * (maxGap - minGap)
+  })
+  return null
+}
+
+// Coffee station bubbling — fires a short bubble pop on a tight interval
+// (0.3–0.9s) when PM is within ~3.5m. Mimics a percolator brewing in the
+// background of the room.
+function CoffeeProximityAudio({
+  worldX,
+  worldZ,
+}: {
+  worldX: number
+  worldZ: number
+}) {
+  const nextFireAtRef = useRef(performance.now() / 1000 + 1)
+  useFrame(() => {
+    const dx = playerPosition.x - worldX
+    const dz = playerPosition.z - worldZ
+    const distSq = dx * dx + dz * dz
+    if (distSq > 12.25) return // 3.5m proximity ring
+    const now = performance.now() / 1000
+    if (now < nextFireAtRef.current) return
+    audio.playCoffeeBubble()
+    // Bubble interval: 0.3s (close & frequent) to 1.2s (farther & sparse).
+    const dist = Math.sqrt(distSq)
+    const closeness = 1 - dist / 3.5
+    const baseGap = 0.4 + (1 - closeness) * 0.6
+    nextFireAtRef.current = now + baseGap + Math.random() * 0.4
   })
   return null
 }
