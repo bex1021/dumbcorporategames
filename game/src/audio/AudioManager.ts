@@ -382,39 +382,115 @@ class AudioManager {
   }
 
   /**
-   * Achievement-unlock ding — short sine ping with a tiny upward chirp.
-   * Pitch rises across consecutive pops to feel like a building melody:
-   *   pop 0  →  660 Hz   (E5)
-   *   pop 1  →  741 Hz   (F#5)  (+2 semitones)
-   *   pop 2  →  831 Hz   (G#5)  (+4 semitones)
-   *   ...etc
+   * Achievement-unlock chord-ding — three stacked sines forming a major
+   * triad (root + major 3rd + perfect 5th) for a richer, sparklier
+   * "you won this" sound than a single sine. Each chord rises +2 semitones
+   * from the previous pop:
+   *   pop 0  →  660 Hz major triad
+   *   pop 1  →  +2 semitones
+   *   pop 2  →  +4 semitones
+   *   ...capped at +8 semitones.
    *
    * The caller (EndingScreen) passes the achievement's index in the
-   * just-unlocked list as `popIndex`, and we convert to semitones.
+   * earned-this-run list as `popIndex`.
    */
   playAchievementPop(popIndex: number = 0) {
     if (!this.ctx || this.muted) return
     const ctx = this.ctx
     const now = ctx.currentTime
-    // Base 660Hz, +2 semitones per pop. Cap at 8 semitones so very long
-    // unlock streaks don't ascend into uncomfortable territory.
     const semitones = Math.min(popIndex * 2, 8)
-    const freq = 660 * Math.pow(2, semitones / 12)
+    const baseFreq = 660 * Math.pow(2, semitones / 12)
+    // Major triad — root, major 3rd (5/4), perfect 5th (3/2).
+    const freqs = [baseFreq, baseFreq * 1.25, baseFreq * 1.5]
 
-    const osc = ctx.createOscillator()
-    osc.type = 'sine'
-    osc.frequency.setValueAtTime(freq, now)
-    // Small upward chirp for that "ding" brightness
-    osc.frequency.exponentialRampToValueAtTime(freq * 1.06, now + 0.06)
-
+    // Shared envelope so the 3 voices feel like one chord, not three pings.
     const gain = ctx.createGain()
     gain.gain.setValueAtTime(0.0001, now)
-    gain.gain.exponentialRampToValueAtTime(0.16, now + 0.008)
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.32)
+    gain.gain.exponentialRampToValueAtTime(0.13, now + 0.008)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.4)
+    gain.connect(ctx.destination)
 
-    osc.connect(gain).connect(ctx.destination)
-    osc.start(now)
-    osc.stop(now + 0.36)
+    for (const f of freqs) {
+      const osc = ctx.createOscillator()
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(f, now)
+      // Small upward chirp on each voice for "ding" brightness
+      osc.frequency.exponentialRampToValueAtTime(f * 1.04, now + 0.06)
+      osc.connect(gain)
+      osc.start(now)
+      osc.stop(now + 0.45)
+    }
+
+    // High sparkle layer — a quiet, much higher sine that decays fast,
+    // gives the chord that "magic" shimmer overtone.
+    const sparkleOsc = ctx.createOscillator()
+    sparkleOsc.type = 'sine'
+    sparkleOsc.frequency.setValueAtTime(baseFreq * 4, now)
+    const sparkleGain = ctx.createGain()
+    sparkleGain.gain.setValueAtTime(0.0001, now)
+    sparkleGain.gain.exponentialRampToValueAtTime(0.04, now + 0.01)
+    sparkleGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18)
+    sparkleOsc.connect(sparkleGain).connect(ctx.destination)
+    sparkleOsc.start(now)
+    sparkleOsc.stop(now + 0.22)
+  }
+
+  /**
+   * Big "TA-DA" finale fanfare — fires once after the cascade of
+   * achievement pops finishes. Four-note ascending C-E-G-C run with a
+   * brassy filtered-sawtooth timbre, last note sustained for a moment of
+   * triumph. Used by EndingScreen at the tail of the achievement cascade.
+   */
+  playAchievementFanfare() {
+    if (!this.ctx || this.muted) return
+    const ctx = this.ctx
+    const now = ctx.currentTime
+    // C5 → E5 → G5 → C6
+    const notes: { f: number; t: number; dur: number }[] = [
+      { f: 523.25, t: 0.00, dur: 0.16 },
+      { f: 659.25, t: 0.12, dur: 0.16 },
+      { f: 783.99, t: 0.24, dur: 0.16 },
+      { f: 1046.5, t: 0.38, dur: 0.85 }, // sustained finale note
+    ]
+    for (const { f, t, dur } of notes) {
+      const start = now + t
+      const end = start + dur
+
+      // Brass-ish: sawtooth through a low-pass that opens up briefly.
+      const osc = ctx.createOscillator()
+      osc.type = 'sawtooth'
+      osc.frequency.setValueAtTime(f, start)
+
+      const filter = ctx.createBiquadFilter()
+      filter.type = 'lowpass'
+      filter.frequency.setValueAtTime(f * 3, start)
+      filter.frequency.exponentialRampToValueAtTime(f * 6, start + 0.06)
+      filter.Q.value = 1.2
+
+      const gain = ctx.createGain()
+      gain.gain.setValueAtTime(0.0001, start)
+      gain.gain.exponentialRampToValueAtTime(0.18, start + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.0001, end)
+
+      osc.connect(filter).connect(gain).connect(ctx.destination)
+      osc.start(start)
+      osc.stop(end + 0.05)
+
+      // Octave shimmer on the sustained final note — gives that
+      // "trumpet flourish" overtone.
+      if (dur > 0.5) {
+        const shimmerOsc = ctx.createOscillator()
+        shimmerOsc.type = 'sine'
+        shimmerOsc.frequency.setValueAtTime(f * 2, start)
+        const shimmerGain = ctx.createGain()
+        shimmerGain.gain.setValueAtTime(0.0001, start)
+        shimmerGain.gain.exponentialRampToValueAtTime(0.06, start + 0.05)
+        shimmerGain.gain.exponentialRampToValueAtTime(0.0001, end)
+        shimmerOsc.connect(shimmerGain).connect(ctx.destination)
+        shimmerOsc.start(start)
+        shimmerOsc.stop(end + 0.05)
+      }
+    }
   }
 
   /** Satisfying slap impact — fires the moment Leonard's hand connects

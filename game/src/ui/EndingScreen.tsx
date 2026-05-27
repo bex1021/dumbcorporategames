@@ -31,6 +31,17 @@ import {
 // scheduled inside the useEffect.
 const POP_STAGGER_MS = 150
 
+// Sparkle directions — 8 dots distributed evenly around 360° at a
+// moderate radius. Each becomes (--dx, --dy) on its card. Kept under
+// ~45px so the dots stay roughly inside the grid cell and don't smear
+// across into neighboring cards' airspace. Computed once at module load.
+const SPARKLE_DIRECTIONS = Array.from({ length: 8 }, (_, i) => {
+  const angle = (i / 8) * Math.PI * 2 + Math.PI / 16 // small offset so dots don't sit on horizontal/vertical axes
+  // Slight radius variance so sparkles don't look like a perfect ring.
+  const r = 38 + (i % 2 === 0 ? 0 : 6)
+  return { dx: Math.cos(angle) * r, dy: Math.sin(angle) * r }
+})
+
 // ---- Per-ending narrative copy (kept from the previous EndingScreen) ----
 
 type EndingKey =
@@ -114,18 +125,32 @@ export function EndingScreen() {
     npcsHandled: handledCount,
   })
 
-  // Schedule a rising-pitch ding for each achievement earned this run, one
-  // every POP_STAGGER_MS so the audio cascade lines up with the CSS
-  // scale-bounce on the cards. Uses earnedThisRun (not lastUnlocked) so
-  // the celebration still fires on replays after every achievement has
-  // already been first-time-unlocked.
+  // Schedule the achievement fanfare:
+  //   1. A rising-pitch chord-ding for each card earned this run, fired
+  //      at i * POP_STAGGER_MS so the audio cascade lines up with the CSS
+  //      scale-bounce on the cards.
+  //   2. A "TA-DA" brass fanfare a beat after the last card pops, as
+  //      the curtain-call moment.
+  // Uses earnedThisRun (not lastUnlocked) so the celebration still fires
+  // on replays after every achievement has been first-time-unlocked.
   // Effect must live above the conditional return — hooks can't be skipped.
   useEffect(() => {
     if (phase !== 'ended' || earnedThisRun.length === 0) return
-    const timers = earnedThisRun.map((_, i) =>
+    const popTimers = earnedThisRun.map((_, i) =>
       setTimeout(() => audio.playAchievementPop(i), i * POP_STAGGER_MS)
     )
-    return () => timers.forEach(clearTimeout)
+    // Fanfare fires shortly after the last chord-ding lands so it reads
+    // as a finale, not a 5th note in the cascade.
+    const fanfareDelay =
+      (earnedThisRun.length - 1) * POP_STAGGER_MS + 550 // last pop start + pop duration
+    const fanfareTimer = setTimeout(
+      () => audio.playAchievementFanfare(),
+      fanfareDelay
+    )
+    return () => {
+      popTimers.forEach(clearTimeout)
+      clearTimeout(fanfareTimer)
+    }
   }, [phase, earnedThisRun])
 
   if (phase !== 'ended' || !ending) return null
@@ -269,60 +294,89 @@ export function EndingScreen() {
             </button>
           </div>
 
-          {/* Right: 2-column grid of compact achievement cards. Each
-              card stacks an emoji + title row on top and the full
-              description below in a smaller font. Titles wrap, descriptions
-              wrap — nothing is truncated, so the player sees the full text
-              of what they won. Just-unlocked cards cascade in with the
-              `achievement-pop` keyframes + an audio ding (see useEffect
-              above). */}
+          {/* Right: 2-column grid of compact achievement cards. Cards
+              earned this run get the full fanfare treatment: scale
+              overshoot + wiggle pop-in, a diagonal gold shimmer sweep,
+              a breathing gold glow, sparkle dots flying outward, and
+              chord-ding audio (see useEffect above). */}
           <div className="grid grid-cols-2 gap-2 self-start">
             {ACHIEVEMENTS.map((a) => {
               const isUnlocked = unlocked.has(a.id)
               const isNew = justUnlockedSet.has(a.id)
               const earnedNow = earnedThisRunSet.has(a.id)
               const popIndex = popOrderMap.get(a.id)
+              const popDelay =
+                earnedNow && popIndex !== undefined
+                  ? `${popIndex * POP_STAGGER_MS}ms`
+                  : undefined
               return (
                 <div
                   key={a.id}
                   className={[
                     'relative px-2.5 py-2 rounded border',
-                    isUnlocked
-                      ? isNew
-                        ? 'border-[#f5cd47] bg-[#fff7d6] text-[#172b4d]'
-                        : 'border-[#dfe1e6] bg-white text-[#172b4d]'
-                      : 'border-[#dfe1e6] bg-[#f4f5f7] text-[#5e6c84]',
+                    earnedNow
+                      ? 'border-[#f5cd47] bg-[#fff7d6] text-[#172b4d]'
+                      : isUnlocked
+                        ? 'border-[#dfe1e6] bg-white text-[#172b4d]'
+                        : 'border-[#dfe1e6] bg-[#f4f5f7] text-[#5e6c84]',
                     earnedNow ? 'achievement-pop' : '',
                   ].join(' ')}
+                  // CSS variable feeds the same delay into pop, glow,
+                  // shimmer, and sparkle animations defined in index.css.
                   style={
-                    earnedNow && popIndex !== undefined
-                      ? { animationDelay: `${popIndex * POP_STAGGER_MS}ms` }
+                    popDelay
+                      ? ({ '--pop-delay': popDelay } as React.CSSProperties)
                       : undefined
                   }
                 >
-                  {/* Title row: emoji + name. Title wraps to 2 lines if needed. */}
-                  <div className="flex items-start gap-1.5">
-                    <span
-                      className="text-sm leading-none flex-shrink-0 mt-0.5"
-                      style={
-                        !isUnlocked
-                          ? { filter: 'grayscale(1)', opacity: 0.45 }
-                          : undefined
-                      }
-                    >
-                      {a.emoji}
-                    </span>
-                    <span className="text-[11px] font-semibold leading-tight flex-1 min-w-0">
-                      {a.title}
-                    </span>
+                  {/* Shimmer wrapper — gold gradient sweeps across the card
+                      once on entry. Clipped to rounded corners via the
+                      wrapper's own overflow:hidden. */}
+                  {earnedNow && <span className="achievement-shimmer" />}
+
+                  {/* Sparkle burst — 8 dots fan out from card center. */}
+                  {earnedNow &&
+                    SPARKLE_DIRECTIONS.map((dir, i) => (
+                      <span
+                        key={i}
+                        className={`achievement-sparkle${
+                          i % 2 === 0 ? '' : ' cream'
+                        }`}
+                        style={
+                          {
+                            '--dx': `${dir.dx}px`,
+                            '--dy': `${dir.dy}px`,
+                          } as React.CSSProperties
+                        }
+                      />
+                    ))}
+
+                  {/* Content sits above the shimmer/sparkles via z-index. */}
+                  <div className="relative z-10">
+                    {/* Title row: emoji + name. Title wraps if needed. */}
+                    <div className="flex items-start gap-1.5">
+                      <span
+                        className="text-sm leading-none flex-shrink-0 mt-0.5"
+                        style={
+                          !isUnlocked
+                            ? { filter: 'grayscale(1)', opacity: 0.45 }
+                            : undefined
+                        }
+                      >
+                        {a.emoji}
+                      </span>
+                      <span className="text-[11px] font-semibold leading-tight flex-1 min-w-0">
+                        {a.title}
+                      </span>
+                    </div>
+                    {/* Description — full text, wraps freely. */}
+                    <div className="text-[10px] leading-snug mt-1 opacity-80">
+                      {a.description}
+                    </div>
                   </div>
-                  {/* Description — full text, wraps freely so nothing
-                      gets cut off. */}
-                  <div className="text-[10px] leading-snug mt-1 opacity-80">
-                    {a.description}
-                  </div>
+
                   {isNew && (
-                    <span className="absolute -top-1 -right-1 text-[8px] uppercase tracking-wider text-[#7f5f01] bg-[#f5cd47] px-1 rounded-sm font-bold">
+                    <span className="absolute -top-1 -right-1 z-20 text-[8px] uppercase tracking-wider text-[#7f5f01] bg-[#f5cd47] px-1 rounded-sm font-bold">
                       New
                     </span>
                   )}

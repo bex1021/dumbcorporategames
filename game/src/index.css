@@ -27,23 +27,137 @@ html, body, #root {
 }
 
 /*
- * Achievement pop-in animation — used on the EndingScreen for cards that
- * were just unlocked in the run that ended. Each card uses inline
- * animation-delay so they cascade one after another with a 150ms stagger.
+ * Achievement cascade — used on the EndingScreen for cards earned this run.
+ * Each card cascades in at its own offset via the `--pop-delay` CSS var
+ * set inline by the React component (POP_STAGGER_MS × card index).
  *
- *   0%   — scale 0, invisible
- *   60%  — overshoot to 1.15
- *   100% — settle at 1.0
+ * Four moving parts, all keyed off the same per-card delay:
+ *   1. pop-in: game-show overshoot scale + rotation wiggle (0.55s)
+ *   2. shimmer: gold gradient sweeps diagonally across the card (1.4s,
+ *      sits in a child wrapper with overflow:hidden so it clips to the
+ *      rounded border)
+ *   3. glow: breathing gold box-shadow that pulses indefinitely after
+ *      the pop settles
+ *   4. sparkle: 8 small dots burst outward from the card center,
+ *      direction encoded per-dot via --dx/--dy custom props.
  */
+
+/* 1. The big pop. Scale 0 → 1.5 overshoot → 0.92 undershoot → settle,
+   with a small rotation wiggle that resets to 0 at the end. */
 @keyframes achievement-pop-in {
-  0%   { transform: scale(0); opacity: 0; }
-  60%  { transform: scale(1.15); opacity: 1; }
-  100% { transform: scale(1); opacity: 1; }
+  0%   { transform: scale(0)    rotate(-6deg); opacity: 0; }
+  40%  { transform: scale(1.5)  rotate(4deg);  opacity: 1; }
+  65%  { transform: scale(0.92) rotate(-2deg); opacity: 1; }
+  85%  { transform: scale(1.04) rotate(1deg);  opacity: 1; }
+  100% { transform: scale(1)    rotate(0deg);  opacity: 1; }
 }
 
+/* 2. Shimmer sweep — a diagonal gold gradient slides left → right across
+   the card once on entry. Lives on a child ::before (see .achievement-shimmer)
+   so it clips to the rounded border without affecting the card's own
+   overflow (which would hide the NEW badge / sparkles). */
+@keyframes achievement-shimmer-sweep {
+  0%   { transform: translateX(-120%) skewX(-18deg); opacity: 0; }
+  20%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translateX(180%)  skewX(-18deg); opacity: 0; }
+}
+
+/* 3. Glow pulse — gold box-shadow that breathes after the pop lands.
+   Soft enough to feel ambient, not strobe-y. */
+@keyframes achievement-glow-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0  1px  rgba(245, 205, 71, 0.9),
+      0 0 8px      rgba(245, 205, 71, 0.35);
+  }
+  50% {
+    box-shadow:
+      0 0 0  2px  rgba(245, 205, 71, 1),
+      0 0 22px     rgba(245, 205, 71, 0.75);
+  }
+}
+
+/* 4. Sparkle — small dot that flies outward from card center, scales up
+   then fades. --dx and --dy come from inline style per dot to spread
+   them around 360°. */
+@keyframes achievement-sparkle {
+  0% {
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  60% {
+    transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1.4);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(calc(-50% + var(--dx) * 1.4), calc(-50% + var(--dy) * 1.4)) scale(0);
+    opacity: 0;
+  }
+}
+
+/* Card class: applies pop-in + lingering glow pulse. Both animations
+   wait for --pop-delay before starting so the cascade timing matches
+   the inline JS audio scheduling. The `backwards` fill on pop-in keeps
+   the card invisible during the delay; the glow waits its own
+   computed delay (pop-delay + 0.55s pop duration). */
 .achievement-pop {
-  /* Default backwards fill so the card stays invisible until its delay
-     elapses — otherwise we'd see all new cards at full size before the
-     animation starts, then watch them all snap to scale 0 simultaneously. */
-  animation: achievement-pop-in 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+  animation:
+    achievement-pop-in 0.55s cubic-bezier(0.34, 1.56, 0.64, 1)
+      var(--pop-delay, 0ms) backwards,
+    achievement-glow-pulse 2.4s ease-in-out
+      calc(var(--pop-delay, 0ms) + 0.55s) infinite;
+  /* Each card sits in its own grid cell; relative positioning lets the
+     shimmer + sparkle children layer inside it. */
+  position: relative;
+}
+
+/* Shimmer wrapper — sized to fill the card, clips the moving gradient
+   to the rounded corners. Its ::before is the actual gradient. */
+.achievement-shimmer {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+.achievement-shimmer::before {
+  content: '';
+  position: absolute;
+  inset: -10% -50%;
+  background: linear-gradient(
+    110deg,
+    transparent 35%,
+    rgba(255, 224, 102, 0.85) 50%,
+    transparent 65%
+  );
+  animation: achievement-shimmer-sweep 1.2s ease-out
+    calc(var(--pop-delay, 0ms) + 0.25s) backwards;
+}
+
+/* Sparkle dot — positioned at card center, flies outward to its assigned
+   (--dx, --dy). Color alternates between gold and cream via the variant
+   class on the dot. */
+.achievement-sparkle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #ffd700;
+  box-shadow: 0 0 4px rgba(255, 215, 0, 0.9);
+  pointer-events: none;
+  opacity: 0;
+  z-index: 2;
+  animation: achievement-sparkle 0.75s ease-out
+    calc(var(--pop-delay, 0ms) + 0.2s) forwards;
+}
+.achievement-sparkle.cream {
+  background: #fff8d0;
+  box-shadow: 0 0 4px rgba(255, 248, 208, 1);
 }
