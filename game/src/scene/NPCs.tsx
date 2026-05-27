@@ -1,10 +1,27 @@
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { Html } from '@react-three/drei'
+import { useFrame } from '@react-three/fiber'
+import type { Group, Object3D } from 'three'
 import { NPCS, OBJECT_INTERACTIONS } from '../config/constants'
 import { useGameStore, type Effects } from '../state/gameStore'
 import { playerPosition } from '../state/playerState'
 import { GLBHumanoid } from './GLBHumanoid'
 import { Workstation } from './Furniture'
+
+// Head-turn tuning: NPCs notice the player when they're within this many
+// meters (squared so we can skip a sqrt). 4m² (≈ 2m radius around the desk)
+// is the proximity ring used for the InteractPrompt too, but we expand to
+// 4m radius (16m²) for awareness so heads turn before E-prompts appear.
+const HEAD_TURN_RANGE_SQ = 16
+// Max yaw a Mixamo head bone can hold before it starts to look unnatural.
+// Real necks reach ~70° comfortably; clamp to 1.22 rad so the head doesn't
+// rotate past believable range when player walks behind a seated NPC.
+const HEAD_TURN_MAX_YAW = 1.22
+// Smoothing factor per frame for head rotation toward target. Lower = lazier
+// glance; higher = snappier double-take. 0.08 reads as "noticing you".
+const HEAD_TURN_LERP = 0.08
+// Lerp back to neutral when player leaves the proximity ring.
+const HEAD_RELAX_LERP = 0.06
 
 // When an NPC enters dialogue, they swap to the standing-idle variant of
 // their base mesh (e.g., Male1_idle / Female1_idle) and rotate to face the PM.
@@ -143,8 +160,87 @@ function NPC({
   // NPC out from behind their desk when they stand up to talk, so they're
   // beside the chair, not on top of it.
 
+  // ---- Head-turn refs ----
+  // groupRef anchors us in the scene graph so we can traverse downward into
+  // GLBHumanoid's cloned skeleton to find the head bone. headRef caches it
+  // once located so subsequent frames just rotate, no traversal.
+  const groupRef = useRef<Group>(null)
+  const headRef = useRef<Object3D | null>(null)
+  // GLBs load async via Suspense. The head bone won't exist for the first
+  // few frames after mount; cap traversal attempts so we don't waste cycles
+  // if a particular GLB never resolves (e.g., a 404 in the wild).
+  const findAttemptsRef = useRef(0)
+
+  useFrame(() => {
+    if (!groupRef.current) return
+
+    // Lazy-find the Mixamo head bone after the cloned skinned mesh mounts.
+    // Bone name in our processed GLBs is `mixamorigHead` (sometimes
+    // `mixamorig9Head` depending on the source file). The trailing `Head$`
+    // anchor avoids matching `mixamorigHeadTop_End`, the tiny leaf bone
+    // above the head that we DON'T want to rotate.
+    // Cap at 1800 frames (~30s at 60fps) so a never-resolving GLB doesn't
+    // waste cycles forever, but we have a generous window for cold-cache
+    // loads on a slow connection.
+    if (!headRef.current && findAttemptsRef.current < 1800) {
+      findAttemptsRef.current++
+      groupRef.current.traverse((obj) => {
+        if (!headRef.current && /^mixamorig\d*Head$/.test(obj.name)) {
+          headRef.current = obj
+        }
+      })
+      if (!headRef.current) return
+    }
+    if (!headRef.current) return
+
+    // During dialogue the whole body has already been rotated by the outer
+    // group to face the PM (talkingFacingY), so additional head-turn would
+    // double-rotate. Relax the head back to neutral instead.
+    if (isTalking) {
+      headRef.current.rotation.y *= 1 - HEAD_RELAX_LERP
+      return
+    }
+
+    // World position of the NPC's head pivot is approximately the outer
+    // group's XZ — close enough for proximity & angle math (the head bone
+    // is ~1.5m above ground, but we're only doing horizontal yaw).
+    const npcX = x + sideOffsetX
+    const npcZ = z
+    const dx = playerPosition.x - npcX
+    const dz = playerPosition.z - npcZ
+    const distSq = dx * dx + dz * dz
+
+    if (distSq > HEAD_TURN_RANGE_SQ) {
+      // Player out of range — drift head back to neutral.
+      headRef.current.rotation.y *= 1 - HEAD_RELAX_LERP
+      return
+    }
+
+    // World-frame angle from NPC toward player, measured from +Z toward +X
+    // (matches the convention used by talkingFacingY math above).
+    const playerAngleWorld = Math.atan2(dx, dz)
+    // The body's world-facing direction is outer rotation + the inner-group
+    // π wrapper that flips Mixamo's default -Z forward into +Z.
+    const bodyWorldFacing = facingY + Math.PI
+    // Desired head yaw, relative to the body's forward.
+    let yaw = playerAngleWorld - bodyWorldFacing
+    // Wrap into [-π, π] so the head takes the shorter rotational path.
+    while (yaw > Math.PI) yaw -= Math.PI * 2
+    while (yaw < -Math.PI) yaw += Math.PI * 2
+    // Clamp so heads can't twist 180° to track a player behind them — they
+    // hold a maxed-out side-glance instead, which reads as "I noticed you
+    // and I'm too jaded to fully turn around."
+    const clamped = Math.max(-HEAD_TURN_MAX_YAW, Math.min(HEAD_TURN_MAX_YAW, yaw))
+    const cur = headRef.current.rotation.y
+    headRef.current.rotation.y = cur + (clamped - cur) * HEAD_TURN_LERP
+  })
+
   return (
-    <group position={[x + sideOffsetX, 0, z]} rotation={[0, facingY, 0]}>
+    <group
+      ref={groupRef}
+      position={[x + sideOffsetX, 0, z]}
+      rotation={[0, facingY, 0]}
+    >
       {renderedGlb && (
         <Suspense fallback={null}>
           <group
@@ -348,22 +444,15 @@ function ObjectNPC({
     <group position={[x, 0, z]}>
       {role === 'Plant' ? (
         <group>
+          {/* Pot — static, never sways */}
           <mesh position={[0, 0.3, 0]} castShadow>
             <cylinderGeometry args={[0.32, 0.25, 0.6, 16]} />
             <meshStandardMaterial color="#7a5a3a" />
           </mesh>
-          <mesh position={[0, 0.95, 0]} castShadow>
-            <sphereGeometry args={[0.5, 14, 12]} />
-            <meshStandardMaterial color={color} />
-          </mesh>
-          <mesh position={[0.15, 1.2, 0.1]} castShadow>
-            <sphereGeometry args={[0.3, 12, 10]} />
-            <meshStandardMaterial color={color} />
-          </mesh>
-          <mesh position={[-0.18, 1.15, -0.05]} castShadow>
-            <sphereGeometry args={[0.25, 12, 10]} />
-            <meshStandardMaterial color={color} />
-          </mesh>
+          {/* Foliage — sways gently when player is nearby. Pivot is at the
+              top of the pot (y=0.6) so the leaves rock at the soil line,
+              like a real plant disturbed by someone brushing past. */}
+          <SwayingFoliage worldX={x} worldZ={z} color={color} />
         </group>
       ) : (
         <group>
@@ -396,6 +485,62 @@ function ObjectNPC({
           )}
         </>
       )}
+    </group>
+  )
+}
+
+// Phyllis's leaves rock gently when the player gets close. The pivot group
+// sits at y=0.6 (top of the pot), so the foliage hinges at the soil line
+// rather than rotating around its own center — looks like a real plant
+// reacting to someone brushing past.
+//
+// Intensity ramps linearly from 1.0 at touch to 0 at 4m, then the rotation
+// smoothly returns to neutral. We never snap; ramps are 0.15-step lerps so
+// the sway has visible inertia (it keeps swaying briefly after you stop).
+function SwayingFoliage({
+  worldX,
+  worldZ,
+  color,
+}: {
+  worldX: number
+  worldZ: number
+  color: string
+}) {
+  const swayRef = useRef<Group>(null)
+  useFrame((state) => {
+    if (!swayRef.current) return
+    const dx = playerPosition.x - worldX
+    const dz = playerPosition.z - worldZ
+    const dist = Math.hypot(dx, dz)
+    // 1.0 at touch, 0 at 4m+. PM interacts via E at ~1.5m, so sway is
+    // visibly peaking when the interact prompt appears.
+    const intensity = Math.max(0, 1 - dist / 4)
+    const t = state.clock.elapsedTime
+    // Two-axis sine wave with different frequencies on each axis so the
+    // motion never feels like a clean wobble — reads as foliage, not a metronome.
+    const targetX = Math.sin(t * 2.7) * 0.12 * intensity
+    const targetZ = Math.cos(t * 2.3) * 0.08 * intensity
+    swayRef.current.rotation.x =
+      swayRef.current.rotation.x * 0.85 + targetX * 0.15
+    swayRef.current.rotation.z =
+      swayRef.current.rotation.z * 0.85 + targetZ * 0.15
+  })
+  return (
+    <group ref={swayRef} position={[0, 0.6, 0]}>
+      {/* Main leaf bulb — local-coord positions are original world Y minus
+          the 0.6 pivot offset. */}
+      <mesh position={[0, 0.35, 0]} castShadow>
+        <sphereGeometry args={[0.5, 14, 12]} />
+        <meshStandardMaterial color={color} />
+      </mesh>
+      <mesh position={[0.15, 0.6, 0.1]} castShadow>
+        <sphereGeometry args={[0.3, 12, 10]} />
+        <meshStandardMaterial color={color} />
+      </mesh>
+      <mesh position={[-0.18, 0.55, -0.05]} castShadow>
+        <sphereGeometry args={[0.25, 12, 10]} />
+        <meshStandardMaterial color={color} />
+      </mesh>
     </group>
   )
 }

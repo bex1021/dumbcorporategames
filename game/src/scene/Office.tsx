@@ -1,5 +1,6 @@
 import { Text } from '@react-three/drei'
 import { OFFICE, ZONES, WINDOWS } from '../config/constants'
+import { WallClock } from './WallClock'
 
 // ---- Office palette ----
 // Severance bones (white walls, fluorescent ceiling) softened with warm
@@ -59,6 +60,15 @@ export function Office() {
       {ZONES.map((z) => (
         <Zone key={z.id} {...z} />
       ))}
+
+      {/* Severance-style wall clock on the back wall, right-segment.
+          Reads the gameStore's timeMinutes so the standup deadline is *felt*
+          in the world, not just labeled in the HUD chip. Position offset
+          0.12m forward of the wall plane to avoid z-fighting with the wall
+          and any mounted signage on the same plane. */}
+      <WallClock
+        position={[6, OFFICE.wallHeight - 0.65, -OFFICE.halfDepth + 0.12]}
+      />
     </group>
   )
 }

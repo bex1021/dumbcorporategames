@@ -26,6 +26,12 @@ import { useKeyboard } from '../hooks/useKeyboard'
 import { OFFICE, PLAYER, ROOM_COLLIDERS } from '../config/constants'
 import { playerPosition, playerVelocity, playerFacing } from '../state/playerState'
 import { useGameStore } from '../state/gameStore'
+import { audio } from '../audio/AudioManager'
+
+// How often to fire a footstep while moving. Tuned to Leonard's walk-cycle
+// cadence (~2.6 steps/sec at full speed). At slower speed the player
+// auto-tween the gait by stretching the interval (see step-rate scaling).
+const STEP_BASE_INTERVAL_S = 0.42
 
 useGLTF.preload('/models/Player_Idle.glb')
 useGLTF.preload('/models/Player_Walking.glb')
@@ -62,6 +68,11 @@ export function Player() {
 
   // Crossfade target — stored in a ref so we only fire on TRANSITION.
   const currentRef = useRef<'Idle' | 'Walk'>('Idle')
+
+  // Footstep cadence state: time of last step + parity flag for L/R pitch.
+  // Kept in refs so they don't trigger React re-renders every frame.
+  const lastStepRef = useRef(0)
+  const stepParityRef = useRef(0)
 
   useEffect(() => {
     const idleAction = actions[IDLE_NAME]
@@ -156,6 +167,22 @@ export function Player() {
 
     // Crossfade Idle ↔ Walk on speed threshold crossing only.
     const speed = Math.hypot(playerVelocity.x, playerVelocity.z)
+
+    // Footstep audio: fire a step every ~0.42s of actual walking, scaled by
+    // velocity so backward / slowed motion ticks slightly slower (feels more
+    // natural). Alternate pitch each step so the rhythm doesn't sound robotic.
+    if (speed > 0.4) {
+      const now = performance.now() / 1000
+      const speedScale = Math.min(1, speed / PLAYER.walkSpeed)
+      const interval = STEP_BASE_INTERVAL_S / Math.max(0.4, speedScale)
+      if (now - lastStepRef.current >= interval) {
+        lastStepRef.current = now
+        const pitch = stepParityRef.current === 0 ? 1.0 : 0.92
+        audio.playFootstep({ pitch })
+        stepParityRef.current = 1 - stepParityRef.current
+      }
+    }
+
     const desired: 'Idle' | 'Walk' = speed > 0.2 ? 'Walk' : 'Idle'
     if (desired !== currentRef.current) {
       const prev = actions[currentRef.current]
