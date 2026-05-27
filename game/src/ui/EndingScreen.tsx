@@ -121,9 +121,9 @@ export function EndingScreen() {
     <div className="fixed inset-0 z-50 bg-[#f4f5f7] text-[#172b4d] flex flex-col overflow-hidden">
       <JiraNav />
 
-      {/* Page header — centered */}
+      {/* Page header — same max-w as the body so it aligns visually */}
       <div className="px-6 pt-3 pb-2 flex-shrink-0">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-5xl mx-auto">
           <div className="text-[12px] text-[#5e6c84]">
             Projects › Customer Happiness Portal Refresh › Sprint 47 › Retrospective
           </div>
@@ -134,8 +134,13 @@ export function EndingScreen() {
                 {copy.title}
               </span>
             </h1>
-            <div className="text-[12px] text-[#5e6c84]">
-              {handledCount}/{TICKETS.length} tickets handled · ended {time}
+            <div className="text-[12px] text-[#5e6c84] flex items-center gap-3">
+              <span>
+                {handledCount}/{TICKETS.length} tickets · ended {time}
+              </span>
+              <span className="text-[#42526e]">
+                · {unlocked.size}/{ACHIEVEMENTS.length} achievements
+              </span>
             </div>
           </div>
         </div>
@@ -232,16 +237,13 @@ export function EndingScreen() {
             </button>
           </div>
 
-          {/* Right: dedicated achievements list with full descriptions.
-              Every achievement is visible at once with its title +
-              description — no truncation, no tooltip required. */}
+          {/* Right: achievements list with full descriptions. Header
+              removed so the first card aligns with the outcome banner
+              top in the center column — the running count is shown in
+              the page title bar instead. Locked achievements still show
+              their emoji but desaturated so the badge is recognizable
+              even before unlock. */}
           <div className="flex flex-col gap-1.5">
-            <div className="text-[10px] uppercase tracking-widest text-[#5e6c84] mb-0.5">
-              Achievements
-              <span className="ml-2 font-normal">
-                {unlocked.size}/{ACHIEVEMENTS.length}
-              </span>
-            </div>
             {ACHIEVEMENTS.map((a) => {
               const isUnlocked = unlocked.has(a.id)
               const isNew = justUnlockedSet.has(a.id)
@@ -249,7 +251,7 @@ export function EndingScreen() {
                 <div
                   key={a.id}
                   className={[
-                    'relative flex items-start gap-2 px-2.5 py-1.5 rounded border',
+                    'relative flex items-start gap-2.5 px-2.5 py-2 rounded border',
                     isUnlocked
                       ? isNew
                         ? 'border-[#f5cd47] bg-[#fff7d6] text-[#172b4d]'
@@ -257,8 +259,18 @@ export function EndingScreen() {
                       : 'border-[#dfe1e6] bg-[#f4f5f7] text-[#5e6c84]',
                   ].join(' ')}
                 >
-                  <span className="text-sm leading-none flex-shrink-0 mt-0.5">
-                    {isUnlocked ? (isNew ? '★' : '✓') : '○'}
+                  {/* Emoji badge — large at left of the card. Locked
+                      achievements get desaturated so the icon is still
+                      legible without spoiling the win. */}
+                  <span
+                    className="text-xl leading-none flex-shrink-0 mt-0.5"
+                    style={
+                      !isUnlocked
+                        ? { filter: 'grayscale(1)', opacity: 0.45 }
+                        : undefined
+                    }
+                  >
+                    {a.emoji}
                   </span>
                   <div className="flex-1 min-w-0">
                     <div className="text-[12px] font-medium leading-tight">

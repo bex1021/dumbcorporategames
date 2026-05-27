@@ -39,6 +39,10 @@ export type Achievement = {
   condition: (s: RunSnapshot) => boolean
   // Optional sentence shown on the ending screen — corporate satire flavor.
   flavor: string
+  // Emoji rendered as the badge on the ending screen achievement card.
+  // Picked per-achievement to telegraph the win (clock for On Time,
+  // printer for Printer Prophet, etc).
+  emoji: string
 }
 
 export const ACHIEVEMENTS: Achievement[] = [
@@ -46,6 +50,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     id: 'survived-the-sweep',
     title: 'Survived the Sweep',
     description: 'Completed Pre-Standup Alignment without escalation.',
+    emoji: '🎯',
     condition: (s) =>
       s.ending === 'standup-complete' ||
       s.ending === 'green-enough' ||
@@ -56,6 +61,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     id: 'on-time',
     title: 'On Time',
     description: 'Handled all 5 stakeholders before the 10:15 standup.',
+    emoji: '⏰',
     // Won the run AND timeMinutes never exceeded the deadline.
     condition: (s) =>
       (s.ending === 'standup-complete' ||
@@ -68,6 +74,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     id: 'aggressively-aligned',
     title: 'Aggressively Aligned',
     description: 'Ended a run with Alignment 8 or higher.',
+    emoji: '🏆',
     condition: (s) => s.alignment >= 8,
     flavor: 'You have collected enough artifacts to summon a Strategy Doc.',
   },
@@ -75,6 +82,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     id: 'performative-flailing',
     title: 'Performative Flailing',
     description: 'Won a run with Alignment 2 or lower.',
+    emoji: '🎭',
     // You completed the standup but produced almost no alignment "value".
     // The play-style achievement for going through the motions.
     condition: (s) =>
@@ -87,6 +95,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     id: 'aligned-but-hated',
     title: 'Aligned but Hated',
     description: 'Won with Alignment ≥ 8 and Team Pissed-Off ≥ 60.',
+    emoji: '😤',
     // The pyrrhic-alignment ending also captures this; achievement still
     // unlocks even if you scrape through with green-enough at high pissed.
     condition: (s) => s.alignment >= 8 && s.pissedOff >= 60,
@@ -97,6 +106,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     id: 'glassdoor-draft',
     title: 'Glassdoor Draft',
     description: 'Pissed-Off reached the Glassdoor tier (≥ 75).',
+    emoji: '💼',
     // Bumped 60 → 75 to match the actual GLASSDOOR_DRAFT meter tier.
     condition: (s) => s.pissedOff >= 75,
     flavor: 'Three of your reports have suspiciously updated LinkedIn headlines.',
@@ -105,6 +115,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     id: 'calendar-apocalypse',
     title: 'Calendar Apocalypse',
     description: 'Triggered the calendar recovery panel in a run.',
+    emoji: '📅',
     condition: (s) => s.recoveryTriggered,
     flavor: 'You said "I have a hard stop" so many times you forgot which one.',
   },
@@ -112,6 +123,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     id: 'reality-caught-up',
     title: 'Reality Caught Up',
     description: 'A delayed consequence fired during a run.',
+    emoji: '⚡',
     condition: (s) => s.delayedFireCount >= 1,
     flavor: 'The phrase "as I flagged earlier" was used against you.',
   },
@@ -119,6 +131,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     id: 'printer-prophet',
     title: 'Printer Prophet',
     description: 'Interacted with the printer 5 times in a single run.',
+    emoji: '🖨️',
     // The printer has 5 escalating bark lines — this rewards finding all of them.
     condition: (s) => (s.copingUseCounts.printer ?? 0) >= 5,
     flavor: 'PC LOAD LETTER. PC LOAD MEANING.',
@@ -127,6 +140,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     id: 'plant-friend',
     title: 'Plant Friend',
     description: 'Vented to Phyllis 5 times in a single run.',
+    emoji: '🌿',
     condition: (s) => (s.copingUseCounts.phyllis ?? 0) >= 5,
     flavor:
       'You and Phyllis have decided to take this 1:1 outside the formal evaluation cycle.',
@@ -135,6 +149,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     id: 'permanent-lurker',
     title: 'Permanent Lurker',
     description: 'Completed the standup without opening the Slack panel once.',
+    emoji: '👁️',
     // Only counts as 'won' if you actually finished the day — failing the
     // standup AND ignoring Slack is just regular failure, not avoidance art.
     condition: (s) =>
@@ -148,6 +163,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     id: 'inbox-zero',
     title: 'Inbox Zero',
     description: 'Opened Slack and finished the run with fewer than 5 unread.',
+    emoji: '📭',
     condition: (s) => s.slackOpenedAtAll && s.finalUnreadSlack < 5,
     flavor:
       'You read every message that came in. We are obligated to consider whether this was a good use of your time.',
