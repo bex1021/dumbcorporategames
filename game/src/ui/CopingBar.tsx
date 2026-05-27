@@ -11,7 +11,13 @@
 import { useState } from 'react'
 import { useGameStore, type Effects } from '../state/gameStore'
 import { audio } from '../audio/AudioManager'
+import { playerPosition, playerFacing, playerVelocity } from '../state/playerState'
 import { EffectChip } from './EffectChip'
+
+// Bathroom interior center — must match Bathroom.tsx geometry. PM is
+// teleported here when "Cry in Bathroom" fires, facing +X toward the
+// mirror on the right wall.
+const BATHROOM_TELEPORT = { x: 16, z: 11.5, facingY: -Math.PI / 2 }
 
 type CopingAction = {
   id: string
@@ -113,6 +119,19 @@ export function CopingBar() {
     applyEffects(effects)
     incrementCoping(action.id)
     audio.play('slack') // soft ping for any coping action
+
+    // Cry in Bathroom teleports the PM to the actual bathroom room
+    // carved out of the front-right corner. Mutate the shared transform
+    // refs directly — the Player useFrame reads playerPosition each
+    // frame, so this takes effect on the next render. Zero velocity so
+    // PM doesn't carry forward motion across the teleport.
+    if (action.id === 'bathroom') {
+      playerPosition.x = BATHROOM_TELEPORT.x
+      playerPosition.z = BATHROOM_TELEPORT.z
+      playerVelocity.x = 0
+      playerVelocity.z = 0
+      playerFacing.y = BATHROOM_TELEPORT.facingY
+    }
   }
 
   const hoveredAction = ACTIONS.find((a) => a.id === hoveredId) ?? null

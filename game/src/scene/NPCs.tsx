@@ -500,35 +500,170 @@ function ObjectNPC({
   )
 }
 
-// Coffee station — moved here from Office.tsx so it can participate in the
-// ObjectNPC interaction system (E to "Grab a coffee", rotating barks, meter
-// effects). Visual identical to the previous Office.tsx CoffeeMachine.
+// Coffee station — a proper barista-style espresso bar. Replaces the
+// previous "two boxes stacked" placeholder with a recognizable counter +
+// machine + accessories silhouette: counter base with dark wood top, a
+// brushed-metal espresso machine body with group head + portafilter +
+// drip tray, a bean hopper on top, a steam wand sticking out to the side,
+// a small pressure gauge, a coffee pot on a heat plate, and a few mugs.
+//
+// All meshes are local to the parent ObjectNPC group, which sits at the
+// coffee station's world position (constants.ts NPCS 'coffee' entry).
 function CoffeeMachine() {
   return (
     <group>
-      {/* Counter — sterile gray */}
-      <mesh position={[0, 0.45, 0]} castShadow receiveShadow>
-        <boxGeometry args={[1.2, 0.9, 0.6]} />
-        <meshStandardMaterial color="#8a9499" />
+      {/* ---------- Counter ---------- */}
+      {/* Gray base */}
+      <mesh position={[0, 0.4, 0]} castShadow receiveShadow>
+        <boxGeometry args={[1.6, 0.8, 0.55]} />
+        <meshStandardMaterial color="#8a9499" roughness={0.6} />
       </mesh>
-      {/* Coffee machine on top — gloss black */}
-      <mesh position={[0, 1.15, 0]} castShadow>
-        <boxGeometry args={[0.5, 0.5, 0.4]} />
-        <meshStandardMaterial color="#3d4549" />
+      {/* Wood-grain dark top */}
+      <mesh position={[0, 0.825, 0]} castShadow receiveShadow>
+        <boxGeometry args={[1.65, 0.05, 0.6]} />
+        <meshStandardMaterial color="#3a2c1e" roughness={0.7} />
       </mesh>
-      {/* Spout */}
-      <mesh position={[0, 0.95, 0.18]} castShadow>
-        <cylinderGeometry args={[0.04, 0.04, 0.1, 8]} />
+
+      {/* ---------- Espresso machine body ---------- */}
+      {/* Main brushed-metal body, sitting left of center on the counter */}
+      <mesh position={[-0.2, 1.13, -0.02]} castShadow receiveShadow>
+        <boxGeometry args={[0.6, 0.55, 0.36]} />
+        <meshStandardMaterial color="#aab2ba" metalness={0.55} roughness={0.35} />
+      </mesh>
+      {/* Dark cap on top of body */}
+      <mesh position={[-0.2, 1.42, -0.02]} castShadow>
+        <boxGeometry args={[0.62, 0.05, 0.36]} />
+        <meshStandardMaterial color="#1f2226" roughness={0.4} />
+      </mesh>
+      {/* Bean hopper — translucent brown cylinder on top */}
+      <mesh position={[-0.2, 1.55, -0.08]}>
+        <cylinderGeometry args={[0.07, 0.07, 0.2, 16]} />
+        <meshStandardMaterial
+          color="#3a2410"
+          roughness={0.3}
+          transparent
+          opacity={0.85}
+        />
+      </mesh>
+      {/* Hopper cap */}
+      <mesh position={[-0.2, 1.66, -0.08]}>
+        <cylinderGeometry args={[0.08, 0.08, 0.025, 16]} />
         <meshStandardMaterial color="#1a1a1a" />
       </mesh>
-      {/* Tiny teal status LED on the machine — Lumon-y detail */}
-      <mesh position={[0.18, 1.18, 0.21]}>
-        <boxGeometry args={[0.04, 0.02, 0.01]} />
+
+      {/* ---------- Group head + portafilter (where coffee comes out) ---------- */}
+      <mesh position={[-0.2, 1.05, 0.21]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+        <cylinderGeometry args={[0.045, 0.045, 0.09, 14]} />
+        <meshStandardMaterial color="#1a1a1a" metalness={0.75} roughness={0.3} />
+      </mesh>
+      {/* Portafilter stem — short black handle protruding down-out */}
+      <mesh
+        position={[-0.2, 0.985, 0.32]}
+        rotation={[Math.PI / 3.2, 0, 0]}
+        castShadow
+      >
+        <cylinderGeometry args={[0.022, 0.022, 0.18, 8]} />
+        <meshStandardMaterial color="#1a1a1a" />
+      </mesh>
+      {/* Portafilter handle cap */}
+      <mesh position={[-0.2, 0.94, 0.41]} rotation={[Math.PI / 3.2, 0, 0]}>
+        <boxGeometry args={[0.06, 0.025, 0.04]} />
+        <meshStandardMaterial color="#2a2a2a" />
+      </mesh>
+
+      {/* Drip tray — thin slotted rectangle under the group head */}
+      <mesh position={[-0.2, 0.865, 0.15]}>
+        <boxGeometry args={[0.18, 0.018, 0.16]} />
+        <meshStandardMaterial color="#15191c" metalness={0.4} />
+      </mesh>
+
+      {/* ---------- Steam wand ---------- */}
+      {/* Chrome cylinder angling out to the right */}
+      <mesh
+        position={[0.15, 1.12, 0.06]}
+        rotation={[0, 0, -Math.PI / 3.5]}
+        castShadow
+      >
+        <cylinderGeometry args={[0.012, 0.012, 0.34, 8]} />
+        <meshStandardMaterial color="#c0c5cc" metalness={0.85} roughness={0.18} />
+      </mesh>
+      {/* Steam tip nozzle */}
+      <mesh position={[0.31, 1.18, 0.06]} castShadow>
+        <sphereGeometry args={[0.018, 8, 6]} />
+        <meshStandardMaterial color="#a0a4aa" metalness={0.85} />
+      </mesh>
+
+      {/* ---------- Pressure gauge ---------- */}
+      <mesh
+        position={[0.08, 1.18, 0.19]}
+        rotation={[Math.PI / 2, 0, 0]}
+        castShadow
+      >
+        <cylinderGeometry args={[0.038, 0.038, 0.015, 18]} />
+        <meshStandardMaterial color="#f4f5f7" roughness={0.4} />
+      </mesh>
+      {/* Gauge needle — small red bar pointing slightly past upright */}
+      <mesh position={[0.085, 1.195, 0.198]} rotation={[0, 0, -0.5]}>
+        <boxGeometry args={[0.005, 0.028, 0.002]} />
+        <meshStandardMaterial color="#c44a4a" emissive="#c44a4a" emissiveIntensity={0.4} />
+      </mesh>
+
+      {/* ---------- Status LED — teal Lumon detail ---------- */}
+      <mesh position={[0.22, 1.32, 0.18]}>
+        <boxGeometry args={[0.04, 0.018, 0.006]} />
         <meshStandardMaterial
           color="#4fa9a3"
           emissive="#4fa9a3"
-          emissiveIntensity={0.8}
+          emissiveIntensity={0.9}
         />
+      </mesh>
+
+      {/* ---------- Coffee pot on heat plate (right of espresso machine) ---------- */}
+      {/* Heat plate */}
+      <mesh position={[0.45, 0.86, -0.02]} castShadow>
+        <boxGeometry args={[0.22, 0.025, 0.22]} />
+        <meshStandardMaterial color="#15191c" />
+      </mesh>
+      {/* Pot body — slightly tapered cylinder */}
+      <mesh position={[0.45, 1.0, -0.02]} castShadow>
+        <cylinderGeometry args={[0.08, 0.07, 0.24, 16]} />
+        <meshStandardMaterial color="#222428" metalness={0.3} roughness={0.55} />
+      </mesh>
+      {/* Coffee inside, peeking out the top */}
+      <mesh position={[0.45, 1.1, -0.02]}>
+        <cylinderGeometry args={[0.062, 0.062, 0.04, 14]} />
+        <meshStandardMaterial
+          color="#3d2010"
+          emissive="#2a1408"
+          emissiveIntensity={0.15}
+        />
+      </mesh>
+      {/* Pot handle — short rectangular grip on the side */}
+      <mesh position={[0.56, 1.0, -0.02]} castShadow>
+        <boxGeometry args={[0.05, 0.16, 0.025]} />
+        <meshStandardMaterial color="#15191c" />
+      </mesh>
+
+      {/* ---------- Mugs ---------- */}
+      {/* Mug A — left of espresso machine on counter top */}
+      <mesh position={[-0.62, 0.89, -0.02]} castShadow>
+        <cylinderGeometry args={[0.045, 0.045, 0.085, 14]} />
+        <meshStandardMaterial color="#f0eee8" roughness={0.5} />
+      </mesh>
+      {/* Mug A handle — small ring on the side */}
+      <mesh position={[-0.555, 0.89, -0.02]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.022, 0.006, 8, 16]} />
+        <meshStandardMaterial color="#f0eee8" />
+      </mesh>
+      {/* Mug B — stacked on top of Mug A */}
+      <mesh position={[-0.62, 0.98, -0.02]} castShadow>
+        <cylinderGeometry args={[0.045, 0.045, 0.085, 14]} />
+        <meshStandardMaterial color="#f0eee8" roughness={0.5} />
+      </mesh>
+      {/* Mug C — beige variant on counter, slightly forward */}
+      <mesh position={[-0.5, 0.89, 0.13]} castShadow>
+        <cylinderGeometry args={[0.045, 0.045, 0.085, 14]} />
+        <meshStandardMaterial color="#c8b89a" roughness={0.6} />
       </mesh>
     </group>
   )

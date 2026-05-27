@@ -224,7 +224,9 @@ export const OBJECT_INTERACTIONS: Record<string, ObjectInteraction> = {
 export const ZONES = [
   { id: 'pm-desk', label: 'PM Desk', kind: 'desk', x: -9, z: 9 },
   // Coffee moved to NPCS roster as an interactive object NPC. See OBJECT_INTERACTIONS.
-  { id: 'bathroom', label: 'Bathroom', kind: 'door', x: 9, z: 9 },
+  // Bathroom is now a real room (see Bathroom.tsx) carved into the front-right
+  // corner — colliders below + geometry in Bathroom.tsx. "Cry in Bathroom"
+  // coping action teleports PM inside.
   { id: 'hr', label: 'HR Office', kind: 'room', x: -10, z: -10, w: 6, d: 4 },
   { id: 'meeting', label: 'SYNERGY 2A', kind: 'room', x: 10, z: -10, w: 6, d: 4 },
 ] as const
@@ -236,7 +238,7 @@ export const WINDOWS = [
   { x: 12, w: 5, h: 2 },
 ] as const
 
-// Rectangular wall colliders for partitioned rooms (HR, SYNERGY 2A).
+// Rectangular wall colliders for partitioned rooms (HR, SYNERGY 2A, Bathroom).
 // Each room has back + left + right walls; the front (+Z side) is open as a
 // doorway. Axes are world XZ; player collides against these.
 export const ROOM_COLLIDERS = [
@@ -248,4 +250,12 @@ export const ROOM_COLLIDERS = [
   { minX: 7, maxX: 13, minZ: -12.04, maxZ: -11.96 }, // back wall
   { minX: 6.96, maxX: 7.04, minZ: -12, maxZ: -8 }, // left wall
   { minX: 12.96, maxX: 13.04, minZ: -12, maxZ: -8 }, // right wall
+  // Bathroom (front-right corner, bounds x=14..18, z=10..13)
+  // The office's front wall (z=+13) and right wall (x=+18) form 2 sides
+  // automatically; we only need to collide the new partition walls.
+  // Front partition at z=10, full width
+  { minX: 14, maxX: 18, minZ: 9.96, maxZ: 10.04 },
+  // Left partition at x=14, SPLIT by a 1m doorway at z=11..12
+  { minX: 13.96, maxX: 14.04, minZ: 10, maxZ: 11 },
+  { minX: 13.96, maxX: 14.04, minZ: 12, maxZ: 13 },
 ] as const

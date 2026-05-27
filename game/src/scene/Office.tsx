@@ -1,5 +1,6 @@
 import { Text } from '@react-three/drei'
 import { OFFICE, ZONES, WINDOWS } from '../config/constants'
+import { Bathroom } from './Bathroom'
 import { WallClock } from './WallClock'
 
 // ---- Office palette ----
@@ -69,6 +70,12 @@ export function Office() {
       <WallClock
         position={[6, OFFICE.wallHeight - 0.65, -OFFICE.halfDepth + 0.12]}
       />
+
+      {/* Bathroom carved into the front-right corner. Walls + fixtures
+          + tile floor + signage. PM is teleported here when "Cry in
+          Bathroom" is clicked on the coping bar. See Bathroom.tsx and
+          ROOM_COLLIDERS in constants.ts. */}
+      <Bathroom />
     </group>
   )
 }
