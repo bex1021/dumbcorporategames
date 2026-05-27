@@ -479,14 +479,23 @@ function PMChair() {
         <cylinderGeometry args={[0.04, 0.04, 0.4, 10]} />
         <meshStandardMaterial color="#1a1a1a" metalness={0.5} roughness={0.4} />
       </mesh>
-      {/* 5-leg star base */}
+      {/* 5-leg star base — each leg is a long thin box pointing OUTWARD
+          from the chair center. The default boxGeometry has its long
+          axis along local +Z, so we rotate by +angle around Y so each
+          leg's long axis aligns with the radial direction (sin θ, 0, cos θ).
+          Previous version used -angle which collapsed all legs inward to
+          the center.
+
+          Position each leg's center at radius 0.15 so the inner end is
+          near the pillar and the outer end (at +0.29 = 0.15 + 0.14) is
+          at the wheel position. */}
       {Array.from({ length: 5 }).map((_, i) => {
         const angle = (i / 5) * Math.PI * 2
         return (
           <mesh
             key={i}
-            position={[Math.sin(angle) * 0.18, 0.05, Math.cos(angle) * 0.18]}
-            rotation={[0, -angle, 0]}
+            position={[Math.sin(angle) * 0.15, 0.05, Math.cos(angle) * 0.15]}
+            rotation={[0, angle, 0]}
             castShadow
           >
             <boxGeometry args={[0.05, 0.05, 0.28]} />
@@ -494,15 +503,15 @@ function PMChair() {
           </mesh>
         )
       })}
-      {/* 5 small wheels at the leg tips */}
+      {/* 5 small wheels at the leg tips, radius 0.29 */}
       {Array.from({ length: 5 }).map((_, i) => {
         const angle = (i / 5) * Math.PI * 2
         return (
           <mesh
             key={`wheel-${i}`}
-            position={[Math.sin(angle) * 0.31, 0.025, Math.cos(angle) * 0.31]}
+            position={[Math.sin(angle) * 0.29, 0.025, Math.cos(angle) * 0.29]}
           >
-            <sphereGeometry args={[0.025, 8, 6]} />
+            <sphereGeometry args={[0.028, 10, 8]} />
             <meshStandardMaterial color="#15191c" />
           </mesh>
         )
