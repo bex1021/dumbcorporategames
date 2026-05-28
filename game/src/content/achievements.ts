@@ -94,11 +94,14 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     id: 'aligned-but-hated',
     title: 'Aligned but Hated',
-    description: 'Won with Alignment ≥ 8 and Team Pissed-Off ≥ 60.',
+    description: 'Won with Alignment ≥ 7 and Team Pissed-Off ≥ 45.',
     emoji: '😤',
-    // The pyrrhic-alignment ending also captures this; achievement still
-    // unlocks even if you scrape through with green-enough at high pissed.
-    condition: (s) => s.alignment >= 8 && s.pissedOff >= 60,
+    // Thresholds lowered 8→7 / 60→45 after playtest: the original combo was
+    // mathematically unreachable. High-alignment choices are low-pissed, and
+    // the high-pissed paths spike Meeting Load into calendar-apocalypse
+    // before you can finish. 7/45 is hittable by a deliberately
+    // aggravating-but-aligned run. Matches the pyrrhic-alignment ending gate.
+    condition: (s) => s.alignment >= 7 && s.pissedOff >= 45,
     flavor:
       'Everyone agreed with you. Everyone is also drafting an exit interview question they will ask each other.',
   },

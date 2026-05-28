@@ -50,6 +50,7 @@ type EndingKey =
   | 'pyrrhic-alignment'
   | 'full-escalation'
   | 'calendar-apocalypse'
+  | 'missed-standup'
 
 const ENDING_COPY: Record<EndingKey, { title: string; body: string; goalMet: boolean }> = {
   'standup-complete': {
@@ -83,6 +84,12 @@ const ENDING_COPY: Record<EndingKey, { title: string; body: string; goalMet: boo
     title: 'Calendar Apocalypse',
     body:
       'There are no empty slots. There are no decisions. There is only availability.\n\nWork cannot fail if no one has time to do it.',
+    goalMet: false,
+  },
+  'missed-standup': {
+    title: 'Missed the Standup',
+    body:
+      "It is 10:30 AM. The standup started fifteen minutes ago. It started without you.\n\nThe meeting invite says \"optional,\" which is how you know it was not. Someone has already typed \"will follow up with PM async\" into the thread.\n\nYou were still in the bullpen, aligning. The aligning was, in the end, the thing that made you late to be aligned.",
     goalMet: false,
   },
 }

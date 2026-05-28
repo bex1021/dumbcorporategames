@@ -38,6 +38,12 @@ import { audio } from '../audio/AudioManager'
 // step = ~0.53s. We use 0.55 to slightly stagger ahead of perfect sync,
 // which sounds more natural than a tight metronome lock.
 const STEP_BASE_INTERVAL_S = 0.55
+// Game-minutes consumed per meter walked. At 4.2 m/s walk speed this is
+// ~0.25 game-min per real second of walking — so a focused run spends
+// ~6-10 min crossing the floor and a wanderer can burn 15-20+, eating into
+// the 75-min standup budget (and the 90-min hard deadline) without
+// dominating it. Tunable.
+const WALK_MINUTES_PER_METER = 0.06
 
 useGLTF.preload('/models/Player_Idle.glb')
 useGLTF.preload('/models/Player_Walking.glb')
@@ -95,6 +101,10 @@ export function Player() {
   const rightArmBoneRef = useRef<Object3D | null>(null)
   const slapStartTimeRef = useRef(0)
   const lastTriggerRef = useRef(0)
+  // Accumulates fractional game-minutes from walking; flushes whole minutes
+  // to the store. Distance × WALK_MINUTES_PER_METER, so standing still is
+  // free and (since we key off velocity, not position) teleports don't count.
+  const walkMinAccumRef = useRef(0)
 
   useEffect(() => {
     const idleAction = actions[IDLE_NAME]
@@ -189,6 +199,20 @@ export function Player() {
 
     // Crossfade Idle ↔ Walk on speed threshold crossing only.
     const speed = Math.hypot(playerVelocity.x, playerVelocity.z)
+
+    // Walking burns the clock. Accumulate fractional game-minutes from
+    // distance covered this frame (speed × delta = metres); flush whole
+    // minutes to the store, which also enforces the hard 10:30 deadline.
+    // Keyed off velocity, so the Cry-in-Bathroom teleport (which zeroes
+    // velocity) never counts as a sprint across the office.
+    if (speed > 0.2) {
+      walkMinAccumRef.current += speed * delta * WALK_MINUTES_PER_METER
+      if (walkMinAccumRef.current >= 1) {
+        const whole = Math.floor(walkMinAccumRef.current)
+        walkMinAccumRef.current -= whole
+        useGameStore.getState().addWalkTime(whole)
+      }
+    }
 
     // Footstep audio: fire a step every STEP_BASE_INTERVAL_S while moving.
     // No speed scaling — the Mixamo Walk animation plays at a fixed cadence

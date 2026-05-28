@@ -91,6 +91,10 @@ const WIN_NPC_COUNT = 5 // required NPC roster: Brent, Tasha, Priya, Chad, Diane
 // rating takes a penalty per minute late. See LATE_PENALTY_PER_MINUTE.
 export const STANDUP_TIME_MINUTES = 75
 export const LATE_PENALTY_PER_MINUTE = 2
+// Hard fail deadline: the 10:15 standup is at 75 min; you get a 15-minute
+// grace, then it's over. Cross 90 min (10:30 AM) and the run ends in a loss
+// no matter your meters. Closes the "take forever, never fail" exploit.
+export const HARD_DEADLINE_MINUTES = 90
 
 export type Ending =
   | 'standup-complete'
@@ -98,6 +102,7 @@ export type Ending =
   | 'pyrrhic-alignment'
   | 'full-escalation'
   | 'calendar-apocalypse'
+  | 'missed-standup'
 
 type State = {
   // Meters
@@ -185,6 +190,9 @@ type State = {
   // Actions
   startGame: () => void
   applyEffects: (e: Effects) => void
+  // Accrue game-time from walking. Called by Player.tsx as the PM moves
+  // (distance-based, so standing still is free). Trips the hard deadline.
+  addWalkTime: (minutes: number) => void
   markHandled: (npcId: string) => void
   incrementCoping: (actionId: string) => void
   setNearbyNPC: (npcId: string | null) => void
@@ -219,6 +227,7 @@ const INITIAL: Omit<
   State,
   | 'startGame'
   | 'applyEffects'
+  | 'addWalkTime'
   | 'markHandled'
   | 'incrementCoping'
   | 'setNearbyNPC'
@@ -322,13 +331,41 @@ export const useGameStore: GameStoreHook =
   },
 
   applyEffects: (e) =>
-    set((s) => ({
-      timeMinutes: s.timeMinutes + (e.time ?? 0),
-      projectStatus: clamp(s.projectStatus + (e.projectStatus ?? 0), 0, 100),
-      pissedOff: clamp(s.pissedOff + (e.pissedOff ?? 0), 0, 100),
-      meetingLoad: clamp(s.meetingLoad + (e.meetingLoad ?? 0), 0, 100),
-      alignment: Math.max(0, s.alignment + (e.alignment ?? 0)),
-    })),
+    set((s) => {
+      const timeMinutes = s.timeMinutes + (e.time ?? 0)
+      const projectStatus = clamp(s.projectStatus + (e.projectStatus ?? 0), 0, 100)
+      const pissedOff = clamp(s.pissedOff + (e.pissedOff ?? 0), 0, 100)
+      const meetingLoad = clamp(s.meetingLoad + (e.meetingLoad ?? 0), 0, 100)
+      const alignment = Math.max(0, s.alignment + (e.alignment ?? 0))
+      const base = { timeMinutes, projectStatus, pissedOff, meetingLoad, alignment }
+      // Hard deadline: a costly choice (e.g. a +30m option, or Cry in
+      // Bathroom's +15m) can push you past 10:30 — that's a loss.
+      if (s.phase === 'playing' && timeMinutes >= HARD_DEADLINE_MINUTES) {
+        return { ...base, ...missedStandupPatch(s, base) }
+      }
+      return base
+    }),
+
+  // Walking burns the clock. Player.tsx feeds whole game-minutes here as the
+  // PM moves around. Trips the same hard deadline as everything else.
+  addWalkTime: (minutes) =>
+    set((s) => {
+      if (s.phase !== 'playing' || minutes <= 0) return {}
+      const timeMinutes = s.timeMinutes + minutes
+      if (timeMinutes >= HARD_DEADLINE_MINUTES) {
+        return {
+          timeMinutes,
+          ...missedStandupPatch(s, {
+            timeMinutes,
+            projectStatus: s.projectStatus,
+            pissedOff: s.pissedOff,
+            meetingLoad: s.meetingLoad,
+            alignment: s.alignment,
+          }),
+        }
+      }
+      return { timeMinutes }
+    }),
 
   markHandled: (npcId) => {
     // Compute the patch outside set() so we can also schedule the toast
@@ -641,7 +678,7 @@ export const useGameStore: GameStoreHook =
       const allHandled = REQUIRED_NPC_IDS.every((id) => s.handledNPCs.has(id))
       if (allHandled) {
         let ending: Ending
-        if (alignment >= 8 && pissedOff >= 60) ending = 'pyrrhic-alignment'
+        if (alignment >= 7 && pissedOff >= 45) ending = 'pyrrhic-alignment'
         else if (projectStatus < 70) ending = 'green-enough'
         else ending = 'standup-complete'
         return { ...base, phase: 'ended', ending, ...endingPatch(ending) }
@@ -807,6 +844,42 @@ export function computeRating(s: RatingInput): Rating {
 
 function clamp(v: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, v))
+}
+
+// End-of-run patch for a "missed-standup" loss (hard deadline crossed).
+// Shared by applyEffects (costly choices / coping) and addWalkTime (dawdling)
+// so the deadline behaves identically no matter what advanced the clock.
+// `s` supplies the run-scoped achievement inputs; `m` the final meters.
+function missedStandupPatch(
+  s: State,
+  m: {
+    timeMinutes: number
+    projectStatus: number
+    pissedOff: number
+    meetingLoad: number
+    alignment: number
+  }
+) {
+  return {
+    phase: 'ended' as const,
+    ending: 'missed-standup' as Ending,
+    ...finalizeAchievements(
+      {
+        ending: 'missed-standup',
+        projectStatus: m.projectStatus,
+        pissedOff: m.pissedOff,
+        meetingLoad: m.meetingLoad,
+        alignment: m.alignment,
+        timeMinutes: m.timeMinutes,
+        copingUseCounts: s.copingUseCounts,
+        recoveryTriggered: s.runRecoveryTriggered,
+        delayedFireCount: s.runDelayedFireCount,
+        slackOpenedAtAll: s.runSlackOpened,
+        finalUnreadSlack: s.unreadSlack,
+      },
+      s.unlockedAchievements
+    ),
+  }
 }
 
 // Compute newly-unlocked achievement IDs given a run's final snapshot.

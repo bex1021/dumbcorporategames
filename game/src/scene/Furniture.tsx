@@ -254,8 +254,9 @@ function TashaAccents() {
         <boxGeometry args={[0.12, 0.01, 0.01]} />
         <meshStandardMaterial color="#3a3a40" />
       </mesh>
-      {/* Color swatch strip — 4 small colored chips */}
-      {['#e8a8a8', '#a8c8e0', '#7aa86c', '#fce97a'].map((c, i) => (
+      {/* Color swatch strip — chips. Green chip removed per playtest (the
+          green box read as an out-of-place debug object). */}
+      {['#e8a8a8', '#a8c8e0', '#fce97a'].map((c, i) => (
         <mesh
           key={i}
           position={[-0.45 + i * 0.045, 0.792, -0.34]}
@@ -283,10 +284,8 @@ function PriyaAccents() {
         <boxGeometry args={[0.055, 0.002, 0.055]} />
         <meshStandardMaterial color="#a8c8e0" />
       </mesh>
-      <mesh position={[-0.4, 0.801, -0.18]} rotation={[0, -0.15, 0]}>
-        <boxGeometry args={[0.055, 0.002, 0.055]} />
-        <meshStandardMaterial color="#c8e0a8" />
-      </mesh>
+      {/* (Removed the third, green sticky note — playtest flagged the green
+          box reading as an out-of-place debug object against the palette.) */}
       {/* Bound notebook — navy with a thin red band */}
       <mesh position={[0.42, 0.795, 0.12]} castShadow>
         <boxGeometry args={[0.18, 0.022, 0.23]} />

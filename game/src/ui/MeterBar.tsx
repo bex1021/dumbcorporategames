@@ -28,9 +28,19 @@ export function MeterBar({ label, value, max, tiers, preview, inverted }: Props)
     preview !== undefined ? Math.max(0, Math.min(100, (preview / max) * 100)) : null
 
   return (
-    <div className="flex flex-col gap-1 min-w-[150px]">
-      <div className="text-[10px] uppercase tracking-widest text-beige-300 leading-tight">
-        {label}
+    <div
+      className="group flex flex-col gap-1 min-w-[150px] cursor-help"
+      title={`${label}: ${Math.round(value)} / ${max}${
+        preview !== undefined ? `  →  ${Math.round(preview)} after this choice` : ''
+      }`}
+    >
+      <div className="text-[10px] uppercase tracking-widest text-beige-300 leading-tight flex items-center justify-between gap-2">
+        <span>{label}</span>
+        {/* Raw value — fades in when hovering anywhere on the meter. The
+            native title tooltip above covers accessibility / touch. */}
+        <span className="opacity-0 group-hover:opacity-100 transition-opacity text-beige-100 font-mono tabular-nums">
+          {Math.round(value)}/{max}
+        </span>
       </div>
       <div
         className="text-beige-100 text-[11px] font-medium leading-tight whitespace-nowrap"
