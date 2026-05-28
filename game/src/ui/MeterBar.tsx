@@ -36,10 +36,15 @@ export function MeterBar({ label, value, max, tiers, preview, inverted }: Props)
     >
       <div className="text-[10px] uppercase tracking-widest text-beige-300 leading-tight flex items-center justify-between gap-2">
         <span>{label}</span>
-        {/* Raw value — fades in when hovering anywhere on the meter. The
-            native title tooltip above covers accessibility / touch. */}
-        <span className="opacity-0 group-hover:opacity-100 transition-opacity text-beige-100 font-mono tabular-nums">
-          {Math.round(value)}/{max}
+        {/* Raw value — ALWAYS visible. (Hover-reveal was unreliable over the
+            click-through 3D HUD, so the number is just shown outright.)
+            `preview` shows the post-choice value as "68→74" during dialogue. */}
+        <span className="text-beige-50 font-mono font-semibold tabular-nums">
+          {Math.round(value)}
+          {preview !== undefined && preview !== value && (
+            <span className="text-beige-300">→{Math.round(preview)}</span>
+          )}
+          <span className="text-beige-300/60">/{max}</span>
         </span>
       </div>
       <div
