@@ -87,8 +87,12 @@ export function HUD() {
         </div>
       </div>
 
-      {/* Meters row */}
-      <div className="bg-ink-900/75 backdrop-blur-sm rounded px-4 py-3 flex gap-6 flex-wrap">
+      {/* Meters row. pointer-events-auto re-enables hover here (the HUD root
+          is pointer-events-none so it doesn't block the canvas) — without it
+          the per-meter hover numbers + tooltips never fire. Safe because
+          movement is keyboard-only; capturing the mouse over the top strip
+          doesn't interfere with gameplay. */}
+      <div className="pointer-events-auto bg-ink-900/75 backdrop-blur-sm rounded px-4 py-3 flex gap-6 flex-wrap">
         <MeterBar
           label="Project Status"
           value={projectStatus}
