@@ -490,7 +490,7 @@ export const useGameStore: GameStoreHook =
         if (pissedOff >= 75) ending = 'full-escalation'
         else if (meetingLoad >= 80) ending = 'calendar-apocalypse'
         else if (projectStatus < 45) ending = 'full-escalation'
-        else if (alignment >= 8 && pissedOff >= 60) ending = 'pyrrhic-alignment'
+        else if (alignment >= 6 && pissedOff >= 40) ending = 'pyrrhic-alignment'
         else if (projectStatus < 70) ending = 'green-enough'
         else ending = 'standup-complete'
         set({
@@ -678,7 +678,7 @@ export const useGameStore: GameStoreHook =
       const allHandled = REQUIRED_NPC_IDS.every((id) => s.handledNPCs.has(id))
       if (allHandled) {
         let ending: Ending
-        if (alignment >= 7 && pissedOff >= 45) ending = 'pyrrhic-alignment'
+        if (alignment >= 6 && pissedOff >= 40) ending = 'pyrrhic-alignment'
         else if (projectStatus < 70) ending = 'green-enough'
         else ending = 'standup-complete'
         return { ...base, phase: 'ended', ending, ...endingPatch(ending) }

@@ -94,14 +94,16 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     id: 'aligned-but-hated',
     title: 'Aligned but Hated',
-    description: 'Won with Alignment ≥ 7 and Team Pissed-Off ≥ 45.',
+    description: 'Won with Alignment ≥ 6 and Team Pissed-Off ≥ 40.',
     emoji: '😤',
-    // Thresholds lowered 8→7 / 60→45 after playtest: the original combo was
-    // mathematically unreachable. High-alignment choices are low-pissed, and
-    // the high-pissed paths spike Meeting Load into calendar-apocalypse
-    // before you can finish. 7/45 is hittable by a deliberately
-    // aggravating-but-aligned run. Matches the pyrrhic-alignment ending gate.
-    condition: (s) => s.alignment >= 7 && s.pissedOff >= 45,
+    // Thresholds walked down across playtests (8/60 → 7/45 → 6/40) after
+    // testers kept landing ~6/38 on aggressive-aligned runs. The trap: the
+    // diplomatic "+1 alignment" choices are CALMING (negative pissed-off),
+    // so a player going for alignment by feel actually lowers pissed-off.
+    // 6/40 rewards the bureaucratic-aggressive path (meeting choices, which
+    // raise both alignment AND pissed-off) without needing a perfect run.
+    // Kept in lockstep with the pyrrhic-alignment ending gate in gameStore.
+    condition: (s) => s.alignment >= 6 && s.pissedOff >= 40,
     flavor:
       'Everyone agreed with you. Everyone is also drafting an exit interview question they will ask each other.',
   },
