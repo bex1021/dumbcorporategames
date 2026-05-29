@@ -154,7 +154,6 @@ function NPC({
   //     facing -Z toward their desk against the back wall
   const facingY =
     talkingFacingY !== null ? talkingFacingY : isStanding ? Math.PI : 0
-  const badgeY = isStanding ? 1.3 : 1.0
   // No lift for standing characters — their idle bind pose places feet at y=0.
   const liftY = isTalking || pose === 'stand'
     ? 0
@@ -258,7 +257,6 @@ function NPC({
           </group>
         </Suspense>
       )}
-      <ChestBadge color={color} y={badgeY} />
       {showLabels && (
         <>
           <Label name={name} role={role} y={isStanding ? 2.1 : 1.7} />
@@ -416,19 +414,6 @@ function StatusIndicator({ id, y }: { id: string; y: number }) {
   )
 }
 
-function ChestBadge({ color, y }: { color: string; y: number }) {
-  return (
-    <mesh position={[0, y, -0.14]} castShadow>
-      <boxGeometry args={[0.18, 0.1, 0.02]} />
-      <meshStandardMaterial
-        color={color}
-        emissive={color}
-        emissiveIntensity={0.15}
-        roughness={0.5}
-      />
-    </mesh>
-  )
-}
 
 function ObjectNPC({
   id,

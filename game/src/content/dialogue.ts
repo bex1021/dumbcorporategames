@@ -130,12 +130,12 @@ export const DIALOGUE: Record<string, NPCDialogue> = {
         // Stakeholder-map route: maxxes alignment but devastates calendar + ship date.
         // Delayed: the stakeholder map has teeth (more meetings appear later).
         label: 'Socialize the design with stakeholders',
-        // One of only two +2-alignment choices in the game. Time cut 30→20
-        // and pissed 7→11 (Build: Aligned-but-Hated rebalance) so the
-        // alignment-max path can fit under the 90-min hard deadline AND
-        // actually generate the resentment the achievement is named for —
-        // forcing everyone into a socialization meeting IS the "hated" part.
-        effects: { time: 20, projectStatus: -4, meetingLoad: 18, pissedOff: 11, alignment: 2 },
+        // One of only two +2-alignment choices in the game. Tuned across two
+        // passes (now time 16, pissed 13) so a full alignment-max run lands
+        // ~10:20 — comfortably under the 90-min deadline even with normal
+        // walking — and reliably clears pissed-off 45 with margin. Forcing
+        // everyone into a socialization meeting IS the "hated" part.
+        effects: { time: 16, projectStatus: -4, meetingLoad: 18, pissedOff: 13, alignment: 2 },
         resultCopy:
           'You transform one opinion into seven opinions and call it alignment.\n\nThe design now has a stakeholder map. The map has teeth.',
         sound: 'calendar',
@@ -291,10 +291,10 @@ export const DIALOGUE: Record<string, NPCDialogue> = {
         id: 'c',
         // Calibration route: huge meeting cost + alignment payoff
         label: 'Schedule feedback calibration',
-        // The other +2-alignment choice. Same rebalance as Tasha C: time
-        // 30→20, pissed 7→11, so an alignment-max run fits the deadline and
-        // lands in the Aligned-but-Hated corridor (align ≥7, pissed ≥45).
-        effects: { time: 20, projectStatus: -2, meetingLoad: 18, pissedOff: 11, alignment: 2 },
+        // The other +2-alignment choice. Same tuning as Tasha C: time 16,
+        // pissed 13, so the alignment-max run fits the deadline and clears
+        // the Aligned-but-Hated corridor (align ≥7, pissed ≥45) with margin.
+        effects: { time: 16, projectStatus: -2, meetingLoad: 18, pissedOff: 13, alignment: 2 },
         resultCopy:
           'You create a meeting where everyone will agree that words have consequences, then choose worse words.',
         sound: 'calendar',
