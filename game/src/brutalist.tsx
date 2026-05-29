@@ -46,6 +46,23 @@ export function useBrutalistFonts() {
   }, [])
 }
 
+// ─── Responsive — single phone breakpoint for the marketing site ─────────
+// Inline styles can't hold media queries, so layout components call this and
+// switch their columns / font sizes when the viewport is phone-width.
+export function useIsMobile(breakpoint = 760) {
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== 'undefined' && window.innerWidth < breakpoint,
+  )
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`)
+    const handler = () => setIsMobile(mq.matches)
+    handler()
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [breakpoint])
+  return isMobile
+}
+
 // ─── Page scroll wrapper ──────────────────────────────────────────────────
 // The app's index.css sets `overflow: hidden` on html/body/#root so the 3D
 // game stays anchored. The marketing routes need to scroll — wrap them in
@@ -96,14 +113,17 @@ export function SectionStarter({
   meta?: ReactNode
   dark?: boolean
 }) {
+  const isMobile = useIsMobile()
   return (
     <div style={{
       borderTop: `4px solid ${BR.ink}`,
       borderBottom: `1px solid ${BR.ink}`,
       background: dark ? BR.ink : BR.bg,
       color: dark ? BR.bg : BR.ink,
-      padding: '32px 32px 24px',
-      display: 'grid', gridTemplateColumns: '1fr auto', gap: 32, alignItems: 'end',
+      padding: isMobile ? '24px 20px 18px' : '32px 32px 24px',
+      display: 'grid',
+      gridTemplateColumns: isMobile ? '1fr' : '1fr auto',
+      gap: isMobile ? 14 : 32, alignItems: 'end',
     }}>
       <div>
         <div style={{
@@ -114,14 +134,15 @@ export function SectionStarter({
         </div>
         <h2 style={{
           margin: 0, fontFamily: brFont, fontWeight: 900,
-          fontSize: 72, lineHeight: 0.95, letterSpacing: '-0.03em', textTransform: 'uppercase',
+          fontSize: 'clamp(38px, 9vw, 72px)', lineHeight: 0.95, letterSpacing: '-0.03em', textTransform: 'uppercase',
         }}>{title}</h2>
       </div>
       {meta && (
         <div style={{
           fontFamily: brMono, fontSize: 11, color: dark ? '#aaa' : BR.muted,
-          textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: 'right',
-          maxWidth: 280, lineHeight: 1.55,
+          textTransform: 'uppercase', letterSpacing: '0.1em',
+          textAlign: isMobile ? 'left' : 'right',
+          maxWidth: isMobile ? 'none' : 280, lineHeight: 1.55,
         }}>{meta}</div>
       )}
     </div>
@@ -172,31 +193,39 @@ export function Ticker({
 export type NavLink = { label: string; href?: string; to?: string; active?: boolean }
 
 export function Nav({ links, badge }: { links: NavLink[]; badge?: ReactNode }) {
+  const isMobile = useIsMobile()
   return (
     <header style={{
       position: 'sticky', top: 0, zIndex: 5,
       borderBottom: `1px solid ${BR.rule}`,
       background: BR.bg,
-      padding: '14px 28px',
-      display: 'flex', alignItems: 'center', gap: 24,
+      padding: isMobile ? '12px 18px' : '14px 28px',
+      display: 'flex', alignItems: 'center', gap: isMobile ? 10 : 24,
+      flexWrap: 'wrap',
       fontFamily: brFont,
     }}>
       <a href="/" style={{
+        order: 0,
         fontFamily: brFont, fontWeight: 900, fontSize: 14, letterSpacing: '0.04em',
         textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 10,
         color: BR.ink, textDecoration: 'none',
       }}>
-        <div style={{ width: 22, height: 22, background: BR.ink, position: 'relative' }}>
+        <div style={{ width: 22, height: 22, background: BR.ink, position: 'relative', flexShrink: 0 }}>
           <div style={{ position: 'absolute', inset: 4, background: BR.accent }} />
         </div>
         DUMB CORPORATE GAMES
-        <span style={{
-          fontFamily: brMono, fontWeight: 400, fontSize: 10, color: BR.muted, letterSpacing: '0.1em',
-          borderLeft: `1px solid ${BR.rule}`, paddingLeft: 10, marginLeft: 6,
-        }}>EST. WHENEVER · LLC PENDING</span>
+        {!isMobile && (
+          <span style={{
+            fontFamily: brMono, fontWeight: 400, fontSize: 10, color: BR.muted, letterSpacing: '0.1em',
+            borderLeft: `1px solid ${BR.rule}`, paddingLeft: 10, marginLeft: 6,
+          }}>EST. WHENEVER · LLC PENDING</span>
+        )}
       </a>
       <nav style={{
-        marginLeft: 'auto', display: 'flex', gap: 22,
+        order: isMobile ? 2 : 1,
+        marginLeft: isMobile ? 0 : 'auto',
+        width: isMobile ? '100%' : 'auto',
+        display: 'flex', gap: isMobile ? 16 : 22, flexWrap: 'wrap',
         fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700,
       }}>
         {links.map((l) => (
@@ -207,7 +236,9 @@ export function Nav({ links, badge }: { links: NavLink[]; badge?: ReactNode }) {
       </nav>
       {badge && (
         <div style={{
-          marginLeft: 16, padding: '4px 10px', border: `1px solid ${BR.rule}`,
+          order: isMobile ? 1 : 2,
+          marginLeft: isMobile ? 'auto' : 16,
+          padding: '4px 10px', border: `1px solid ${BR.rule}`,
           background: BR.accent, color: '#000', fontFamily: brMono, fontWeight: 700,
           fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase',
         }}>{badge}</div>
@@ -218,6 +249,7 @@ export function Nav({ links, badge }: { links: NavLink[]; badge?: ReactNode }) {
 
 // ─── Mission ─────────────────────────────────────────────────────────────
 export function Mission() {
+  const isMobile = useIsMobile()
   return (
     <section id="mission" style={{ borderBottom: `4px solid ${BR.ink}`, background: BR.bg }}>
       <SectionStarter
@@ -225,11 +257,11 @@ export function Mission() {
         title={<>OUR MISSION.</>}
         meta="EFFECTIVE IMMEDIATELY · NEVER REVOKED"
       />
-      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', borderBottom: `1px solid ${BR.ink}` }}>
-        <div style={{ padding: '32px 32px 40px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.5fr 1fr', borderBottom: `1px solid ${BR.ink}` }}>
+        <div style={{ padding: isMobile ? '24px 20px 28px' : '32px 32px 40px' }}>
           <p style={{
             margin: 0, fontFamily: brFont, fontWeight: 700,
-            fontSize: 34, lineHeight: 1.18, letterSpacing: '-0.015em',
+            fontSize: 'clamp(22px, 5.5vw, 34px)', lineHeight: 1.18, letterSpacing: '-0.015em',
             textTransform: 'uppercase', color: BR.ink,
           }}>
             DUMB CORPORATE GAMES IS A WHOLLY-OWNED SUBSIDIARY OF NOTHING, WITH A PORTFOLIO OF
@@ -245,7 +277,7 @@ export function Mission() {
             STATUS: <b style={{ color: BR.green }}>GREEN</b>.
           </p>
         </div>
-        <div style={{ borderLeft: `1px solid ${BR.ink}`, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ borderLeft: isMobile ? 'none' : `1px solid ${BR.ink}`, borderTop: isMobile ? `1px solid ${BR.ink}` : 'none', display: 'flex', flexDirection: 'column' }}>
           {[
             ['OWNERSHIP', 'DO THE THING BEFORE SOMEONE TELLS YOU TO.'],
             ['ALIGNMENT', 'THE ACT OF PRODUCING ARTIFACTS THAT IMPLY PROGRESS.'],
@@ -280,14 +312,15 @@ export function Mission() {
 
 // ─── About the studio ────────────────────────────────────────────────────
 export function AboutTheStudio() {
+  const isMobile = useIsMobile()
   return (
     <section id="about" style={{
       borderBottom: `4px solid ${BR.ink}`, background: BR.ink, color: BR.bg,
     }}>
       <div style={{
-        padding: '32px 32px 24px',
+        padding: isMobile ? '24px 20px 18px' : '32px 32px 24px',
         borderBottom: `1px solid #333`,
-        display: 'grid', gridTemplateColumns: '1fr auto', gap: 32, alignItems: 'end',
+        display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr auto', gap: isMobile ? 14 : 32, alignItems: 'end',
       }}>
         <div>
           <div style={{
@@ -298,7 +331,7 @@ export function AboutTheStudio() {
           </div>
           <h2 style={{
             margin: 0, fontFamily: brFont, fontWeight: 900,
-            fontSize: 72, lineHeight: 0.95, letterSpacing: '-0.03em', textTransform: 'uppercase',
+            fontSize: 'clamp(36px, 8.5vw, 72px)', lineHeight: 0.95, letterSpacing: '-0.03em', textTransform: 'uppercase',
           }}>BUILT BY A CORPORATE SLAVE.</h2>
         </div>
         <div style={{
@@ -310,12 +343,13 @@ export function AboutTheStudio() {
       </div>
 
       <div style={{
-        padding: '28px 32px 36px',
-        display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 36, alignItems: 'flex-start',
+        padding: isMobile ? '22px 20px 28px' : '28px 32px 36px',
+        display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : '1.4fr 1fr', gap: isMobile ? 22 : 36, alignItems: 'flex-start',
       }}>
         <p style={{
           margin: 0, fontFamily: brFont, fontSize: 22, lineHeight: 1.4,
           color: BR.bg, fontWeight: 500, maxWidth: 760,
+          minWidth: 0, overflowWrap: 'anywhere',
         }}>
           I HAVE A REAL JOB. <i>THIS IS NOT IT.</i> THE STANDUPS THAT INSPIRED <i>BLOCKED</i> ARE
           NOT NECESSARILY THE STANDUPS I AM CURRENTLY ATTENDING — FOR HOPEFULLY OBVIOUS REASONS.
@@ -325,7 +359,7 @@ export function AboutTheStudio() {
             HELLO@DUMBCORPORATEGAMES.COM
           </a>.
         </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0, minWidth: 0 }}>
           {[
             { l: 'EMAIL → HELLO@DUMBCORPORATEGAMES.COM', href: 'mailto:hello@dumbcorporategames.com' },
             { l: 'LINKEDIN → ACCOUNT PENDING DELETION',  href: '#' },
@@ -338,8 +372,9 @@ export function AboutTheStudio() {
               textTransform: 'uppercase', textDecoration: 'none',
               borderTop: i ? 'none' : `1px solid ${BR.bg}`,
               display: 'flex', justifyContent: 'space-between', gap: 12,
+              minWidth: 0,
             }}>
-              <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.l}</span>
+              <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{a.l}</span>
               <span style={{ color: BR.accent, flexShrink: 0 }}>·0{i + 1}</span>
             </a>
           ))}
@@ -357,6 +392,7 @@ type SignupState =
   | { kind: 'error'; message: string }
 
 export function Signup() {
+  const isMobile = useIsMobile()
   const [email, setEmail] = useState('')
   const [state, setState] = useState<SignupState>({ kind: 'idle' })
 
@@ -390,8 +426,8 @@ export function Signup() {
       borderBottom: `4px solid ${BR.ink}`, background: BR.accent, color: '#000',
     }}>
       <div style={{
-        padding: '40px 32px 32px',
-        display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 36, alignItems: 'center',
+        padding: isMobile ? '28px 20px 28px' : '40px 32px 32px',
+        display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : '1.4fr 1fr', gap: isMobile ? 24 : 36, alignItems: 'center',
       }}>
         <div>
           <div style={{
@@ -404,13 +440,13 @@ export function Signup() {
           </div>
           <h2 style={{
             margin: 0, fontFamily: brFont, fontWeight: 900,
-            fontSize: 96, lineHeight: 0.9, letterSpacing: '-0.045em',
+            fontSize: 'clamp(44px, 11vw, 96px)', lineHeight: 0.9, letterSpacing: '-0.045em',
             textTransform: 'uppercase',
           }}>
             ONE EMAIL.<br />PER RELEASE.<br />NO THOUGHT<br />LEADERSHIP.
           </h2>
         </div>
-        <form onSubmit={submit} style={{ alignSelf: 'center' }}>
+        <form onSubmit={submit} style={{ alignSelf: 'center', minWidth: 0 }}>
           <label style={{
             display: 'block',
             fontFamily: brMono, fontSize: 12,
@@ -425,7 +461,7 @@ export function Signup() {
               placeholder="you@bigco.example"
               disabled={state.kind === 'submitting'}
               style={{
-                flex: 1, border: 'none', padding: '18px 18px',
+                flex: 1, minWidth: 0, border: 'none', padding: '18px 18px',
                 fontFamily: brMono, fontSize: 16,
                 background: 'transparent', outline: 'none',
               }}
@@ -480,7 +516,7 @@ export function Closer() {
       <div style={{
         whiteSpace: 'nowrap',
         fontFamily: brFont, fontWeight: 900,
-        fontSize: 184, lineHeight: 0.9, letterSpacing: '-0.05em',
+        fontSize: 'clamp(64px, 17vw, 184px)', lineHeight: 0.9, letterSpacing: '-0.05em',
         textTransform: 'uppercase',
       }}>
         <div style={{ display: 'inline-flex', gap: 36, animation: 'br-closer 60s linear infinite' }}>

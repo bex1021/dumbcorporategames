@@ -13,7 +13,7 @@ import { useEffect, useState } from 'react'
 import {
   PageScroll, BR, brFont, brMono,
   Nav, Ticker, SectionStarter, Mission, AboutTheStudio, Signup, Closer, Footer,
-  ctaPrimary, ctaSecondary,
+  ctaPrimary, ctaSecondary, useIsMobile,
   type NavLink,
 } from '../brutalist'
 
@@ -72,6 +72,7 @@ export default function Blocked() {
 
 // ─── Hero ─────────────────────────────────────────────────────────────────
 function Hero() {
+  const isMobile = useIsMobile()
   return (
     <section id="top" style={{ borderBottom: `4px solid ${BR.ink}`, position: 'relative' }}>
       <div style={{
@@ -87,7 +88,7 @@ function Hero() {
         <span>UPDATED <b style={{ color: BR.ink }}>0 SECONDS AGO</b></span>
       </div>
 
-      <div style={{ padding: '20px 28px 4px' }}>
+      <div style={{ padding: isMobile ? '18px 20px 4px' : '20px 28px 4px' }}>
         <div style={{
           fontFamily: brMono, fontSize: 11, color: BR.muted,
           textTransform: 'uppercase', letterSpacing: '0.16em',
@@ -128,9 +129,9 @@ function Hero() {
       </div>
 
       <div style={{
-        padding: '10px 28px 20px',
-        display: 'grid', gridTemplateColumns: 'minmax(0, 1.6fr) minmax(280px, 1fr)',
-        gap: 36, alignItems: 'flex-end',
+        padding: isMobile ? '10px 20px 20px' : '10px 28px 20px',
+        display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1.6fr) minmax(280px, 1fr)',
+        gap: isMobile ? 18 : 36, alignItems: 'flex-end',
       }}>
         <p style={{
           margin: 0,
@@ -155,7 +156,10 @@ function Hero() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', borderTop: `4px solid ${BR.ink}`, flexWrap: 'wrap' }}>
+      <div style={{
+        display: 'flex', borderTop: `4px solid ${BR.ink}`, flexWrap: 'wrap',
+        flexDirection: isMobile ? 'column' : 'row',
+      }}>
         <Link to="/play/blocked" style={ctaPrimary}>▶ PLAY BLOCKED — PHASE 1</Link>
         <a href="#mission" style={ctaSecondary}>READ THE MISSION</a>
         <a href="#how"     style={ctaSecondary}>HOW IT PLAYS</a>
@@ -173,6 +177,7 @@ function Hero() {
 
 // ─── Vital Signs — full-width inline HUD strip (static for now) ──────────
 function VitalSigns() {
+  const isMobile = useIsMobile()
   // Hardcoded "office is mildly stressed" snapshot. Wire this to scroll
   // position or to gameStore later if you want it to come alive.
   const proj = 90, p = 17, meet = 21, align = 1
@@ -193,8 +198,8 @@ function VitalSigns() {
       </div>
       <div style={{
         marginTop: 6, fontFamily: brFont, fontWeight: 900,
-        fontSize: 34, lineHeight: 1, color: BR.ink, textTransform: 'uppercase',
-        letterSpacing: '-0.01em',
+        fontSize: 'clamp(19px, 5vw, 34px)', lineHeight: 1, color: BR.ink, textTransform: 'uppercase',
+        letterSpacing: '-0.01em', overflowWrap: 'anywhere',
       }}>{hot}</div>
       <div style={{
         marginTop: 8, height: 14, background: BR.bg,
@@ -223,7 +228,11 @@ function VitalSigns() {
         <span>● LIVE · OFFICE VITAL SIGNS · ALIGNLY · 9:14 AM</span>
         <span style={{ color: BR.green }}>STATUS · TIGHT SMILE</span>
       </div>
-      <div style={{ display: 'flex', borderBottom: `1px solid ${BR.ink}`, flexWrap: 'wrap' }}>
+      <div style={{
+        display: isMobile ? 'grid' : 'flex',
+        gridTemplateColumns: isMobile ? 'minmax(0, 1fr) minmax(0, 1fr)' : undefined,
+        borderBottom: `1px solid ${BR.ink}`, flexWrap: 'wrap',
+      }}>
         <Meter label="PROJECT STATUS" val={proj} color={BR.green} hot="GREEN" />
         <Meter label="PISSED-OFF"     val={p}    color={BR.ink}   hot="FINE" />
         <Meter label="MEETING LOAD"   val={meet} color={BR.ink}   hot="LOW" />
@@ -240,7 +249,8 @@ function VitalSigns() {
           </div>
           <div style={{
             marginTop: 6, fontFamily: brFont, fontWeight: 900,
-            fontSize: 34, lineHeight: 1, color: BR.ink, textTransform: 'uppercase',
+            fontSize: 'clamp(19px, 5vw, 34px)', lineHeight: 1, color: BR.ink, textTransform: 'uppercase',
+            overflowWrap: 'anywhere',
           }}>
             INSUFFICIENT
           </div>
@@ -261,6 +271,7 @@ function VitalSigns() {
 
 // ─── Portfolio ─ Blocked game spec slab ──────────────────────────────────
 function Portfolio() {
+  const isMobile = useIsMobile()
   return (
     <section>
       <SectionStarter
@@ -270,12 +281,12 @@ function Portfolio() {
       />
 
       <div style={{
-        display: 'grid', gridTemplateColumns: '1.4fr 1fr',
+        display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.4fr 1fr',
         borderBottom: `4px solid ${BR.ink}`,
       }}>
         <div style={{
-          background: BR.ink, color: BR.bg, padding: '36px 36px',
-          position: 'relative', minHeight: 520,
+          background: BR.ink, color: BR.bg, padding: isMobile ? '24px 20px' : '36px 36px',
+          position: 'relative', minHeight: isMobile ? 'auto' : 520,
           display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
         }}>
           <div>
@@ -287,7 +298,7 @@ function Portfolio() {
             </div>
             <h3 style={{
               margin: '14px 0 0', fontFamily: brFont, fontWeight: 900,
-              fontSize: 124, lineHeight: 0.92, letterSpacing: '-0.045em',
+              fontSize: 'clamp(60px, 13vw, 124px)', lineHeight: 0.92, letterSpacing: '-0.045em',
               textTransform: 'uppercase',
             }}>
               BLOCKED<span style={{ color: BR.accent }}>:</span><br />
@@ -317,7 +328,9 @@ function Portfolio() {
         </div>
 
         <div style={{
-          background: BR.paper, padding: 24, borderLeft: `4px solid ${BR.ink}`,
+          background: BR.paper, padding: 24,
+          borderLeft: isMobile ? 'none' : `4px solid ${BR.ink}`,
+          borderTop: isMobile ? `4px solid ${BR.ink}` : 'none',
           display: 'flex', flexDirection: 'column',
         }}>
           <div style={{
@@ -384,6 +397,7 @@ function HowItPlays() {
     ['CHOOSE',   'HONEST ANSWERS ARE USUALLY WRONG. CORPORATE EVASIONS USUALLY OPTIMAL.'],
     ['SURVIVE',  'STANDUP AT 10:15 · STATUS G/Y · PO < 90 · ALIGNMENT ≥ 4.'],
   ]
+  const isMobile = useIsMobile()
   return (
     <section id="how" style={{ borderBottom: `4px solid ${BR.ink}` }}>
       <SectionStarter
@@ -391,13 +405,13 @@ function HowItPlays() {
         title={<>HOW IT<br />PLAYS.</>}
         meta="ESTIMATED READ TIME · 90 SECONDS · IGNORED ANYWAY"
       />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(5, minmax(0, 1fr))' }}>
         {steps.map(([h, b], i) => (
           <div key={h} style={{
             padding: '24px 22px 30px',
             background: i === 0 ? BR.ink : BR.bg,
             color: i === 0 ? BR.bg : BR.ink,
-            borderLeft: i ? `1px solid ${BR.ink}` : 'none',
+            borderLeft: isMobile ? 'none' : (i ? `1px solid ${BR.ink}` : 'none'),
             borderBottom: `1px solid ${BR.ink}`,
             position: 'relative',
           }}>
@@ -437,6 +451,7 @@ const NPCS: { name: string; blocked: string; line: string }[] = [
 ]
 
 function Cast() {
+  const isMobile = useIsMobile()
   return (
     <section id="cast" style={{ borderBottom: `4px solid ${BR.ink}` }}>
       <SectionStarter
@@ -444,9 +459,10 @@ function Cast() {
         title={<>THE BLOCKED.</>}
         meta="ALL CLAIM \u201CNO BLOCKERS\u201D · ALL FIVE STATEMENTS FALSE"
       />
-      <div>
+      <div style={{ overflowX: isMobile ? 'auto' : undefined }}>
         <div style={{
           display: 'grid', gridTemplateColumns: '64px 160px 1fr 1.4fr 130px',
+          minWidth: isMobile ? 680 : undefined,
           background: BR.ink, color: BR.bg,
           fontFamily: brMono, fontSize: 11, letterSpacing: '0.14em',
           textTransform: 'uppercase', fontWeight: 700,
@@ -458,6 +474,7 @@ function Cast() {
         {NPCS.map((n, i) => (
           <div key={n.name} style={{
             display: 'grid', gridTemplateColumns: '64px 160px 1fr 1.4fr 130px',
+            minWidth: isMobile ? 680 : undefined,
             background: i % 2 ? BR.bg : BR.paper,
             borderBottom: `1px solid ${BR.ink}`,
             fontFamily: brFont,
@@ -544,6 +561,7 @@ function ScreenshotSlot({ src, alt, height }: { src: string; alt: string; height
 }
 
 function Screenshots() {
+  const isMobile = useIsMobile()
   return (
     <section style={{ borderBottom: `4px solid ${BR.ink}` }}>
       <SectionStarter
@@ -553,7 +571,7 @@ function Screenshots() {
       />
 
       <div style={{
-        display: 'grid', gridTemplateColumns: '1.8fr 1fr',
+        display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.8fr 1fr',
         borderBottom: `1px solid ${BR.ink}`,
       }}>
         {/* Hero shot */}
@@ -613,7 +631,7 @@ function Screenshots() {
 
       {/* Bottom row */}
       <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)',
+        display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
         borderBottom: `1px solid ${BR.ink}`,
       }}>
         {SHOTS.slice(4).map((s, i) => (
@@ -660,6 +678,7 @@ const LOG: LogLine[] = [
 ]
 
 function RawLog() {
+  const isMobile = useIsMobile()
   return (
     <section id="log" style={{ borderBottom: `4px solid ${BR.ink}` }}>
       <SectionStarter
@@ -668,9 +687,10 @@ function RawLog() {
         meta="08:58 → 09:03 AM · 10 MESSAGES · 1 LIE PER LINE"
         dark
       />
-      <div style={{ background: BR.paper }}>
+      <div style={{ background: BR.paper, overflowX: isMobile ? 'auto' : undefined }}>
         <div style={{
           display: 'grid', gridTemplateColumns: '70px 140px 200px 1fr',
+          minWidth: isMobile ? 620 : undefined,
           background: BR.ink, color: BR.bg,
           fontFamily: brMono, fontSize: 11, letterSpacing: '0.14em',
           textTransform: 'uppercase', fontWeight: 700,
@@ -682,6 +702,7 @@ function RawLog() {
         {LOG.map((m, i) => (
           <div key={i} style={{
             display: 'grid', gridTemplateColumns: '70px 140px 200px 1fr',
+            minWidth: isMobile ? 620 : undefined,
             borderBottom: `1px solid ${BR.ink}`,
             background: m.alert ? BR.accent : (i % 2 ? BR.paper : BR.bg),
             color: BR.ink,
@@ -740,6 +761,7 @@ const ENDORSEMENTS: { q: string; who: string; where: string }[] = [
 ]
 
 function Endorsements() {
+  const isMobile = useIsMobile()
   const [featured, ...rest] = ENDORSEMENTS
   return (
     <section style={{ borderBottom: `4px solid ${BR.ink}` }}>
@@ -752,9 +774,9 @@ function Endorsements() {
       {/* Featured pull-quote — gets the press-blurb treatment */}
       <div style={{
         background: BR.ink, color: BR.bg,
-        padding: '40px 32px 36px',
+        padding: isMobile ? '28px 20px 24px' : '40px 32px 36px',
         borderBottom: `1px solid ${BR.ink}`,
-        display: 'grid', gridTemplateColumns: '1fr auto', gap: 36, alignItems: 'end',
+        display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr auto', gap: isMobile ? 16 : 36, alignItems: 'end',
       }}>
         <div>
           <div style={{
@@ -783,11 +805,11 @@ function Endorsements() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)' }}>
         {rest.map((e, i) => (
           <div key={i} style={{
             padding: '28px 28px 24px',
-            borderLeft: i % 2 ? `1px solid ${BR.ink}` : 'none',
+            borderLeft: isMobile ? 'none' : (i % 2 ? `1px solid ${BR.ink}` : 'none'),
             borderBottom: `1px solid ${BR.ink}`,
             background: i === 0 || i === 3 ? BR.paper : BR.bg,
             display: 'grid', gridTemplateColumns: '90px 1fr', gap: 18,
@@ -844,6 +866,7 @@ const FAQS: { q: string; a: string }[] = [
 ]
 
 function FAQ() {
+  const isMobile = useIsMobile()
   return (
     <section id="faq" style={{ borderBottom: `4px solid ${BR.ink}` }}>
       <SectionStarter
@@ -851,12 +874,12 @@ function FAQ() {
         title={<>QUESTIONS<br />FROM THE FLOOR.</>}
         meta="SIX (6) ANSWERS · ZERO FOLLOWUPS BOOKED"
       />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)' }}>
         {FAQS.map((f, i) => (
           <div key={i} style={{
-            padding: '24px 28px 26px',
-            borderLeft: i % 2 ? `1px solid ${BR.ink}` : 'none',
-            borderBottom: i < 4 ? `1px solid ${BR.ink}` : 'none',
+            padding: isMobile ? '20px' : '24px 28px 26px',
+            borderLeft: isMobile ? 'none' : (i % 2 ? `1px solid ${BR.ink}` : 'none'),
+            borderBottom: (isMobile ? i < FAQS.length - 1 : i < 4) ? `1px solid ${BR.ink}` : 'none',
             background: i % 2 ? BR.bg : BR.paper,
           }}>
             <div style={{
@@ -881,6 +904,7 @@ function FAQ() {
 
 // ─── Sticky bottom CTA — slides in once you scroll past the hero ─────────
 function StickyPlayCTA() {
+  const isMobile = useIsMobile()
   const [show, setShow] = useState(false)
   useEffect(() => {
     const hero = document.getElementById('top')
@@ -905,24 +929,27 @@ function StickyPlayCTA() {
         fontFamily: brFont,
       }}
     >
-      <div style={{
-        padding: '12px 22px',
-        display: 'flex', alignItems: 'center', gap: 14,
-        fontFamily: brMono, fontSize: 11, color: '#aaa',
-        textTransform: 'uppercase', letterSpacing: '0.12em',
-        borderRight: `1px solid #333`, flex: 1,
-      }}>
-        <span style={{ color: BR.accent }}>●</span>
-        <span>STILL READING.</span>
-        <span style={{ color: BR.bg, fontWeight: 700 }}>YOU COULD JUST PLAY IT.</span>
-      </div>
+      {!isMobile && (
+        <div style={{
+          padding: '12px 22px',
+          display: 'flex', alignItems: 'center', gap: 14,
+          fontFamily: brMono, fontSize: 11, color: '#aaa',
+          textTransform: 'uppercase', letterSpacing: '0.12em',
+          borderRight: `1px solid #333`, flex: 1,
+        }}>
+          <span style={{ color: BR.accent }}>●</span>
+          <span>STILL READING.</span>
+          <span style={{ color: BR.bg, fontWeight: 700 }}>YOU COULD JUST PLAY IT.</span>
+        </div>
+      )}
       <Link to="/play/blocked" style={{
         background: BR.accent, color: '#000',
         padding: '14px 28px',
         fontFamily: brFont, fontWeight: 900, fontSize: 16,
         textTransform: 'uppercase', letterSpacing: '0.04em',
         textDecoration: 'none',
-        display: 'inline-flex', alignItems: 'center',
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        flex: isMobile ? 1 : undefined,
       }}>▶ PLAY BLOCKED · FREE</Link>
     </div>
   )

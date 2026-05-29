@@ -13,7 +13,7 @@ import { useEffect, useState } from 'react'
 import {
   PageScroll, BR, brFont, brMono,
   Nav, Ticker, Mission, AboutTheStudio, Signup, Closer, Footer,
-  ctaPrimary, ctaSecondary,
+  ctaPrimary, ctaSecondary, useIsMobile,
   type NavLink,
 } from '../brutalist'
 import { CareerStats } from '../components/CareerStats'
@@ -75,6 +75,7 @@ const NAV_LINKS: NavLink[] = [
 
 // ─── Hero ─────────────────────────────────────────────────────────────────
 function Hero() {
+  const isMobile = useIsMobile()
   return (
     <section style={{ borderBottom: `4px solid ${BR.ink}` }}>
       <div style={{
@@ -92,10 +93,10 @@ function Hero() {
 
       {/* Mega headline + live studio ops board on the right */}
       <div style={{
-        padding: '20px 28px 4px',
+        padding: isMobile ? '18px 20px 4px' : '20px 28px 4px',
         display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1.6fr) minmax(300px, 1fr)',
-        gap: 36, alignItems: 'flex-start',
+        gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1.6fr) minmax(300px, 1fr)',
+        gap: isMobile ? 20 : 36, alignItems: 'flex-start',
       }}>
         <h1 style={{
           margin: 0, fontFamily: brFont, fontWeight: 900,
@@ -112,9 +113,9 @@ function Hero() {
 
       {/* Tagline + studio facts */}
       <div style={{
-        padding: '10px 28px 20px',
-        display: 'grid', gridTemplateColumns: 'minmax(0, 1.6fr) minmax(280px, 1fr)',
-        gap: 36, alignItems: 'flex-end',
+        padding: isMobile ? '10px 20px 20px' : '10px 28px 20px',
+        display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1.6fr) minmax(280px, 1fr)',
+        gap: isMobile ? 20 : 36, alignItems: 'flex-end',
       }}>
         <p style={{
           margin: 0,
@@ -143,7 +144,10 @@ function Hero() {
       </div>
 
       {/* Actions — PLAY is primary, accent orange, top of funnel */}
-      <div style={{ display: 'flex', borderTop: `4px solid ${BR.ink}`, flexWrap: 'wrap' }}>
+      <div style={{
+        display: 'flex', borderTop: `4px solid ${BR.ink}`, flexWrap: 'wrap',
+        flexDirection: isMobile ? 'column' : 'row',
+      }}>
         <Link to="/play/blocked" style={{
           ...ctaPrimary, background: BR.accent, color: '#000',
         }}>▶ PLAY BLOCKED — FREE</Link>
@@ -322,6 +326,7 @@ function StatusBadge({ kind, children }: { kind: StatusKind; children: React.Rea
 }
 
 function GameCard({ g, i }: { g: Game; i: number }) {
+  const isMobile = useIsMobile()
   const live = g.statusKind === 'live'
   const wip = g.statusKind === 'wip'
   const idea = g.statusKind === 'idea'
@@ -334,10 +339,11 @@ function GameCard({ g, i }: { g: Game; i: number }) {
   return (
     <div style={{
       background: bg, color: fg,
-      borderLeft: i ? `1px solid ${BR.ink}` : 'none',
+      borderLeft: isMobile ? 'none' : (i ? `1px solid ${BR.ink}` : 'none'),
+      borderTop: isMobile && i ? `1px solid ${BR.ink}` : 'none',
       display: 'flex', flexDirection: 'column',
       position: 'relative',
-      minHeight: 620,
+      minHeight: isMobile ? 'auto' : 620,
     }}>
       <div style={{
         height: 12,
@@ -365,9 +371,11 @@ function GameCard({ g, i }: { g: Game; i: number }) {
         <h3 style={{
           margin: '6px 0 0',
           fontFamily: brFont, fontWeight: 900,
-          fontSize: idea ? 56 : 64,
+          fontSize: idea ? 'clamp(32px, 3.6vw, 50px)' : 'clamp(36px, 4vw, 56px)',
           lineHeight: 0.92, letterSpacing: '-0.04em',
           textTransform: 'uppercase', color: titleColor,
+          overflowWrap: 'anywhere',
+          hyphens: 'auto',
         }}>
           {g.title}{live && <span style={{ color: BR.accent }}>:</span>}
         </h3>
@@ -463,12 +471,13 @@ function WhatsNext() {
         'A THIRD TITLE IS IN THE PARKING LOT. THE PARKING LOT IS ITSELF A DEPENDENCY WE ARE ACTIVELY MANAGING.',
     },
   ]
+  const isMobile = useIsMobile()
   return (
     <section style={{ borderBottom: `4px solid ${BR.ink}`, background: BR.ink, color: BR.bg }}>
       <div style={{
-        padding: '32px 32px 24px',
+        padding: isMobile ? '24px 20px 18px' : '32px 32px 24px',
         borderBottom: `1px solid #333`,
-        display: 'grid', gridTemplateColumns: '1fr auto', gap: 32, alignItems: 'end',
+        display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr auto', gap: isMobile ? 14 : 32, alignItems: 'end',
       }}>
         <div>
           <div style={{
@@ -495,17 +504,18 @@ function WhatsNext() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)' }}>
         {PHASES.map((p, i) => {
           const live = p.tone === 'live'
           const wip = p.tone === 'wip'
           return (
             <div key={p.phase} style={{
               padding: '24px 24px 28px',
-              borderLeft: i ? `1px solid #333` : 'none',
+              borderLeft: isMobile ? 'none' : (i ? `1px solid #333` : 'none'),
+              borderTop: isMobile && i ? `1px solid #333` : 'none',
               background: live ? BR.accent : BR.ink,
               color: live ? '#000' : BR.bg,
-              minHeight: 280,
+              minHeight: isMobile ? 'auto' : 280,
               display: 'flex', flexDirection: 'column',
             }}>
               <div style={{
@@ -541,13 +551,14 @@ function WhatsNext() {
 }
 
 function Portfolio() {
+  const isMobile = useIsMobile()
   return (
     <section id="games" style={{ borderBottom: `4px solid ${BR.ink}` }}>
       <div style={{
         borderTop: `4px solid ${BR.ink}`,
         borderBottom: `1px solid ${BR.ink}`,
-        background: BR.bg, padding: '32px 32px 24px',
-        display: 'grid', gridTemplateColumns: '1fr auto', gap: 32, alignItems: 'end',
+        background: BR.bg, padding: isMobile ? '24px 20px 18px' : '32px 32px 24px',
+        display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr auto', gap: isMobile ? 14 : 32, alignItems: 'end',
       }}>
         <div>
           <div style={{
@@ -575,7 +586,7 @@ function Portfolio() {
       </div>
 
       {/* 3-up grid, hard-cut, no rounded corners ever */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))' }}>
         {GAMES.map((g, i) => <GameCard key={g.n} g={g} i={i} />)}
       </div>
 

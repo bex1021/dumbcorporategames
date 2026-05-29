@@ -14,10 +14,12 @@
 // no props, no external state.
 
 import { useEffect, useState } from 'react'
-import { BR, brFont, brMono } from '../brutalist'
+import { BR, brFont, brMono, useIsMobile } from '../brutalist'
 import { ACHIEVEMENTS, loadUnlocked } from '../content/achievements'
 
 export function CareerStats() {
+  const isMobile = useIsMobile()
+  const cols = isMobile ? 2 : 4
   // Hydrate from localStorage on mount. Initial paint is an empty set so
   // the section renders consistently even before localStorage is read
   // (no SSR / hydration mismatch hazard, but cheap insurance).
@@ -47,10 +49,10 @@ export function CareerStats() {
         style={{
           borderTop: `4px solid ${BR.ink}`,
           borderBottom: `1px solid ${BR.ink}`,
-          padding: '32px 32px 24px',
+          padding: isMobile ? '24px 20px 18px' : '32px 32px 24px',
           display: 'grid',
-          gridTemplateColumns: '1fr auto',
-          gap: 32,
+          gridTemplateColumns: isMobile ? '1fr' : '1fr auto',
+          gap: isMobile ? 14 : 32,
           alignItems: 'end',
         }}
       >
@@ -73,7 +75,7 @@ export function CareerStats() {
               margin: 0,
               fontFamily: brFont,
               fontWeight: 900,
-              fontSize: 72,
+              fontSize: 'clamp(38px, 9vw, 72px)',
               lineHeight: 0.95,
               letterSpacing: '-0.03em',
               textTransform: 'uppercase',
@@ -89,8 +91,8 @@ export function CareerStats() {
             color: BR.muted,
             textTransform: 'uppercase',
             letterSpacing: '0.1em',
-            textAlign: 'right',
-            maxWidth: 320,
+            textAlign: isMobile ? 'left' : 'right',
+            maxWidth: isMobile ? 'none' : 320,
             lineHeight: 1.55,
           }}
         >
@@ -103,12 +105,12 @@ export function CareerStats() {
       {/* Black header strip — big count + progress bar + verdict chip. */}
       <div
         style={{
-          padding: '22px 32px',
+          padding: isMobile ? '20px' : '22px 32px',
           background: BR.ink,
           color: BR.bg,
           display: 'grid',
-          gridTemplateColumns: 'auto 1fr auto',
-          gap: 28,
+          gridTemplateColumns: isMobile ? '1fr' : 'auto 1fr auto',
+          gap: isMobile ? 16 : 28,
           alignItems: 'center',
           borderBottom: `1px solid ${BR.ink}`,
         }}
@@ -191,13 +193,13 @@ export function CareerStats() {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
+          gridTemplateColumns: `repeat(${cols}, 1fr)`,
           gap: 0,
         }}
       >
         {ACHIEVEMENTS.map((a, i) => {
           const isUnlocked = unlocked.has(a.id)
-          const isLastCol = (i + 1) % 4 === 0
+          const isLastCol = (i + 1) % cols === 0
           return (
             <div
               key={a.id}
