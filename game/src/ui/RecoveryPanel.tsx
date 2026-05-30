@@ -1,4 +1,4 @@
-// Calendar Apocalypse recovery panel — fires when meetingLoad ≥ 80 mid-standup
+// Calendar Apocalypse recovery panel — fires when meetingLoad ≥ 75 mid-standup
 // after the player closes a dialogue. Gives one chance to decline / focus /
 // delegate before the apocalypse ending lands.
 //

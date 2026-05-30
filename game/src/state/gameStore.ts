@@ -27,7 +27,12 @@ export const PISSED_OFF_TIERS = [
 ] as const
 
 export const MEETING_LOAD_TIERS = [
-  { min: 80, label: 'Calendar Apocalypse', color: '#8b1a1a' },
+  // Trigger lowered 80 → 75: the meeting-heavy choices cost so much time that
+  // no path could reach 80 before the 90-min deadline (peak was 79), making the
+  // recovery panel + Calendar Apocalypse ending + achievement unreachable.
+  // 75 still needs ~4 of 5 stakeholders handled as meetings — deliberate
+  // over-scheduling, not an accident. (Found by the Phase-1 playtest harness.)
+  { min: 75, label: 'Calendar Apocalypse', color: '#8b1a1a' },
   { min: 60, label: 'Pre-Read Required', color: '#b04a30' },
   { min: 40, label: 'Concerning', color: '#c4933a' },
   { min: 20, label: 'Manageable', color: '#c4a93a' },
@@ -467,9 +472,10 @@ export const useGameStore: GameStoreHook =
         ending: 'full-escalation',
         ...endingPatch('full-escalation'),
       })
-    } else if (meetingLoad >= 80) {
+    } else if (meetingLoad >= 75) {
       // Recovery panel coming up — game not ended yet; just flag the trigger
       // for achievement evaluation later when the run actually finishes.
+      // Threshold 75 (was 80): see MEETING_LOAD_TIERS note — 80 was unreachable.
       set({
         ...meterPatch,
         ...toastPatch,
@@ -488,7 +494,7 @@ export const useGameStore: GameStoreHook =
         // gets its own ending rather than landing in the clean-win bucket.
         let ending: Ending
         if (pissedOff >= 75) ending = 'full-escalation'
-        else if (meetingLoad >= 80) ending = 'calendar-apocalypse'
+        else if (meetingLoad >= 75) ending = 'calendar-apocalypse'
         else if (projectStatus < 45) ending = 'full-escalation'
         else if (alignment >= 6 && pissedOff >= 40) ending = 'pyrrhic-alignment'
         else if (projectStatus < 70) ending = 'green-enough'
@@ -662,10 +668,10 @@ export const useGameStore: GameStoreHook =
           s.unlockedAchievements
         )
 
-      // Did the recovery actually rescue us? If meetingLoad still >= 80,
+      // Did the recovery actually rescue us? If meetingLoad still >= 75,
       // the apocalypse lands. If the player traded calendar for an angry
       // team and tripped that cliff instead, full-escalation takes over.
-      if (meetingLoad >= 80) {
+      if (meetingLoad >= 75) {
         return { ...base, phase: 'ended', ending: 'calendar-apocalypse', ...endingPatch('calendar-apocalypse') }
       }
       if (pissedOff >= 75 || projectStatus < 45) {
