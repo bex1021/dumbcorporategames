@@ -14,8 +14,9 @@ import type { AnimationClip } from 'three'
 import {
   LANES, LANE_LERP, GRAVITY, JUMP_V, SLIDE_DUR, CLEAR_JUMP_Y, HIT_Z,
   SPAWN_AHEAD, CULL_BEHIND, LEVEL_DISTANCE, TOTAL_UPDATES,
+  TOKEN_VALUE, TOKEN_Y,
   makeRow, gapRange, speedForLevel, isJumpable, isSlideable, PAL,
-  type Obstacle, type ObstacleKind,
+  type Obstacle, type ObstacleKind, type Token,
 } from './runnerConfig'
 
 const LEONARD_URL = '/models/Player_Idle.glb' // hosts the mesh we render
@@ -26,17 +27,24 @@ useGLTF.preload(WALK_URL)
 // Mixamo "Running" clip is dropped in (see RUN_TIMESCALE note in LeonardModel).
 const RUN_TIMESCALE = 1.7
 
-export type HudState = { updates: number; level: number; distance: number }
+export type HudState = { updates: number; level: number; distance: number; score: number; mult: number }
 
 type Props = {
   running: boolean
   onHud: (h: HudState) => void
   onDeposit: (n: number) => void
+  onToken: () => void
   onDeath: (distance: number) => void
   onWin: () => void
 }
 
-export function RunnerWorld({ running, onHud, onDeposit, onDeath, onWin }: Props) {
+// Combo multiplier from tokens collected this run: x1, then +1 every 8
+// tokens, capped at x4. Rewards greedy weaving without runaway scores.
+function multForCombo(combo: number) {
+  return Math.min(4, 1 + Math.floor(combo / 8))
+}
+
+export function RunnerWorld({ running, onHud, onDeposit, onToken, onDeath, onWin }: Props) {
   const { camera } = useThree()
 
   // ---- per-frame game state (never triggers React re-render) ----
@@ -46,10 +54,13 @@ export function RunnerWorld({ running, onHud, onDeposit, onDeath, onWin }: Props
     speed: speedForLevel(1), level: 1, levelDist: 0, updates: 0,
     alive: true, won: false, boardActive: false,
     nextSpawnZ: 34, hudAccum: 0,
+    score: 0, combo: 0,
   })
   const obsRef = useRef<Obstacle[]>([])
+  const tokRef = useRef<Token[]>([])
   const idRef = useRef(1)
   const [obstacles, setObstacles] = useState<Obstacle[]>([])
+  const [tokens, setTokens] = useState<Token[]>([])
 
   const leonardRef = useRef<THREE.Group>(null)
   const modelRef = useRef<THREE.Group>(null)
@@ -81,12 +92,38 @@ export function RunnerWorld({ running, onHud, onDeposit, onDeath, onWin }: Props
   function syncObstacles() {
     setObstacles(obsRef.current.slice())
   }
+  function syncTokens() {
+    setTokens(tokRef.current.slice())
+  }
 
-  function spawnRow() {
+  // Spawn one obstacle row at nextSpawnZ; return which lanes it occupies so
+  // we can drop tokens in an OPEN lane (pulling the player to weave).
+  function spawnRow(): 'full' | number[] {
     const g = G.current
     const row = makeRow(g.level, Math.random)
+    let occupied: number[] = []
     for (const o of row) {
       obsRef.current.push({ id: idRef.current++, z: g.nextSpawnZ, kind: o.kind, lanes: o.lanes })
+      if (o.lanes === 'full') occupied = [0, 1, 2]
+      else occupied = occupied.concat(o.lanes)
+    }
+    return occupied
+  }
+
+  // Drop a short run of ⭐ tokens in the gap after a row. Placed in an OPEN
+  // lane (so collecting = dodging toward safety), or as a diagonal sweep
+  // across lanes ~30% of the time to force a weave.
+  function spawnTokens(rowZ: number, occupied: 'full' | number[]) {
+    const occ = occupied === 'full' ? [0, 1, 2] : occupied
+    const open = [0, 1, 2].filter((l) => !occ.includes(l))
+    const startLane = open.length
+      ? open[Math.floor(Math.random() * open.length)]
+      : Math.floor(Math.random() * 3)
+    const diagonal = Math.random() < 0.3
+    const baseZ = rowZ + 3.5
+    for (let i = 0; i < 3; i++) {
+      const lane = diagonal ? Math.max(0, Math.min(2, startLane - 1 + i)) : startLane
+      tokRef.current.push({ id: idRef.current++, z: baseZ + i * 2.2, lane })
     }
   }
 
@@ -122,20 +159,25 @@ export function RunnerWorld({ running, onHud, onDeposit, onDeath, onWin }: Props
     if (!g.boardActive) {
       let dirty = false
       while (g.nextSpawnZ < g.z + SPAWN_AHEAD) {
-        spawnRow(); dirty = true
+        const rowZ = g.nextSpawnZ
+        const occ = spawnRow(); dirty = true
+        if (Math.random() < 0.78) spawnTokens(rowZ, occ) // most gaps get tokens
         const [gmin, gmax] = gapRange(g.level)
         const gap = gmin + Math.random() * (gmax - gmin)
         g.nextSpawnZ += gap
         g.levelDist += gap
         if (g.levelDist >= LEVEL_DISTANCE) { spawnBoard(); break }
       }
-      if (dirty) syncObstacles()
+      if (dirty) { syncObstacles(); syncTokens() }
     }
 
     // ---- cull behind ----
     const before = obsRef.current.length
     obsRef.current = obsRef.current.filter((o) => o.z > g.z - CULL_BEHIND)
     if (obsRef.current.length !== before) syncObstacles()
+    const tokBefore = tokRef.current.length
+    tokRef.current = tokRef.current.filter((t) => t.z > g.z - CULL_BEHIND)
+    if (tokRef.current.length !== tokBefore) syncTokens()
 
     // ---- collision / deposit ----
     for (const o of obsRef.current) {
@@ -161,7 +203,8 @@ export function RunnerWorld({ running, onHud, onDeposit, onDeath, onWin }: Props
         }
         continue
       }
-      // hazard
+      // hazard. A 'wall' is neither jumpable nor slideable → cleared stays
+      // false → you die unless you switched out of its lane (inLane above).
       const cleared =
         (isJumpable(o.kind) && g.y >= CLEAR_JUMP_Y) ||
         (isSlideable(o.kind) && g.sliding)
@@ -169,6 +212,25 @@ export function RunnerWorld({ running, onHud, onDeposit, onDeath, onWin }: Props
         g.alive = false
         onDeath(Math.floor(g.z))
         return
+      }
+    }
+
+    // ---- token pickup (only reached if still alive this frame) ----
+    {
+      let collected = 0
+      const survivors: Token[] = []
+      for (const t of tokRef.current) {
+        if (Math.abs(t.z - g.z) <= HIT_Z && t.lane === g.lane) collected++
+        else survivors.push(t)
+      }
+      if (collected > 0) {
+        for (let i = 0; i < collected; i++) {
+          g.combo += 1
+          g.score += TOKEN_VALUE * multForCombo(g.combo)
+        }
+        tokRef.current = survivors
+        syncTokens()
+        onToken()
       }
     }
 
@@ -192,7 +254,10 @@ export function RunnerWorld({ running, onHud, onDeposit, onDeath, onWin }: Props
     g.hudAccum += dt
     if (g.hudAccum > 0.12) {
       g.hudAccum = 0
-      onHud({ updates: g.updates, level: g.level, distance: Math.floor(g.z) })
+      onHud({
+        updates: g.updates, level: g.level, distance: Math.floor(g.z),
+        score: g.score, mult: multForCombo(g.combo),
+      })
     }
   })
 
@@ -240,6 +305,11 @@ export function RunnerWorld({ running, onHud, onDeposit, onDeath, onWin }: Props
       {/* Obstacles */}
       {obstacles.map((o) => (
         <ObstacleMesh key={o.id} obstacle={o} />
+      ))}
+
+      {/* ⭐ Story-point tokens */}
+      {tokens.map((t) => (
+        <TokenMesh key={t.id} token={t} />
       ))}
 
       {/* Leonard */}
@@ -314,6 +384,20 @@ function SidePillar({ x, z, tint }: { x: number; z: number; tint: string }) {
   )
 }
 
+// ⭐ Story-point token — spinning gold gem floating in a lane.
+function TokenMesh({ token }: { token: Token }) {
+  const ref = useRef<THREE.Mesh>(null)
+  useFrame((_, dt) => {
+    if (ref.current) ref.current.rotation.y += dt * 3
+  })
+  return (
+    <mesh ref={ref} position={[LANES[token.lane], TOKEN_Y, token.z]}>
+      <octahedronGeometry args={[0.34, 0]} />
+      <meshStandardMaterial color={PAL.update} emissive={PAL.update} emissiveIntensity={0.6} />
+    </mesh>
+  )
+}
+
 // ---- Obstacle rendering ----
 function ObstacleMesh({ obstacle }: { obstacle: Obstacle }) {
   const laneXs =
@@ -368,6 +452,22 @@ function ObstaclePiece({ kind, x, full }: { kind: ObstacleKind; x: number; full:
             <meshStandardMaterial color={PAL.overhang} />
           </mesh>
         ))}
+      </group>
+    )
+  }
+  if (kind === 'wall') {
+    // tall purple dependency wall — too tall to jump, no gap to slide.
+    // The ONLY way past is to be in another lane. Red warning stripe on top.
+    return (
+      <group position={[x, 0, 0]}>
+        <mesh position={[0, 1.7, 0]}>
+          <boxGeometry args={[w, 3.4, 0.9]} />
+          <meshStandardMaterial color={PAL.wall} emissive={PAL.wall} emissiveIntensity={0.2} />
+        </mesh>
+        <mesh position={[0, 3.05, 0]}>
+          <boxGeometry args={[w + 0.04, 0.3, 0.94]} />
+          <meshStandardMaterial color={PAL.gap} emissive={PAL.gap} emissiveIntensity={0.45} />
+        </mesh>
       </group>
     )
   }

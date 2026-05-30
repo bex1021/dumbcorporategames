@@ -25,11 +25,16 @@ export const HIT_Z = 0.7 // |obstacle.z - leonard.z| within this = contact
 
 // ---- Speed + level structure ----
 export const BASE_SPEED = 13 // units/s on level 1
-export const SPEED_PER_LEVEL = 2.6 // each board deposit speeds things up
-export const TOTAL_UPDATES = 4 // 4 boards to clear the phase
+export const SPEED_PER_LEVEL = 3.2 // each board deposit speeds things up (L1 13 → L4 ~22.6)
+export const TOTAL_UPDATES = 4 // 4 boards to clear the phase (also the natural difficulty cap)
 export const LEVEL_DISTANCE = 340 // forward units of obstacles per level before its board
 export const SPAWN_AHEAD = 90 // spawn obstacles this far ahead of Leonard
 export const CULL_BEHIND = 14 // remove obstacles this far behind Leonard
+
+// ---- Collectibles ----
+export const TOKEN_VALUE = 25 // base story points per token (× combo multiplier)
+export const TOKEN_Y = 1.15 // float height — grabbable while grounded or low-jumping
+export type Token = { id: number; z: number; lane: number }
 
 // ---- Obstacle gaps (random per spawn; tighten with level) ----
 export const GAP_MIN = 17
@@ -40,8 +45,11 @@ export const GAP_TIGHTEN_PER_LEVEL = 1.5 // shave this off min+max each level
 // 'block'    — stack of tickets in a lane; JUMP over it.
 // 'overhang' — sprint-banner bar at head height; SLIDE under it.
 // 'gap'      — red BLOCKED trap tile on the floor; JUMP over it.
+// 'wall'     — tall purple "dependency wall"; CANNOT jump or slide it — the
+//              only way past is to be in a different lane. This is what makes
+//              lane-camping fatal (you can't jump/slide your way through).
 // 'board'    — full-width Kanban gate; run through it to DEPOSIT an update.
-export type ObstacleKind = 'block' | 'overhang' | 'gap' | 'board'
+export type ObstacleKind = 'block' | 'overhang' | 'gap' | 'wall' | 'board'
 
 export type Obstacle = {
   id: number
@@ -72,29 +80,37 @@ export function isSlideable(k: ObstacleKind) {
 export function makeRow(level: number, rand: () => number): Omit<Obstacle, 'id' | 'z'>[] {
   const r = rand()
 
-  // Level 1 leans on single-lane, dodgeable hazards. Later levels add
-  // full-width forced jumps/slides and two-lane squeezes.
+  // Every level includes WALLS (must-dodge, can't jump/slide) so lane-camping
+  // is fatal from the start. Level 1 stays gentle otherwise; later levels add
+  // full-width forced jumps/slides, two-lane squeezes, and more walls.
   if (level <= 1) {
-    if (r < 0.34) return [{ kind: 'block', lanes: [pickLane(rand)] }]
-    if (r < 0.62) return [{ kind: 'gap', lanes: [pickLane(rand)] }]
-    if (r < 0.85) return [{ kind: 'overhang', lanes: [pickLane(rand)] }]
+    if (r < 0.26) return [{ kind: 'block', lanes: [pickLane(rand)] }]
+    if (r < 0.48) return [{ kind: 'gap', lanes: [pickLane(rand)] }]
+    if (r < 0.66) return [{ kind: 'overhang', lanes: [pickLane(rand)] }]
+    if (r < 0.85) return [{ kind: 'wall', lanes: wallLanes(rand) }] // MUST switch lanes
     return [{ kind: 'block', lanes: twoLanes(rand) }] // dodge to the open lane
   }
 
   if (level === 2) {
-    if (r < 0.22) return [{ kind: 'block', lanes: 'full' }] // forced jump
-    if (r < 0.42) return [{ kind: 'overhang', lanes: 'full' }] // forced slide
-    if (r < 0.6) return [{ kind: 'gap', lanes: twoLanes(rand) }]
-    if (r < 0.8) return [{ kind: 'overhang', lanes: [pickLane(rand)] }]
-    return [{ kind: 'block', lanes: [pickLane(rand)] }]
+    if (r < 0.18) return [{ kind: 'block', lanes: 'full' }] // forced jump
+    if (r < 0.34) return [{ kind: 'overhang', lanes: 'full' }] // forced slide
+    if (r < 0.56) return [{ kind: 'wall', lanes: wallLanes(rand) }]
+    if (r < 0.72) return [{ kind: 'gap', lanes: twoLanes(rand) }]
+    return [{ kind: 'overhang', lanes: [pickLane(rand)] }]
   }
 
-  // Level 3+ — meanest mix.
-  if (r < 0.26) return [{ kind: 'block', lanes: 'full' }]
-  if (r < 0.5) return [{ kind: 'overhang', lanes: 'full' }]
-  if (r < 0.68) return [{ kind: 'gap', lanes: twoLanes(rand) }]
-  if (r < 0.84) return [{ kind: 'block', lanes: twoLanes(rand) }]
-  return [{ kind: 'overhang', lanes: [pickLane(rand)] }]
+  // Level 3+ — meanest mix, walls common.
+  if (r < 0.16) return [{ kind: 'block', lanes: 'full' }]
+  if (r < 0.3) return [{ kind: 'overhang', lanes: 'full' }]
+  if (r < 0.56) return [{ kind: 'wall', lanes: wallLanes(rand) }]
+  if (r < 0.74) return [{ kind: 'gap', lanes: twoLanes(rand) }]
+  return [{ kind: 'wall', lanes: [pickLane(rand)] }]
+}
+
+// Walls occupy 1 or 2 lanes — NEVER all three (that'd be unavoidable). A
+// 2-lane wall leaves exactly one safe lane to weave into.
+function wallLanes(rand: () => number): 'full' | number[] {
+  return rand() < 0.5 ? [pickLane(rand)] : twoLanes(rand)
 }
 
 function pickLane(rand: () => number): number {
@@ -126,6 +142,7 @@ export const PAL = {
   blockEdge: '#4c9aff',
   overhang: '#ff5630', // sprint-banner red-orange
   gap: '#de350b', // BLOCKED trap red
+  wall: '#8777d9', // Atlassian purple — the unjumpable "dependency wall"
   board: '#36b37e', // Kanban green gate
   boardEdge: '#abf5d1',
   update: '#ffab00', // the carried "update" cards — Jira yellow

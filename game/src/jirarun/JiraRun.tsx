@@ -18,17 +18,16 @@ type Phase = 'intro' | 'running' | 'dead' | 'won'
 
 export default function JiraRun() {
   const [phase, setPhase] = useState<Phase>('intro')
-  const [hud, setHud] = useState<HudState>({ updates: 0, level: 1, distance: 0 })
+  const [hud, setHud] = useState<HudState>({ updates: 0, level: 1, distance: 0, score: 0, mult: 1 })
   const [fading, setFading] = useState(false)
   const [runnerKey, setRunnerKey] = useState(0)
-  const [deathDist, setDeathDist] = useState(0)
 
   const start = useCallback(() => {
     // dramatic fade-to-black, then drop into the board
     setFading(true)
     sfx.warp()
     window.setTimeout(() => {
-      setHud({ updates: 0, level: 1, distance: 0 })
+      setHud({ updates: 0, level: 1, distance: 0, score: 0, mult: 1 })
       setRunnerKey((k) => k + 1)
       setPhase('running')
       setFading(false)
@@ -38,7 +37,7 @@ export default function JiraRun() {
   const retry = useCallback(() => {
     setFading(true)
     window.setTimeout(() => {
-      setHud({ updates: 0, level: 1, distance: 0 })
+      setHud({ updates: 0, level: 1, distance: 0, score: 0, mult: 1 })
       setRunnerKey((k) => k + 1)
       setPhase('running')
       setFading(false)
@@ -70,7 +69,8 @@ export default function JiraRun() {
             running={phase === 'running'}
             onHud={setHud}
             onDeposit={(n) => { sfx.deposit(); if (n >= TOTAL_UPDATES) sfx.win() }}
-            onDeath={(d) => { sfx.crash(); setDeathDist(d); setPhase('dead') }}
+            onToken={() => sfx.token()}
+            onDeath={() => { sfx.crash(); setPhase('dead') }}
             onWin={() => setPhase('won')}
           />
         </Canvas>
@@ -78,8 +78,8 @@ export default function JiraRun() {
 
       {phase === 'running' && <HUD hud={hud} />}
       {phase === 'intro' && <IntroScreen onStart={start} />}
-      {phase === 'dead' && <DeadScreen distance={deathDist} updates={hud.updates} onRetry={retry} />}
-      {phase === 'won' && <WinScreen distance={hud.distance} />}
+      {phase === 'dead' && <DeadScreen score={hud.score} updates={hud.updates} onRetry={retry} />}
+      {phase === 'won' && <WinScreen score={hud.score} />}
 
       {/* fade-to-black overlay */}
       <div
@@ -113,15 +113,20 @@ function HUD({ hud }: { hud: HudState }) {
           ))}
         </div>
       </div>
-      {/* level + distance */}
+      {/* sprint + story-point score + combo */}
       <div className="text-right">
         <div
-          className="text-[11px] uppercase tracking-widest font-bold px-2 py-1 rounded"
+          className="text-[11px] uppercase tracking-widest font-bold px-2 py-1 rounded inline-block"
           style={{ background: PAL.update, color: '#3a2a00' }}
         >
           Sprint {hud.level}
         </div>
-        <div className="text-white/80 text-sm mt-1 tabular-nums">{hud.distance} pts</div>
+        <div className="text-white font-bold text-lg mt-1 tabular-nums">⭐ {hud.score}</div>
+        {hud.mult > 1 && (
+          <div className="text-[12px] font-bold tabular-nums" style={{ color: PAL.update }}>
+            ×{hud.mult} combo
+          </div>
+        )}
       </div>
     </div>
   )
@@ -153,6 +158,8 @@ function IntroScreen({ onStart }: { onStart: () => void }) {
           <div>← → &nbsp; / &nbsp; A D &nbsp;—&nbsp; switch lane</div>
           <div>↑ &nbsp; / &nbsp; W &nbsp; / &nbsp; SPACE &nbsp;—&nbsp; jump (blocks & red traps)</div>
           <div>↓ &nbsp; / &nbsp; S &nbsp;—&nbsp; slide (red banners overhead)</div>
+          <div style={{ color: PAL.wall }}>⬛ purple walls — can't jump, <b>switch lanes!</b></div>
+          <div style={{ color: PAL.update }}>⭐ grab story-point tokens for combo points</div>
         </div>
         <button
           onClick={onStart}
@@ -167,7 +174,7 @@ function IntroScreen({ onStart }: { onStart: () => void }) {
 }
 
 // ---- Death ----
-function DeadScreen({ distance, updates, onRetry }: { distance: number; updates: number; onRetry: () => void }) {
+function DeadScreen({ score, updates, onRetry }: { score: number; updates: number; onRetry: () => void }) {
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center p-6 bg-black/70">
       <div className="max-w-md w-full text-center font-mono text-white">
@@ -177,7 +184,7 @@ function DeadScreen({ distance, updates, onRetry }: { distance: number; updates:
         </h1>
         <p className="text-white/70 text-sm mb-1">You hit a blocker and dropped your updates.</p>
         <p className="text-white/50 text-xs mb-6">
-          {updates}/{TOTAL_UPDATES} deposited · {distance} pts of story points run
+          {updates}/{TOTAL_UPDATES} deposited · ⭐ {score} story points
         </p>
         <button
           onClick={onRetry}
@@ -192,7 +199,7 @@ function DeadScreen({ distance, updates, onRetry }: { distance: number; updates:
 }
 
 // ---- Win ----
-function WinScreen({ distance }: { distance: number }) {
+function WinScreen({ score }: { score: number }) {
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center p-6"
       style={{ background: 'radial-gradient(circle at 50% 40%, #1f7a4d, #06291b)' }}>
@@ -205,7 +212,7 @@ function WinScreen({ distance }: { distance: number }) {
           Four updates deposited. The board is, briefly, Green.
         </p>
         <p className="text-white/55 text-xs mb-6">
-          {distance} story points run. It is 11:00 AM. Then your phone buzzes:
+          ⭐ {score} story points banked. It is 11:00 AM. Then your phone buzzes:
           the SteerCo lunch order just fell through.
         </p>
         <div className="flex flex-col gap-2 items-center">
@@ -244,6 +251,7 @@ const sfx = (() => {
   }
   return {
     warp: () => { blip(180, 0.5, 'sawtooth', 0.1, 900) },
+    token: () => { blip(880, 0.08, 'square', 0.09, 1320) },
     deposit: () => { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => blip(f, 0.12, 'square', 0.12), i * 70)) },
     crash: () => { blip(300, 0.4, 'sawtooth', 0.16, 60) },
     win: () => { [523, 659, 784, 1047, 1319].forEach((f, i) => setTimeout(() => blip(f, 0.18, 'triangle', 0.14), i * 110)) },

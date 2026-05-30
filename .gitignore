@@ -49,3 +49,6 @@ game/public/models/Player_Sitting.glb
 # Temp / scratch
 *.tmp
 *.bak
+
+# Raw Mixamo FBX drops (staging for FBX→GLB conversion; not served)
+game/public/models/_mixamo_raw/
