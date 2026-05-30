@@ -73,7 +73,7 @@ export default function Game() {
           position: [PLAYER.spawnX, CAMERA.height, PLAYER.spawnZ + CAMERA.distance],
           fov: CAMERA.fov,
         }}
-        gl={{ antialias: !isHighDPI }}
+        gl={{ antialias: !isHighDPI, preserveDrawingBuffer: true }}
         onCreated={({ gl }) => {
           gl.domElement.addEventListener(
             'webglcontextlost',

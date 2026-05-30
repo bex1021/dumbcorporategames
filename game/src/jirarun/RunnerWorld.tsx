@@ -11,13 +11,8 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useGLTF, useAnimations } from '@react-three/drei'
 import * as THREE from 'three'
 import type { AnimationClip } from 'three'
-import {
-  LANES, LANE_LERP, GRAVITY, JUMP_V, SLIDE_DUR, CLEAR_JUMP_Y, HIT_Z,
-  SPAWN_AHEAD, CULL_BEHIND, LEVEL_DISTANCE, TOTAL_UPDATES,
-  TOKEN_VALUE, TOKEN_Y,
-  makeRow, gapRange, speedForLevel, isJumpable, isSlideable, PAL,
-  type Obstacle, type ObstacleKind, type Token,
-} from './runnerConfig'
+import { LANES, TOKEN_Y, PAL, type Obstacle, type ObstacleKind, type Token } from './runnerConfig'
+import { Sim, multForCombo } from './simulation'
 
 const LEONARD_URL = '/models/Player_Idle.glb' // hosts the mesh we render
 const RUN_URL = '/models/Player_run.glb' // real Mixamo running clip (anim-only, ~73KB)
@@ -34,6 +29,19 @@ const RUN_TIMESCALE = 1.2
 // (same pattern as playerState) so we don't thread props through Suspense.
 const runnerAnim = { jumping: false }
 
+// Pick the run's seed: ?seed=N in the URL replays an exact obstacle layout
+// (used to reproduce a run the playtest harness flagged); otherwise random.
+function readSeed(): number {
+  try {
+    const q = new URLSearchParams(window.location.search).get('seed')
+    if (q != null && q !== '') {
+      const n = Number(q)
+      if (Number.isFinite(n)) return n >>> 0
+    }
+  } catch { /* ignore */ }
+  return Math.floor(Math.random() * 0xffffffff)
+}
+
 export type HudState = { updates: number; level: number; distance: number; score: number; mult: number }
 export type Checkpoint = { level: number; updates: number; score: number }
 
@@ -47,36 +55,28 @@ type Props = {
   onDeposit: (n: number) => void
   onToken: () => void
   onCheckpoint: (c: Checkpoint) => void
-  onDeath: (distance: number) => void
-  onWin: () => void
-}
-
-// Combo multiplier from tokens collected this run: x1, then +1 every 8
-// tokens, capped at x4. Rewards greedy weaving without runaway scores.
-function multForCombo(combo: number) {
-  return Math.min(4, 1 + Math.floor(combo / 8))
+  onDeath: (result: { score: number; updates: number }) => void
+  onWin: (result: { score: number; updates: number }) => void
 }
 
 export function RunnerWorld({ running, start, onHud, onDeposit, onToken, onCheckpoint, onDeath, onWin }: Props) {
   const { camera } = useThree()
 
-  // ---- per-frame game state (never triggers React re-render) ----
-  // Seeded from `start` (the current sprint checkpoint) so retries resume the
-  // sprint instead of the whole phase. z always restarts at 0 — only the
-  // sprint number / deposits / score carry over.
-  const G = useRef({
-    z: 0, lane: 1, x: 0, y: 0, vy: 0, grounded: true,
-    sliding: false, slideT: 0,
-    speed: speedForLevel(start.level), level: start.level, levelDist: 0, updates: start.updates,
-    alive: true, won: false, boardActive: false,
-    nextSpawnZ: 34, hudAccum: 0,
-    score: start.score, combo: 0,
-  })
-  const obsRef = useRef<Obstacle[]>([])
-  const tokRef = useRef<Token[]>([])
-  const idRef = useRef(1)
+  // ---- the shared rules engine (single source of truth for gameplay) ----
+  // Created once per mount (the parent remounts us via key on every new run /
+  // retry), seeded from `start` so a retry resumes the current sprint.
+  const seedRef = useRef(readSeed())
+  const simRef = useRef<Sim | null>(null)
+  if (!simRef.current) simRef.current = new Sim(seedRef.current, start)
+
+  // React only renders the obstacle/token *lists*; we re-sync them from the sim
+  // when its version counters change (a few times/sec on spawn/cull), never
+  // per-frame.
   const [obstacles, setObstacles] = useState<Obstacle[]>([])
   const [tokens, setTokens] = useState<Token[]>([])
+  const lastObsV = useRef(-1)
+  const lastTokV = useRef(-1)
+  const hudAccum = useRef(0)
 
   const leonardRef = useRef<THREE.Group>(null)
   const modelRef = useRef<THREE.Group>(null)
@@ -86,201 +86,89 @@ export function RunnerWorld({ running, start, onHud, onDeposit, onToken, onCheck
   // ---- input ----
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      const g = G.current
-      if (!running || !g.alive || g.won) return
+      const sim = simRef.current
+      if (!running || !sim || !sim.state.alive || sim.state.won) return
       switch (e.key) {
         // Camera is BEHIND Leonard looking +Z, so world +X renders on the
-        // player's LEFT. Left/A must therefore move toward the higher lane
-        // index (+X) to feel correct on screen, and Right/D toward the lower.
+        // player's LEFT. Left/A nudges toward the higher lane index (+1) to
+        // feel correct on screen, and Right/D toward the lower (-1).
         case 'ArrowLeft': case 'a': case 'A':
-          g.lane = Math.min(2, g.lane + 1); e.preventDefault(); break
+          sim.nudgeLane(1); e.preventDefault(); break
         case 'ArrowRight': case 'd': case 'D':
-          g.lane = Math.max(0, g.lane - 1); e.preventDefault(); break
+          sim.nudgeLane(-1); e.preventDefault(); break
         case 'ArrowUp': case 'w': case 'W': case ' ':
-          if (g.grounded && !g.sliding) { g.vy = JUMP_V; g.grounded = false }
-          e.preventDefault(); break
+          sim.jump(); e.preventDefault(); break
         case 'ArrowDown': case 's': case 'S':
-          if (g.grounded) { g.sliding = true; g.slideT = SLIDE_DUR }
-          e.preventDefault(); break
+          sim.slide(); e.preventDefault(); break
       }
     }
     window.addEventListener('keydown', down)
     return () => window.removeEventListener('keydown', down)
   }, [running])
 
-  function syncObstacles() {
-    setObstacles(obsRef.current.slice())
-  }
-  function syncTokens() {
-    setTokens(tokRef.current.slice())
-  }
-
-  // Spawn one obstacle row at nextSpawnZ; return which lanes it occupies so
-  // we can drop tokens in an OPEN lane (pulling the player to weave).
-  function spawnRow(): 'full' | number[] {
-    const g = G.current
-    const row = makeRow(g.level, Math.random)
-    let occupied: number[] = []
-    for (const o of row) {
-      obsRef.current.push({ id: idRef.current++, z: g.nextSpawnZ, kind: o.kind, lanes: o.lanes })
-      if (o.lanes === 'full') occupied = [0, 1, 2]
-      else occupied = occupied.concat(o.lanes)
+  // Dev-only: expose the live sim so a flagged seed can be inspected/driven
+  // from the browser console (and so an in-browser bot could pilot it). Never
+  // ships to production.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as { __JIRARUN__?: unknown }
+    w.__JIRARUN__ = {
+      seed: seedRef.current,
+      sim: simRef.current,
+      state: () => simRef.current?.state,
+      left: () => simRef.current?.nudgeLane(1),
+      right: () => simRef.current?.nudgeLane(-1),
+      jump: () => simRef.current?.jump(),
+      slide: () => simRef.current?.slide(),
     }
-    return occupied
-  }
-
-  // Drop a short run of ⭐ tokens in the gap after a row. Placed in an OPEN
-  // lane (so collecting = dodging toward safety), or as a diagonal sweep
-  // across lanes ~30% of the time to force a weave.
-  function spawnTokens(rowZ: number, occupied: 'full' | number[]) {
-    const occ = occupied === 'full' ? [0, 1, 2] : occupied
-    const open = [0, 1, 2].filter((l) => !occ.includes(l))
-    const startLane = open.length
-      ? open[Math.floor(Math.random() * open.length)]
-      : Math.floor(Math.random() * 3)
-    const diagonal = Math.random() < 0.3
-    const baseZ = rowZ + 3.5
-    for (let i = 0; i < 3; i++) {
-      const lane = diagonal ? Math.max(0, Math.min(2, startLane - 1 + i)) : startLane
-      tokRef.current.push({ id: idRef.current++, z: baseZ + i * 2.2, lane })
-    }
-  }
-
-  function spawnBoard() {
-    const g = G.current
-    obsRef.current.push({ id: idRef.current++, z: g.nextSpawnZ + 8, kind: 'board', lanes: 'full' })
-    g.boardActive = true
-    syncObstacles()
-  }
+    return () => { delete w.__JIRARUN__ }
+  }, [])
 
   useFrame((_, dtRaw) => {
-    const g = G.current
-    if (!running || !g.alive || g.won) return
+    const sim = simRef.current
+    if (!sim || !running || !sim.state.alive || sim.state.won) return
     const dt = Math.min(dtRaw, 0.05) // clamp huge frames (tab refocus)
 
-    // forward motion
-    g.z += g.speed * dt
-
-    // lane smoothing
-    const targetX = LANES[g.lane]
-    g.x += (targetX - g.x) * (1 - Math.exp(-LANE_LERP * dt))
-
-    // vertical (jump arc)
-    if (!g.grounded || g.vy !== 0) {
-      g.y += g.vy * dt
-      g.vy += GRAVITY * dt
-      if (g.y <= 0) { g.y = 0; g.vy = 0; g.grounded = true }
-    }
-    // slide timer
-    if (g.sliding) { g.slideT -= dt; if (g.slideT <= 0) g.sliding = false }
-
-    // ---- spawning ----
-    if (!g.boardActive) {
-      let dirty = false
-      while (g.nextSpawnZ < g.z + SPAWN_AHEAD) {
-        const rowZ = g.nextSpawnZ
-        const occ = spawnRow(); dirty = true
-        if (Math.random() < 0.78) spawnTokens(rowZ, occ) // most gaps get tokens
-        const [gmin, gmax] = gapRange(g.level)
-        const gap = gmin + Math.random() * (gmax - gmin)
-        g.nextSpawnZ += gap
-        g.levelDist += gap
-        if (g.levelDist >= LEVEL_DISTANCE) { spawnBoard(); break }
-      }
-      if (dirty) { syncObstacles(); syncTokens() }
+    // Advance the shared rules engine, then react to what it reports.
+    const events = sim.step(dt)
+    for (const e of events) {
+      if (e.type === 'token') onToken()
+      else if (e.type === 'deposit') onDeposit(e.updates)
+      else if (e.type === 'checkpoint') onCheckpoint({ level: e.level, updates: e.updates, score: e.score })
+      else if (e.type === 'win') onWin({ score: sim.state.score, updates: sim.state.updates })
+      else if (e.type === 'death') onDeath({ score: sim.state.score, updates: sim.state.updates })
     }
 
-    // ---- cull behind ----
-    const before = obsRef.current.length
-    obsRef.current = obsRef.current.filter((o) => o.z > g.z - CULL_BEHIND)
-    if (obsRef.current.length !== before) syncObstacles()
-    const tokBefore = tokRef.current.length
-    tokRef.current = tokRef.current.filter((t) => t.z > g.z - CULL_BEHIND)
-    if (tokRef.current.length !== tokBefore) syncTokens()
-
-    // ---- collision / deposit ----
-    for (const o of obsRef.current) {
-      if (Math.abs(o.z - g.z) > HIT_Z) continue
-      const inLane = o.lanes === 'full' || o.lanes.includes(g.lane)
-      if (!inLane) continue
-      if (o.kind === 'board') {
-        // pass-through deposit (only once — mark by moving it behind)
-        if (o.z <= g.z) {
-          g.updates += 1
-          onDeposit(g.updates)
-          obsRef.current = obsRef.current.filter((x) => x.id !== o.id)
-          syncObstacles()
-          if (g.updates >= TOTAL_UPDATES) {
-            g.won = true
-            onWin()
-          } else {
-            g.level += 1
-            g.speed = speedForLevel(g.level)
-            g.levelDist = 0
-            g.boardActive = false
-            // Bank a checkpoint at the start of the new sprint — a death from
-            // here restarts this sprint, not the whole phase.
-            onCheckpoint({ level: g.level, updates: g.updates, score: g.score })
-          }
-        }
-        continue
-      }
-      // hazard. A 'wall' is neither jumpable nor slideable → cleared stays
-      // false → you die unless you switched out of its lane (inLane above).
-      const cleared =
-        (isJumpable(o.kind) && g.y >= CLEAR_JUMP_Y) ||
-        (isSlideable(o.kind) && g.sliding)
-      if (!cleared) {
-        g.alive = false
-        onDeath(Math.floor(g.z))
-        return
-      }
+    // Re-sync the React-rendered lists only when the sim actually changed them.
+    if (sim.state.obsVersion !== lastObsV.current) {
+      lastObsV.current = sim.state.obsVersion
+      setObstacles(sim.state.obstacles.slice())
+    }
+    if (sim.state.tokVersion !== lastTokV.current) {
+      lastTokV.current = sim.state.tokVersion
+      setTokens(sim.state.tokens.slice())
     }
 
-    // ---- token pickup (only reached if still alive this frame) ----
-    {
-      let collected = 0
-      const survivors: Token[] = []
-      for (const t of tokRef.current) {
-        if (Math.abs(t.z - g.z) <= HIT_Z && t.lane === g.lane) collected++
-        else survivors.push(t)
-      }
-      if (collected > 0) {
-        for (let i = 0; i < collected; i++) {
-          g.combo += 1
-          g.score += TOKEN_VALUE * multForCombo(g.combo)
-        }
-        tokRef.current = survivors
-        syncTokens()
-        onToken()
-      }
-    }
-
-    // ---- transforms ----
-    if (leonardRef.current) {
-      leonardRef.current.position.set(g.x, g.y, g.z)
-    }
+    // ---- transforms (read-only view of sim state) ----
+    const s = sim.state
+    if (leonardRef.current) leonardRef.current.position.set(s.x, s.y, s.z)
     // Drive the animation state machine: airborne → Jump clip, else Run.
-    runnerAnim.jumping = !g.grounded
-    if (modelRef.current) {
-      // The run clip animates the body; we only add a slide squash on top.
-      modelRef.current.scale.y = g.sliding ? 0.5 : 1
-    }
+    runnerAnim.jumping = !s.grounded
+    if (modelRef.current) modelRef.current.scale.y = s.sliding ? 0.5 : 1 // slide squash
     // camera follows behind, slight lateral lean toward lane
-    camera.position.set(g.x * 0.35, 3.4, g.z - 6.6)
-    camera.lookAt(g.x * 0.18, 1.0, g.z + 12)
-
+    camera.position.set(s.x * 0.35, 3.4, s.z - 6.6)
+    camera.lookAt(s.x * 0.18, 1.0, s.z + 12)
     // tile the side pillars + floor so the world looks infinite
-    if (pillarsRef.current) pillarsRef.current.position.z = Math.floor((g.z - 16) / 8) * 8
-    if (floorRef.current) floorRef.current.position.z = g.z
+    if (pillarsRef.current) pillarsRef.current.position.z = Math.floor((s.z - 16) / 8) * 8
+    if (floorRef.current) floorRef.current.position.z = s.z
 
     // throttled HUD push
-    g.hudAccum += dt
-    if (g.hudAccum > 0.12) {
-      g.hudAccum = 0
+    hudAccum.current += dt
+    if (hudAccum.current > 0.12) {
+      hudAccum.current = 0
       onHud({
-        updates: g.updates, level: g.level, distance: Math.floor(g.z),
-        score: g.score, mult: multForCombo(g.combo),
+        updates: s.updates, level: s.level, distance: Math.floor(s.z),
+        score: s.score, mult: multForCombo(s.combo),
       })
     }
   })

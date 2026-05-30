@@ -77,8 +77,18 @@ export function isSlideable(k: ObstacleKind) {
 // rises with level: more doubles, tighter mix.
 //
 // `rand` is an injected 0..1 RNG so callers stay deterministic if they want.
-export function makeRow(level: number, rand: () => number): Omit<Obstacle, 'id' | 'z'>[] {
+export function makeRow(level: number, rand: () => number, prevForcedFull = false): Omit<Obstacle, 'id' | 'z'>[] {
   const r = rand()
+
+  // A FULL-WIDTH forced row (jump-the-whole-track or slide-the-whole-track)
+  // immediately after another one can be UNBEATABLE at high speed: the jump's
+  // above-clearance window is shorter than the inter-row gap, so a single jump
+  // can't cover both rows and you can't land-and-recover between them. (The
+  // playtest harness found exactly this — two full blocks 17u apart at sprint
+  // 4.) So if the previous row was a full-width forced action, downgrade this
+  // one to a two-lane version that always leaves an open lane to dodge into.
+  const forced = (kind: ObstacleKind): Omit<Obstacle, 'id' | 'z'>[] =>
+    prevForcedFull ? [{ kind, lanes: twoLanes(rand) }] : [{ kind, lanes: 'full' }]
 
   // Every level includes WALLS (must-dodge, can't jump/slide) so lane-camping
   // is fatal from the start. Level 1 stays gentle otherwise; later levels add
@@ -92,16 +102,16 @@ export function makeRow(level: number, rand: () => number): Omit<Obstacle, 'id' 
   }
 
   if (level === 2) {
-    if (r < 0.18) return [{ kind: 'block', lanes: 'full' }] // forced jump
-    if (r < 0.34) return [{ kind: 'overhang', lanes: 'full' }] // forced slide
+    if (r < 0.18) return forced('block') // forced jump (downgraded if it follows one)
+    if (r < 0.34) return forced('overhang') // forced slide
     if (r < 0.56) return [{ kind: 'wall', lanes: wallLanes(rand) }]
     if (r < 0.72) return [{ kind: 'gap', lanes: twoLanes(rand) }]
     return [{ kind: 'overhang', lanes: [pickLane(rand)] }]
   }
 
   // Level 3+ — meanest mix, walls common.
-  if (r < 0.16) return [{ kind: 'block', lanes: 'full' }]
-  if (r < 0.3) return [{ kind: 'overhang', lanes: 'full' }]
+  if (r < 0.16) return forced('block')
+  if (r < 0.3) return forced('overhang')
   if (r < 0.56) return [{ kind: 'wall', lanes: wallLanes(rand) }]
   if (r < 0.74) return [{ kind: 'gap', lanes: twoLanes(rand) }]
   return [{ kind: 'wall', lanes: [pickLane(rand)] }]
@@ -130,6 +140,18 @@ export function gapRange(level: number): [number, number] {
 
 export function speedForLevel(level: number): number {
   return BASE_SPEED + (level - 1) * SPEED_PER_LEVEL
+}
+
+// Clear "runway" at the start of every sprint: a few seconds of EMPTY track
+// right after each speed-up, so players can re-settle into the new (faster)
+// pace before obstacles resume. Measured in seconds, then converted to world
+// units at that level's speed — so the breather is a constant ~3.6s of
+// reaction time at every level, not a constant distance that shrinks as you
+// get faster. (Without this, the first obstacle of a new sprint can land <1s
+// after the gate, which felt like an instant forced jump.)
+export const SPRINT_GRACE_SECONDS = 3.6
+export function runwayForLevel(level: number): number {
+  return speedForLevel(level) * SPRINT_GRACE_SECONDS
 }
 
 // ---- 8-bit Atlassian palette ----

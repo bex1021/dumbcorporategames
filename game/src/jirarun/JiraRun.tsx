@@ -15,6 +15,9 @@ import { RunnerWorld, type HudState, type Checkpoint } from './RunnerWorld'
 import { TOTAL_UPDATES, PAL } from './runnerConfig'
 
 type Phase = 'intro' | 'running' | 'dead' | 'won'
+// What a finished run hands back to the screens: the story-point haul + how
+// many updates made it in. Feeds the "$0.00 Productivity Receipt" punchline.
+export type RunResult = { score: number; updates: number }
 const FRESH: Checkpoint = { level: 1, updates: 0, score: 0 }
 
 export default function JiraRun() {
@@ -25,6 +28,8 @@ export default function JiraRun() {
   // Current sprint checkpoint — where a retry resumes. Reset on a fresh game,
   // advanced by RunnerWorld each time an update is deposited.
   const [checkpoint, setCheckpoint] = useState<Checkpoint>(FRESH)
+  // The haul from the run that just ended — drives the receipt on dead/won.
+  const [result, setResult] = useState<RunResult>({ score: 0, updates: 0 })
 
   const start = useCallback(() => {
     // fresh game from the intro → wipe the checkpoint, fade in
@@ -68,7 +73,7 @@ export default function JiraRun() {
         <Canvas
           key={runnerKey}
           dpr={[1, 1.5]}
-          gl={{ antialias: false }}
+          gl={{ antialias: false, preserveDrawingBuffer: true }}
           camera={{ position: [0, 3.4, -6.6], fov: 70 }}
         >
           <RunnerWorld
@@ -78,16 +83,16 @@ export default function JiraRun() {
             onDeposit={(n) => { sfx.deposit(); if (n >= TOTAL_UPDATES) sfx.win() }}
             onToken={() => sfx.token()}
             onCheckpoint={setCheckpoint}
-            onDeath={() => { sfx.crash(); setPhase('dead') }}
-            onWin={() => setPhase('won')}
+            onDeath={(r) => { sfx.crash(); setResult(r); setPhase('dead') }}
+            onWin={(r) => { setResult(r); setPhase('won') }}
           />
         </Canvas>
       )}
 
       {phase === 'running' && <HUD hud={hud} />}
       {phase === 'intro' && <IntroScreen onStart={start} />}
-      {phase === 'dead' && <DeadScreen score={hud.score} updates={hud.updates} sprint={checkpoint.level} onRetry={retry} />}
-      {phase === 'won' && <WinScreen score={hud.score} />}
+      {phase === 'dead' && <DeadScreen result={result} sprint={checkpoint.level} onRetry={retry} />}
+      {phase === 'won' && <WinScreen result={result} />}
 
       {/* fade-to-black overlay */}
       <div
@@ -182,7 +187,7 @@ function IntroScreen({ onStart }: { onStart: () => void }) {
 }
 
 // ---- Death ----
-function DeadScreen({ score, updates, sprint, onRetry }: { score: number; updates: number; sprint: number; onRetry: () => void }) {
+function DeadScreen({ result, sprint, onRetry }: { result: RunResult; sprint: number; onRetry: () => void }) {
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center p-6 bg-black/70">
       <div className="max-w-md w-full text-center font-mono text-white">
@@ -190,10 +195,8 @@ function DeadScreen({ score, updates, sprint, onRetry }: { score: number; update
         <h1 className="text-2xl font-black mb-2" style={{ color: PAL.gap, fontFamily: 'sans-serif' }}>
           BLOCKED.
         </h1>
-        <p className="text-white/70 text-sm mb-1">You hit a blocker and dropped your updates.</p>
-        <p className="text-white/50 text-xs mb-6">
-          {updates}/{TOTAL_UPDATES} deposited · ⭐ {score} story points · resuming Sprint {sprint}
-        </p>
+        <p className="text-white/70 text-sm mb-4">You hit a blocker and dropped your updates.</p>
+        <Receipt result={result} />
         <button
           onClick={onRetry}
           className="px-6 py-3 rounded font-bold text-sm uppercase tracking-widest transition hover:brightness-110"
@@ -207,7 +210,7 @@ function DeadScreen({ score, updates, sprint, onRetry }: { score: number; update
 }
 
 // ---- Win ----
-function WinScreen({ score }: { score: number }) {
+function WinScreen({ result }: { result: RunResult }) {
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center p-6"
       style={{ background: 'radial-gradient(circle at 50% 40%, #1f7a4d, #06291b)' }}>
@@ -216,12 +219,12 @@ function WinScreen({ score }: { score: number }) {
         <h1 className="text-2xl font-black mb-2" style={{ color: PAL.boardEdge, fontFamily: 'sans-serif' }}>
           ALL TICKETS UPDATED
         </h1>
-        <p className="text-white/75 text-sm mb-1">
+        <p className="text-white/75 text-sm mb-4">
           Four updates deposited. The board is, briefly, Green.
         </p>
+        <Receipt result={result} />
         <p className="text-white/55 text-xs mb-6">
-          ⭐ {score} story points banked. It is 11:00 AM. Then your phone buzzes:
-          the SteerCo lunch order just fell through.
+          It is 11:00 AM. Then your phone buzzes: the SteerCo lunch order just fell through.
         </p>
         <div className="flex flex-col gap-2 items-center">
           <div className="px-4 py-2 rounded text-[11px] uppercase tracking-widest opacity-70"
@@ -237,6 +240,40 @@ function WinScreen({ score }: { score: number }) {
           </Link>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ---- The $0.00 Productivity Receipt ----
+// The punchline payoff for all those story-point tokens: itemize the haul like
+// a corporate expense report, then stamp the bottom line at exactly $0.00.
+// Cosmetic + meta only — the points never buy an in-run advantage. The joke IS
+// the reward: you grinded the sprint, the org assigns it zero dollars of value.
+function Receipt({ result }: { result: RunResult }) {
+  return (
+    <div className="mx-auto mb-6 w-full max-w-[18rem] rounded-md border border-white/15 bg-black/30 p-4 text-left text-[12px] font-mono">
+      <div className="mb-3 text-center text-[9px] uppercase tracking-[0.25em] text-white/55">
+        Productivity Receipt
+      </div>
+      <ReceiptRow label="Story points collected" value={result.score.toLocaleString()} />
+      <ReceiptRow label="Sprints cleared" value={`${result.updates} / ${TOTAL_UPDATES}`} />
+      <div className="my-2.5 border-t border-dashed border-white/20" />
+      <div className="flex items-baseline justify-between">
+        <span className="text-[11px] uppercase tracking-wide text-white/85">Actual business value</span>
+        <span className="text-xl font-black tabular-nums" style={{ color: PAL.gap }}>$0.00</span>
+      </div>
+      <div className="mt-2 text-center text-[9px] italic text-white/35">
+        Submitted for reimbursement. Pending approval.
+      </div>
+    </div>
+  )
+}
+
+function ReceiptRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between py-0.5 text-white/70">
+      <span>{label}</span>
+      <span className="tabular-nums text-white/90">{value}</span>
     </div>
   )
 }
