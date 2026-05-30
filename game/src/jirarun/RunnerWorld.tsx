@@ -20,12 +20,19 @@ import {
 } from './runnerConfig'
 
 const LEONARD_URL = '/models/Player_Idle.glb' // hosts the mesh we render
-const WALK_URL = '/models/Player_Walking.glb' // loaded for its walk clip only
+const RUN_URL = '/models/Player_run.glb' // real Mixamo running clip (anim-only, ~73KB)
+const JUMP_URL = '/models/Player_jump.glb' // real Mixamo running-jump clip (anim-only)
 useGLTF.preload(LEONARD_URL)
-useGLTF.preload(WALK_URL)
-// Walk clip played fast → reads as a jog. Bump toward ~2.0 once a real
-// Mixamo "Running" clip is dropped in (see RUN_TIMESCALE note in LeonardModel).
-const RUN_TIMESCALE = 1.7
+useGLTF.preload(RUN_URL)
+useGLTF.preload(JUMP_URL)
+// Real run clip now — slight speed-up so the stride cadence reads at game
+// pace (we drive forward motion ourselves; this is purely cosmetic tempo).
+const RUN_TIMESCALE = 1.2
+
+// Shared jump signal: the game loop sets this each frame from grounded
+// state; LeonardModel reads it to crossfade Run ↔ Jump. Module-level mutable
+// (same pattern as playerState) so we don't thread props through Suspense.
+const runnerAnim = { jumping: false }
 
 export type HudState = { updates: number; level: number; distance: number; score: number; mult: number }
 
@@ -73,10 +80,13 @@ export function RunnerWorld({ running, onHud, onDeposit, onToken, onDeath, onWin
       const g = G.current
       if (!running || !g.alive || g.won) return
       switch (e.key) {
+        // Camera is BEHIND Leonard looking +Z, so world +X renders on the
+        // player's LEFT. Left/A must therefore move toward the higher lane
+        // index (+X) to feel correct on screen, and Right/D toward the lower.
         case 'ArrowLeft': case 'a': case 'A':
-          g.lane = Math.max(0, g.lane - 1); e.preventDefault(); break
-        case 'ArrowRight': case 'd': case 'D':
           g.lane = Math.min(2, g.lane + 1); e.preventDefault(); break
+        case 'ArrowRight': case 'd': case 'D':
+          g.lane = Math.max(0, g.lane - 1); e.preventDefault(); break
         case 'ArrowUp': case 'w': case 'W': case ' ':
           if (g.grounded && !g.sliding) { g.vy = JUMP_V; g.grounded = false }
           e.preventDefault(); break
@@ -238,8 +248,10 @@ export function RunnerWorld({ running, onHud, onDeposit, onToken, onDeath, onWin
     if (leonardRef.current) {
       leonardRef.current.position.set(g.x, g.y, g.z)
     }
+    // Drive the animation state machine: airborne → Jump clip, else Run.
+    runnerAnim.jumping = !g.grounded
     if (modelRef.current) {
-      // The walk clip animates the body; we only add a slide squash on top.
+      // The run clip animates the body; we only add a slide squash on top.
       modelRef.current.scale.y = g.sliding ? 0.5 : 1
     }
     // camera follows behind, slight lateral lean toward lane
@@ -324,26 +336,49 @@ export function RunnerWorld({ running, onHud, onDeposit, onToken, onDeath, onWin
   )
 }
 
-// ---- Leonard (reused Phase-1 GLB + walk clip) ----
-// Mirrors Phase 1's proven setup: mount the Idle GLB's scene (the mesh), but
-// drive it with the Walking GLB's clip (root-motion stripped) so he actually
-// RUNS. The walk is played at RUN_TIMESCALE so a brisk walk reads as a jog.
-// When a real Mixamo "Running" clip is dropped in, swap WALK_URL for it and
-// drop RUN_TIMESCALE back toward 1.0.
+// ---- Leonard (idle mesh + real Mixamo run/jump clips) ----
+// Mount the Idle GLB's scene (the mesh) and retarget the run + running-jump
+// clips onto it by bone name (drei useAnimations). Run loops by default;
+// while airborne (runnerAnim.jumping) we crossfade to the Jump clip and back.
+// Root motion is stripped from both so our own physics drives position.
 function LeonardModel() {
   const group = useRef<THREE.Group>(null)
   const idle = useGLTF(LEONARD_URL)
-  const walking = useGLTF(WALK_URL)
+  const run = useGLTF(RUN_URL)
+  const jump = useGLTF(JUMP_URL)
   const clips = useMemo(() => {
-    const raw = pickClip(walking.animations)
-    return raw ? [stripRootMotion(raw, 'Run')] : []
-  }, [walking.animations])
+    const out: AnimationClip[] = []
+    const r = pickClip(run.animations)
+    const j = pickClip(jump.animations)
+    if (r) out.push(stripRootMotion(r, 'Run'))
+    if (j) out.push(stripRootMotion(j, 'Jump'))
+    return out
+  }, [run.animations, jump.animations])
   const { actions } = useAnimations(clips, group)
+  const wasJumping = useRef(false)
+
   useEffect(() => {
-    const run = actions['Run']
-    if (run) { run.reset().play(); run.timeScale = RUN_TIMESCALE }
-    return () => { run?.stop() }
+    const runA = actions['Run']
+    if (runA) { runA.reset().play(); runA.timeScale = RUN_TIMESCALE }
+    return () => { Object.values(actions).forEach((a) => a?.stop()) }
   }, [actions])
+
+  // Crossfade Run ↔ Jump on the shared signal (edge-triggered).
+  useFrame(() => {
+    const j = runnerAnim.jumping
+    if (j === wasJumping.current) return
+    wasJumping.current = j
+    const runA = actions['Run']
+    const jumpA = actions['Jump']
+    if (j) {
+      jumpA?.reset().fadeIn(0.1).play()
+      runA?.fadeOut(0.1)
+    } else {
+      runA?.reset().fadeIn(0.15).play()
+      jumpA?.fadeOut(0.15)
+    }
+  })
+
   // 0.01 = Mixamo cm→m correction (matches Phase 1 Player.tsx). Without it
   // Leonard renders ~100× and the camera ends up inside his shoe.
   // rotation.y = 0 faces him +Z (away from the behind-camera) so we see his

@@ -52,3 +52,5 @@ game/public/models/Player_Sitting.glb
 
 # Raw Mixamo FBX drops (staging for FBX→GLB conversion; not served)
 game/public/models/_mixamo_raw/
+game/public/models/Player_running.glb
+game/public/models/Player_running_jump.glb
