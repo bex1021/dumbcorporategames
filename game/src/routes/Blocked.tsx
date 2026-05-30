@@ -4,7 +4,7 @@
 // portfolio card. The actual playable game lives at /play/blocked.
 //
 // Sections, top to bottom:
-//   Nav · Hero · Ticker · Vital Signs · Portfolio · How It Plays · Cast ·
+//   Nav · Hero · Ticker · Vital Signs · Portfolio · How It Plays ·
 //   Screenshots · Raw Log · Ticker · Mission · Endorsements ·
 //   About the studio · Closer · Signup · Footer
 
@@ -20,7 +20,6 @@ import {
 const NAV_LINKS: NavLink[] = [
   { label: 'BLOCKED',      href: '#top',     active: true },
   { label: 'HOW IT PLAYS', href: '#how' },
-  { label: 'CAST',         href: '#cast' },
   { label: 'LOG',          href: '#log' },
   { label: 'PRESS',        href: '#press' },
   { label: 'ABOUT',        href: '#about' },
@@ -44,7 +43,6 @@ export default function Blocked() {
       <VitalSigns />
       <Portfolio />
       <HowItPlays />
-      <Cast />
       <Screenshots />
       <RawLog />
       <Ticker items={[
@@ -337,41 +335,57 @@ function Portfolio() {
             fontFamily: brMono, fontSize: 11, color: BR.muted,
             textTransform: 'uppercase', letterSpacing: '0.16em',
           }}>
-            FACT SHEET
+            THE BRIEF
           </div>
-          <table style={{
-            width: '100%', borderCollapse: 'collapse',
-            fontFamily: brMono, fontSize: 12, marginTop: 12,
+          <p style={{
+            margin: '14px 0 0',
+            fontFamily: brFont, fontSize: 17, lineHeight: 1.5, color: BR.ink,
           }}>
-            <tbody>
-              {([
-                ['GENRE',     'CORPORATE WALKING SATIRE'],
-                ['LENGTH',    '5–10 MIN · ONE (1) STANDUP'],
-                ['INPUT',     'WASD + E'],
-                ['PLATFORM',  'BROWSER · NO INSTALL'],
-                ['PRICE',     '$0.00 USD'],
-                ['RATING',    'PG · PROFESSIONAL GRIEF'],
-                ['ENDINGS',   '3+ · INCLUDING ACCIDENTAL VALUE DELIVERY'],
-                ['PHASE',     '1 / 3 · MVP'],
-                ['STATUS',    'LIVE'],
-              ] as const).map(([k, v], i) => (
-                <tr key={k} style={{
-                  borderTop: i ? `1px solid ${BR.ink}` : `4px solid ${BR.ink}`,
-                  borderBottom: i === 8 ? `4px solid ${BR.ink}` : 'none',
-                }}>
-                  <td style={{
-                    padding: '8px 0', color: BR.muted,
-                    textTransform: 'uppercase', letterSpacing: '0.08em',
-                    verticalAlign: 'top', width: 100,
-                  }}>{k}</td>
-                  <td style={{
-                    padding: '8px 0', textAlign: 'right',
-                    fontWeight: 700, textTransform: 'uppercase', color: BR.ink,
-                  }}>{v}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            You are Leonard, a PM at <b>ALIGNLY</b>. Standup is in <b>75 minutes</b>.
+            The exec wants the Customer Happiness Portal Refresh{' '}
+            <b style={{ color: BR.green }}>GREEN</b> by end of day. Five of your
+            coworkers have just claimed they have <i>"no blockers."</i> All five
+            are lying.
+          </p>
+          <p style={{
+            margin: '14px 0 0',
+            fontFamily: brFont, fontSize: 15, lineHeight: 1.55, color: '#222',
+          }}>
+            Walk the bullpen. Talk to each of them. Extract the truth about what's
+            actually blocked, manage their stress without burning out, and figure
+            out which corporate evasion will keep the project Green without
+            shipping nothing. Every choice costs something — time, your team's
+            patience, your meeting load, your alignment points.
+          </p>
+          <p style={{
+            margin: '14px 0 0',
+            fontFamily: brFont, fontSize: 15, lineHeight: 1.55, color: '#222',
+          }}>
+            Pick wrong and the calendar swallows you, the project goes Red, or
+            you arrive at standup having delivered exactly nothing.
+          </p>
+          <div style={{
+            marginTop: 18, paddingTop: 14,
+            borderTop: `2px solid ${BR.ink}`,
+            display: 'flex', gap: 6, flexWrap: 'wrap',
+          }}>
+            {([
+              ['5–10 MIN',            false],
+              ['WASD + E',            false],
+              ['BROWSER · NO INSTALL', false],
+              ['$0.00',               true],
+              ['12 ENDINGS',          false],
+              ['12 ACHIEVEMENTS',     false],
+            ] as const).map(([label, accent]) => (
+              <span key={label} style={{
+                fontFamily: brMono, fontSize: 10, fontWeight: 700,
+                padding: '5px 8px', letterSpacing: '0.1em', textTransform: 'uppercase',
+                border: `1px solid ${BR.ink}`,
+                color: '#000',
+                background: accent ? BR.accent : 'transparent',
+              }}>{label}</span>
+            ))}
+          </div>
 
           <div style={{ marginTop: 'auto', paddingTop: 18, display: 'flex', flexDirection: 'column', gap: 0 }}>
             <Link to="/play/blocked" style={{
@@ -441,85 +455,10 @@ function HowItPlays() {
   )
 }
 
-// ─── Cast (NPC table) ────────────────────────────────────────────────────
-const NPCS: { name: string; blocked: string; line: string }[] = [
-  { name: 'ENGINEER',  blocked: 'vague requirements',          line: '"No blockers. I just need someone to explain what \u2018simple but powerful\u2019 means."' },
-  { name: 'DESIGNER',  blocked: 'contradictory feedback',      line: '"No blockers. Leadership asked if it could feel more enterprise, but less B2B."' },
-  { name: 'PRODUCT',   blocked: 'optimistic scope creep',      line: '"No blockers. I added one small requirement. It may affect everything."' },
-  { name: 'SALES',     blocked: 'promised impossible things',  line: '"No blockers. I may have told the client this would be live Thursday."' },
-  { name: 'HR',        blocked: 'meaningless feedback',        line: '"No blockers. Just a reminder: feedback should be actionable, kind, and legally survivable."' },
-]
-
-function Cast() {
-  const isMobile = useIsMobile()
-  return (
-    <section id="cast" style={{ borderBottom: `4px solid ${BR.ink}` }}>
-      <SectionStarter
-        eyebrow="REQUIRED NPCS · n = 5"
-        title={<>THE BLOCKED.</>}
-        meta="ALL CLAIM \u201CNO BLOCKERS\u201D · ALL FIVE STATEMENTS FALSE"
-      />
-      <div style={{ overflowX: isMobile ? 'auto' : undefined }}>
-        <div style={{
-          display: 'grid', gridTemplateColumns: '64px 160px 1fr 1.4fr 130px',
-          minWidth: isMobile ? 680 : undefined,
-          background: BR.ink, color: BR.bg,
-          fontFamily: brMono, fontSize: 11, letterSpacing: '0.14em',
-          textTransform: 'uppercase', fontWeight: 700,
-        }}>
-          {['#', 'ROLE', 'TRUE BLOCKER', 'WHAT THEY ACTUALLY SAY', 'STATUS'].map((h, i) => (
-            <div key={i} style={{ padding: '12px 14px', borderLeft: i ? `1px solid #333` : 'none' }}>{h}</div>
-          ))}
-        </div>
-        {NPCS.map((n, i) => (
-          <div key={n.name} style={{
-            display: 'grid', gridTemplateColumns: '64px 160px 1fr 1.4fr 130px',
-            minWidth: isMobile ? 680 : undefined,
-            background: i % 2 ? BR.bg : BR.paper,
-            borderBottom: `1px solid ${BR.ink}`,
-            fontFamily: brFont,
-          }}>
-            <div style={{
-              padding: '18px 14px',
-              fontFamily: brFont, fontWeight: 900, fontSize: 28,
-              color: BR.accent, lineHeight: 1, fontVariantNumeric: 'tabular-nums',
-            }}>{String(i + 1).padStart(2, '0')}</div>
-            <div style={{
-              padding: '18px 14px', borderLeft: `1px solid ${BR.ink}`,
-              fontFamily: brFont, fontWeight: 900,
-              textTransform: 'uppercase', letterSpacing: '-0.005em',
-              fontSize: 18, alignSelf: 'center',
-            }}>{n.name}</div>
-            <div style={{
-              padding: '18px 14px', borderLeft: `1px solid ${BR.ink}`,
-              fontSize: 14, alignSelf: 'center', color: BR.ink,
-            }}>{n.blocked}</div>
-            <div style={{
-              padding: '18px 14px', borderLeft: `1px solid ${BR.ink}`,
-              fontStyle: 'italic', fontSize: 15, color: '#222',
-              alignSelf: 'center', lineHeight: 1.45,
-            }}>{n.line}</div>
-            <div style={{
-              padding: '18px 14px', borderLeft: `1px solid ${BR.ink}`, alignSelf: 'center',
-            }}>
-              <span style={{
-                fontFamily: brMono, fontSize: 10, fontWeight: 700,
-                letterSpacing: '0.12em', textTransform: 'uppercase',
-                background: BR.accent, color: '#000', padding: '4px 8px',
-              }}>● BLOCKED</span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  )
-}
-
-// ─── Screenshots ─ asymmetric grid ────────────────────────────────────────
 type Shot = { id: string; tag: string; code: string; src: string }
 const SHOTS: Shot[] = [
   { id: 'hero',   tag: 'BULLPEN · 09:14 AM · PM AT ENGINEER POD',           code: 'F.01', src: '/screenshots/01-hero.png' },
-  { id: 'hr',     tag: 'HR GLASS OFFICE · "I\u2019M HEARING SOME THEMES"',  code: 'F.02', src: '/screenshots/02-hr.png' },
+  { id: 'brent',  tag: 'BRENT · ENG · "NO BLOCKERS." (LYING)',                code: 'F.02', src: '/screenshots/07-brent.png' },
   { id: 'print',  tag: 'PRINTER · PC LOAD LETTER · MELTDOWN IMMINENT',      code: 'F.03', src: '/screenshots/03-printer.png' },
   { id: 'cal',    tag: 'CALENDAR · EVERY SLOT A "QUICK SYNC"',              code: 'F.04', src: '/screenshots/04-calendar.png' },
   { id: 'stand',  tag: 'STANDUP COMPLETE · NO ONE IS OKAY',                 code: 'F.05', src: '/screenshots/05-standup.png' },

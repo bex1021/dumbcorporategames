@@ -21,6 +21,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const SHOTS_DIR = path.resolve(__dirname, '../public/screenshots')
 const BASE = 'http://localhost:5173'
 const VIEWPORT = { width: 1600, height: 1000 }
+// Smaller viewport for UI-panel-heavy shots — keeps the centered panel
+// from being lost in dark backdrop when later cropped by object-fit: cover
+// in a thin Screenshots slot.
+const TIGHT_PANEL_VIEWPORT = { width: 1100, height: 720 }
 
 // The shots we want. `setup` is a string preset or a richer object.
 const SHOTS = [
@@ -28,9 +32,9 @@ const SHOTS = [
   { name: '01-hero',     route: '/play/blocked',  setup: 'heroAtPod' },
   { name: '02-hr',       route: '/play/blocked',  setup: { dialogue: 'diane' } },
   { name: '03-printer',  route: '/play/blocked',  setup: 'printerSlap' },
-  { name: '04-calendar', route: '/play/blocked',  setup: 'calendarPanel' },
+  { name: '04-calendar', route: '/play/blocked',  setup: 'calendarPanel', viewport: TIGHT_PANEL_VIEWPORT },
   { name: '05-standup',  route: '/play/blocked',  setup: { ending: 'standup-complete' } },
-  { name: '06-plant',    route: '/play/blocked',  setup: 'plant' },
+  { name: '06-plant',    route: '/play/blocked',  setup: 'plantBark' },
   // Bonus shots beyond the existing slots — usable elsewhere on the site:
   { name: '07-brent',    route: '/play/blocked',  setup: { dialogue: 'brent' } },
   { name: '08-chad',     route: '/play/blocked',  setup: { dialogue: 'chad' } },
@@ -99,11 +103,19 @@ async function applySetup(spec) {
       // approach Brent's pod (-12, 1), camera frames the back of the PM
       // looking toward Brent's desk.
       posMod.playerPosition.set(-10, 0, 3.5)
-    } else if (spec === 'plant') {
+    } else if (spec === 'plantBark') {
       // 06-plant caption: "OFFICE PLANT · SILENT STAKEHOLDER · BOUNDARIES: YES"
-      // Phyllis sits at (12, 9). Stand the PM just south of her so the
-      // camera frames both with the bullpen behind.
-      posMod.playerPosition.set(11, 0, 11.5)
+      // Phyllis sits at (12, 9). Camera is a third-person follow behind the
+      // PM facing -z (north). Stand the PM ~2.5m WEST of Phyllis so she
+      // sits cleanly to the right of frame instead of being eclipsed by
+      // the PM's body. Trigger a bark so her bubble — "Phyllis has noted
+      // your concerns and rated them: valid." — pops up over her.
+      posMod.playerPosition.set(9.2, 0, 10.5)
+      store.getState().setNearbyNPC('phyllis')
+      store.getState().triggerBark(
+        'phyllis',
+        'Phyllis has noted your concerns and rated them: valid.',
+      )
     } else if (spec && spec.dialogue) {
       const id = spec.dialogue
       const [x, z] = NPCS[id]
@@ -131,6 +143,7 @@ async function applySetup(spec) {
 
 async function captureOne(shot) {
   console.log('==', shot.name)
+  await page.setViewport(shot.viewport || VIEWPORT)
   await page.goto(BASE + shot.route, { waitUntil: 'networkidle0' })
 
   if (shot.route === '/play/blocked') {
