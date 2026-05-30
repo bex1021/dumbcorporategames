@@ -35,12 +35,18 @@ const RUN_TIMESCALE = 1.2
 const runnerAnim = { jumping: false }
 
 export type HudState = { updates: number; level: number; distance: number; score: number; mult: number }
+export type Checkpoint = { level: number; updates: number; score: number }
 
 type Props = {
   running: boolean
+  // Where this run begins — start of the current sprint. On a fresh game it's
+  // {1,0,0}; after a death it's the last sprint the player banked, so retries
+  // resume the sprint instead of starting the whole phase over.
+  start: Checkpoint
   onHud: (h: HudState) => void
   onDeposit: (n: number) => void
   onToken: () => void
+  onCheckpoint: (c: Checkpoint) => void
   onDeath: (distance: number) => void
   onWin: () => void
 }
@@ -51,17 +57,20 @@ function multForCombo(combo: number) {
   return Math.min(4, 1 + Math.floor(combo / 8))
 }
 
-export function RunnerWorld({ running, onHud, onDeposit, onToken, onDeath, onWin }: Props) {
+export function RunnerWorld({ running, start, onHud, onDeposit, onToken, onCheckpoint, onDeath, onWin }: Props) {
   const { camera } = useThree()
 
   // ---- per-frame game state (never triggers React re-render) ----
+  // Seeded from `start` (the current sprint checkpoint) so retries resume the
+  // sprint instead of the whole phase. z always restarts at 0 — only the
+  // sprint number / deposits / score carry over.
   const G = useRef({
     z: 0, lane: 1, x: 0, y: 0, vy: 0, grounded: true,
     sliding: false, slideT: 0,
-    speed: speedForLevel(1), level: 1, levelDist: 0, updates: 0,
+    speed: speedForLevel(start.level), level: start.level, levelDist: 0, updates: start.updates,
     alive: true, won: false, boardActive: false,
     nextSpawnZ: 34, hudAccum: 0,
-    score: 0, combo: 0,
+    score: start.score, combo: 0,
   })
   const obsRef = useRef<Obstacle[]>([])
   const tokRef = useRef<Token[]>([])
@@ -209,6 +218,9 @@ export function RunnerWorld({ running, onHud, onDeposit, onToken, onDeath, onWin
             g.speed = speedForLevel(g.level)
             g.levelDist = 0
             g.boardActive = false
+            // Bank a checkpoint at the start of the new sprint — a death from
+            // here restarts this sprint, not the whole phase.
+            onCheckpoint({ level: g.level, updates: g.updates, score: g.score })
           }
         }
         continue
@@ -491,18 +503,22 @@ function ObstaclePiece({ kind, x, full }: { kind: ObstacleKind; x: number; full:
     )
   }
   if (kind === 'wall') {
-    // tall purple dependency wall — too tall to jump, no gap to slide.
-    // The ONLY way past is to be in another lane. Red warning stripe on top.
+    // Tall purple dependency wall — too tall to jump, solid to the floor so
+    // there's no gap to slide. The ONLY way past is another lane. Deliberately
+    // has NO red (red = the duckable overhang) — instead bold WHITE hazard
+    // bands so it reads as a solid "go-around" barrier, never a duck-gate.
     return (
       <group position={[x, 0, 0]}>
         <mesh position={[0, 1.7, 0]}>
           <boxGeometry args={[w, 3.4, 0.9]} />
-          <meshStandardMaterial color={PAL.wall} emissive={PAL.wall} emissiveIntensity={0.2} />
+          <meshStandardMaterial color={PAL.wall} emissive={PAL.wall} emissiveIntensity={0.16} />
         </mesh>
-        <mesh position={[0, 3.05, 0]}>
-          <boxGeometry args={[w + 0.04, 0.3, 0.94]} />
-          <meshStandardMaterial color={PAL.gap} emissive={PAL.gap} emissiveIntensity={0.45} />
-        </mesh>
+        {[0.9, 1.9, 2.9].map((yy) => (
+          <mesh key={yy} position={[0, yy, 0.46]}>
+            <boxGeometry args={[w * 0.88, 0.26, 0.05]} />
+            <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.4} />
+          </mesh>
+        ))}
       </group>
     )
   }

@@ -11,21 +11,26 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { Link } from 'react-router-dom'
-import { RunnerWorld, type HudState } from './RunnerWorld'
+import { RunnerWorld, type HudState, type Checkpoint } from './RunnerWorld'
 import { TOTAL_UPDATES, PAL } from './runnerConfig'
 
 type Phase = 'intro' | 'running' | 'dead' | 'won'
+const FRESH: Checkpoint = { level: 1, updates: 0, score: 0 }
 
 export default function JiraRun() {
   const [phase, setPhase] = useState<Phase>('intro')
   const [hud, setHud] = useState<HudState>({ updates: 0, level: 1, distance: 0, score: 0, mult: 1 })
   const [fading, setFading] = useState(false)
   const [runnerKey, setRunnerKey] = useState(0)
+  // Current sprint checkpoint — where a retry resumes. Reset on a fresh game,
+  // advanced by RunnerWorld each time an update is deposited.
+  const [checkpoint, setCheckpoint] = useState<Checkpoint>(FRESH)
 
   const start = useCallback(() => {
-    // dramatic fade-to-black, then drop into the board
+    // fresh game from the intro → wipe the checkpoint, fade in
     setFading(true)
     sfx.warp()
+    setCheckpoint(FRESH)
     window.setTimeout(() => {
       setHud({ updates: 0, level: 1, distance: 0, score: 0, mult: 1 })
       setRunnerKey((k) => k + 1)
@@ -35,14 +40,15 @@ export default function JiraRun() {
   }, [])
 
   const retry = useCallback(() => {
+    // resume from the banked sprint checkpoint (do NOT reset it)
     setFading(true)
     window.setTimeout(() => {
-      setHud({ updates: 0, level: 1, distance: 0, score: 0, mult: 1 })
+      setHud({ updates: checkpoint.updates, level: checkpoint.level, distance: 0, score: checkpoint.score, mult: 1 })
       setRunnerKey((k) => k + 1)
       setPhase('running')
       setFading(false)
     }, 450)
-  }, [])
+  }, [checkpoint])
 
   // SPACE drives intro-start and retry (RunnerWorld owns in-run input)
   useEffect(() => {
@@ -67,9 +73,11 @@ export default function JiraRun() {
         >
           <RunnerWorld
             running={phase === 'running'}
+            start={checkpoint}
             onHud={setHud}
             onDeposit={(n) => { sfx.deposit(); if (n >= TOTAL_UPDATES) sfx.win() }}
             onToken={() => sfx.token()}
+            onCheckpoint={setCheckpoint}
             onDeath={() => { sfx.crash(); setPhase('dead') }}
             onWin={() => setPhase('won')}
           />
@@ -78,7 +86,7 @@ export default function JiraRun() {
 
       {phase === 'running' && <HUD hud={hud} />}
       {phase === 'intro' && <IntroScreen onStart={start} />}
-      {phase === 'dead' && <DeadScreen score={hud.score} updates={hud.updates} onRetry={retry} />}
+      {phase === 'dead' && <DeadScreen score={hud.score} updates={hud.updates} sprint={checkpoint.level} onRetry={retry} />}
       {phase === 'won' && <WinScreen score={hud.score} />}
 
       {/* fade-to-black overlay */}
@@ -174,7 +182,7 @@ function IntroScreen({ onStart }: { onStart: () => void }) {
 }
 
 // ---- Death ----
-function DeadScreen({ score, updates, onRetry }: { score: number; updates: number; onRetry: () => void }) {
+function DeadScreen({ score, updates, sprint, onRetry }: { score: number; updates: number; sprint: number; onRetry: () => void }) {
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center p-6 bg-black/70">
       <div className="max-w-md w-full text-center font-mono text-white">
@@ -184,14 +192,14 @@ function DeadScreen({ score, updates, onRetry }: { score: number; updates: numbe
         </h1>
         <p className="text-white/70 text-sm mb-1">You hit a blocker and dropped your updates.</p>
         <p className="text-white/50 text-xs mb-6">
-          {updates}/{TOTAL_UPDATES} deposited · ⭐ {score} story points
+          {updates}/{TOTAL_UPDATES} deposited · ⭐ {score} story points · resuming Sprint {sprint}
         </p>
         <button
           onClick={onRetry}
           className="px-6 py-3 rounded font-bold text-sm uppercase tracking-widest transition hover:brightness-110"
           style={{ background: PAL.update, color: '#3a2a00' }}
         >
-          ↻ Press SPACE to re-open the ticket
+          ↻ Press SPACE to restart Sprint {sprint}
         </button>
       </div>
     </div>
