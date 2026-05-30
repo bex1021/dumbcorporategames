@@ -6,10 +6,11 @@
 // single ref (G) so we never churn React; React state holds only the
 // rendered obstacle list (updated a few times/sec on spawn/cull).
 
-import { Suspense, useEffect, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useGLTF, useAnimations } from '@react-three/drei'
 import * as THREE from 'three'
+import type { AnimationClip } from 'three'
 import {
   LANES, LANE_LERP, GRAVITY, JUMP_V, SLIDE_DUR, CLEAR_JUMP_Y, HIT_Z,
   SPAWN_AHEAD, CULL_BEHIND, LEVEL_DISTANCE, TOTAL_UPDATES,
@@ -17,8 +18,13 @@ import {
   type Obstacle, type ObstacleKind,
 } from './runnerConfig'
 
-const LEONARD_URL = '/models/Player_Idle.glb'
+const LEONARD_URL = '/models/Player_Idle.glb' // hosts the mesh we render
+const WALK_URL = '/models/Player_Walking.glb' // loaded for its walk clip only
 useGLTF.preload(LEONARD_URL)
+useGLTF.preload(WALK_URL)
+// Walk clip played fast → reads as a jog. Bump toward ~2.0 once a real
+// Mixamo "Running" clip is dropped in (see RUN_TIMESCALE note in LeonardModel).
+const RUN_TIMESCALE = 1.7
 
 export type HudState = { updates: number; level: number; distance: number }
 
@@ -171,12 +177,8 @@ export function RunnerWorld({ running, onHud, onDeposit, onDeath, onWin }: Props
       leonardRef.current.position.set(g.x, g.y, g.z)
     }
     if (modelRef.current) {
-      // run-bob (cosmetic) + slide squash
-      const t = performance.now() / 1000
-      const bob = g.grounded ? Math.abs(Math.sin(t * 12)) * 0.12 : 0
-      modelRef.current.position.y = bob
+      // The walk clip animates the body; we only add a slide squash on top.
       modelRef.current.scale.y = g.sliding ? 0.5 : 1
-      modelRef.current.position.y -= g.sliding ? 0.0 : 0
     }
     // camera follows behind, slight lateral lean toward lane
     camera.position.set(g.x * 0.35, 3.4, g.z - 6.6)
@@ -252,27 +254,47 @@ export function RunnerWorld({ running, onHud, onDeposit, onDeath, onWin }: Props
   )
 }
 
-// ---- Leonard (reused Phase-1 GLB) ----
-// Single instance, so we use the shared scene directly and play its built-in
-// idle clip — that keeps him in a natural standing pose (not a stiff T-pose)
-// while the procedural run-bob in the loop sells the running. Honors the
-// "reuse the existing Leonard GLB" call without re-fighting the Phase-1
-// animation-retarget saga.
+// ---- Leonard (reused Phase-1 GLB + walk clip) ----
+// Mirrors Phase 1's proven setup: mount the Idle GLB's scene (the mesh), but
+// drive it with the Walking GLB's clip (root-motion stripped) so he actually
+// RUNS. The walk is played at RUN_TIMESCALE so a brisk walk reads as a jog.
+// When a real Mixamo "Running" clip is dropped in, swap WALK_URL for it and
+// drop RUN_TIMESCALE back toward 1.0.
 function LeonardModel() {
   const group = useRef<THREE.Group>(null)
-  const { scene, animations } = useGLTF(LEONARD_URL)
-  const { actions, names } = useAnimations(animations, group)
+  const idle = useGLTF(LEONARD_URL)
+  const walking = useGLTF(WALK_URL)
+  const clips = useMemo(() => {
+    const raw = pickClip(walking.animations)
+    return raw ? [stripRootMotion(raw, 'Run')] : []
+  }, [walking.animations])
+  const { actions } = useAnimations(clips, group)
   useEffect(() => {
-    const first = names[0]
-    if (first && actions[first]) actions[first]!.reset().fadeIn(0.2).play()
-    return () => { names.forEach((n) => actions[n]?.stop()) }
-  }, [actions, names])
+    const run = actions['Run']
+    if (run) { run.reset().play(); run.timeScale = RUN_TIMESCALE }
+    return () => { run?.stop() }
+  }, [actions])
   // 0.01 = Mixamo cm→m correction (matches Phase 1 Player.tsx). Without it
   // Leonard renders ~100× and the camera ends up inside his shoe.
   // rotation.y = 0 faces him +Z (away from the behind-camera) so we see his
-  // back as he runs into the screen — Phase 1's π correction faced him the
-  // wrong way for this camera.
-  return <primitive ref={group} object={scene} rotation={[0, 0, 0]} scale={0.01} />
+  // back as he runs into the screen.
+  return <primitive ref={group} object={idle.scene} rotation={[0, 0, 0]} scale={0.01} />
+}
+
+// Pick the first non-empty clip from a GLB (Mixamo names them "mixamo.com").
+function pickClip(animations: AnimationClip[]): AnimationClip | null {
+  return animations.find((c) => c.tracks.length > 0) ?? null
+}
+// Clone, rename, and drop the root-motion position track so Leonard runs in
+// place (our z-motion drives him forward). Same logic as Phase 1's Player.tsx.
+function stripRootMotion(clip: AnimationClip, name: string): AnimationClip {
+  const cloned = clip.clone() as AnimationClip
+  cloned.name = name
+  cloned.tracks = cloned.tracks.filter((t) => {
+    if (!t.name.endsWith('.position')) return true
+    return !/(?:mixamorig\d*Hips|Hips|Root|Armature)\.position$/.test(t.name)
+  })
+  return cloned
 }
 function FallbackLeonard() {
   return (
