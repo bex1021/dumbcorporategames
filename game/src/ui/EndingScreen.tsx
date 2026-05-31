@@ -10,6 +10,8 @@
 // the "Start new sprint" CTA.
 
 import { useEffect } from 'react'
+import { Link } from 'react-router-dom'
+import { markBeaten } from '../state/progress'
 import {
   useGameStore,
   selectFormattedTime,
@@ -165,6 +167,14 @@ export function EndingScreen() {
       clearTimeout(fanfareTimer)
     }
   }, [phase, earnedThisRun])
+
+  // Campaign progression: a WINNING ending beats Phase 1, which unlocks
+  // Phase 2 (Jira Run) in the level-select hub. Idempotent + fail-silent
+  // (see state/progress.ts) so it's safe to fire on every win and replay.
+  useEffect(() => {
+    if (phase !== 'ended' || !ending) return
+    if (ENDING_COPY[ending as EndingKey]?.goalMet) markBeaten('phase1')
+  }, [phase, ending])
 
   if (phase !== 'ended' || !ending) return null
   const copy = ENDING_COPY[ending as EndingKey]
@@ -341,13 +351,53 @@ export function EndingScreen() {
               </div>
             </div>
 
-            {/* Start new sprint CTA */}
-            <button
-              onClick={() => reset()}
-              className="w-full px-4 py-3 rounded bg-[#0052cc] text-white text-[14px] font-medium hover:bg-[#0747a6] transition shadow-sm"
-            >
-              Start new sprint →
-            </button>
+            {/* Next-step CTAs. On a WIN, the primary action advances the
+                campaign to Phase 2 (Jira Run) — which this win just unlocked
+                in the level-select hub. On a LOSS, the primary action retries
+                this sprint (Phase 2 stays locked until you win). Level select
+                is always available. */}
+            {copy.goalMet ? (
+              <div className="flex flex-col gap-2">
+                <Link
+                  to="/play/jira-run"
+                  className="w-full px-4 py-3 rounded bg-[#0052cc] text-white text-[14px] font-semibold hover:bg-[#0747a6] transition shadow-sm text-center"
+                >
+                  Proceed to the next level →
+                </Link>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => reset()}
+                    className="flex-1 px-4 py-2.5 rounded border border-[#dfe1e6] bg-white text-[#42526e] text-[13px] font-medium hover:bg-[#f4f5f7] transition"
+                  >
+                    ↻ Replay this sprint
+                  </button>
+                  <Link
+                    to="/play"
+                    className="flex-1 px-4 py-2.5 rounded border border-[#dfe1e6] bg-white text-[#42526e] text-[13px] font-medium hover:bg-[#f4f5f7] transition text-center"
+                  >
+                    ☰ Level select
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => reset()}
+                  className="w-full px-4 py-3 rounded bg-[#0052cc] text-white text-[14px] font-semibold hover:bg-[#0747a6] transition shadow-sm"
+                >
+                  ↻ Try this sprint again
+                </button>
+                <Link
+                  to="/play"
+                  className="w-full px-4 py-2.5 rounded border border-[#dfe1e6] bg-white text-[#42526e] text-[13px] font-medium hover:bg-[#f4f5f7] transition text-center"
+                >
+                  ☰ Level select
+                </Link>
+                <p className="text-[11px] text-[#5e6c84] text-center mt-0.5">
+                  Phase 2 unlocks once you survive the standup — reach a winning outcome.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Right: 2-column grid of compact achievement cards. Cards

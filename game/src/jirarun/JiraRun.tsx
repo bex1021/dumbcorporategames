@@ -14,6 +14,7 @@ import { Link } from 'react-router-dom'
 import { RunnerWorld, type HudState, type Checkpoint } from './RunnerWorld'
 import { TOTAL_UPDATES, PAL } from './runnerConfig'
 import { DesktopBoot } from './DesktopBoot'
+import { markBeaten } from '../state/progress'
 
 // Phase 2 opens on Leonard's desktop (the "lock in at your desk" beat), then
 // the runner. 'desktop' replaces the old standalone intro screen.
@@ -97,10 +98,14 @@ export default function JiraRun() {
             onToken={() => sfx.token()}
             onCheckpoint={setCheckpoint}
             onDeath={(r) => { sfx.crash(); setResult(r); setPhase('dead') }}
-            onWin={(r) => { setResult(r); setPhase('won') }}
+            onWin={(r) => { markBeaten('phase2'); setResult(r); setPhase('won') }}
           />
         </Canvas>
       )}
+
+      {/* CRT/scanline/vignette overlay — sells the "inside a monitor" feel
+          whenever the 3D world is showing (not on the desktop boot). */}
+      {phase !== 'desktop' && <CRTOverlay />}
 
       {phase === 'running' && <HUD hud={hud} />}
       {phase === 'running' && (
@@ -119,6 +124,33 @@ export default function JiraRun() {
       <div
         className="pointer-events-none fixed inset-0 z-50 bg-black transition-opacity duration-700"
         style={{ opacity: fading ? 1 : 0 }}
+      />
+    </div>
+  )
+}
+
+// ---- CRT / "inside a monitor" overlay ----
+// Pure CSS (no post-processing dependency): a vignette, fine scanlines, and a
+// faint screen-glow tint layered over the canvas. Cheap + always works.
+function CRTOverlay() {
+  return (
+    <div
+      className="pointer-events-none fixed inset-0 z-30"
+      style={{ background: 'radial-gradient(ellipse 82% 72% at 50% 45%, transparent 58%, rgba(2,8,20,0.58) 100%)' }}
+    >
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage:
+            'repeating-linear-gradient(0deg, rgba(0,0,0,0.16) 0px, rgba(0,0,0,0.16) 1.5px, transparent 1.5px, transparent 4px)',
+        }}
+      />
+      <div
+        className="absolute inset-0"
+        style={{
+          background: 'linear-gradient(rgba(90,150,255,0.05), rgba(90,150,255,0) 32%)',
+          mixBlendMode: 'screen',
+        }}
       />
     </div>
   )
@@ -184,13 +216,19 @@ function DeadScreen({ result, sprint, onRetry, onDesktop }: { result: RunResult;
         >
           ↻ Press SPACE to restart Sprint {sprint}
         </button>
-        <div className="mt-3">
+        <div className="mt-3 flex items-center justify-center gap-4">
           <button
             onClick={onDesktop}
             className="text-white/55 text-[11px] uppercase tracking-widest hover:text-white/85 transition"
           >
             ⎋ Back to desk
           </button>
+          <Link
+            to="/play"
+            className="text-white/55 text-[11px] uppercase tracking-widest hover:text-white/85 transition"
+          >
+            ☰ Level select
+          </Link>
         </div>
       </div>
     </div>
@@ -217,9 +255,9 @@ function WinScreen({ result, onDesktop }: { result: RunResult; onDesktop: () => 
         <div className="flex flex-col gap-2 items-center">
           <div className="px-4 py-2 rounded text-[11px] uppercase tracking-widest opacity-70"
             style={{ background: '#ffffff22' }}>
-            Phase 3 · Lunch Run · coming soon
+            Phase 3 · coming soon
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 justify-center">
             <button
               onClick={onDesktop}
               className="px-5 py-3 rounded font-bold text-sm uppercase tracking-widest transition hover:brightness-110 bg-white/15 text-white"
@@ -227,11 +265,17 @@ function WinScreen({ result, onDesktop }: { result: RunResult; onDesktop: () => 
               ⎋ Back to desk
             </button>
             <Link
-              to="/"
+              to="/play"
               className="px-6 py-3 rounded font-bold text-sm uppercase tracking-widest transition hover:brightness-110"
               style={{ background: PAL.board, color: '#06291b' }}
             >
-              ← Back to studio
+              ☰ Level select
+            </Link>
+            <Link
+              to="/"
+              className="px-5 py-3 rounded font-bold text-sm uppercase tracking-widest transition hover:brightness-110 bg-white/15 text-white"
+            >
+              ← Studio
             </Link>
           </div>
         </div>

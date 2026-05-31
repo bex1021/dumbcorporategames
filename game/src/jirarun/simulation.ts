@@ -134,7 +134,9 @@ export class Sim {
 
   private spawnBoard() {
     const s = this.state
-    s.obstacles.push({ id: s.nextId++, z: s.nextSpawnZ + 8, kind: 'board', lanes: 'full' })
+    // updateNo is cosmetic metadata only (renders "TICKET N UPDATED" on the
+    // gate) — it doesn't affect collision, RNG, or difficulty.
+    s.obstacles.push({ id: s.nextId++, z: s.nextSpawnZ + 8, kind: 'board', lanes: 'full', updateNo: s.level })
     s.boardActive = true
     s.obsVersion++
   }

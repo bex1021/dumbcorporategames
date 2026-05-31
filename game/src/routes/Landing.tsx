@@ -148,9 +148,9 @@ function Hero() {
         display: 'flex', borderTop: `4px solid ${BR.ink}`, flexWrap: 'wrap',
         flexDirection: isMobile ? 'column' : 'row',
       }}>
-        <Link to="/play/blocked" style={{
+        <Link to="/play" style={{
           ...ctaPrimary, background: BR.accent, color: '#000',
-        }}>▶ PLAY BLOCKED — FREE</Link>
+        }}>▶ PLAY — FREE</Link>
         <a href="#games" style={ctaSecondary}>▼ SEE OUR GAMES</a>
         <a href="#mission" style={ctaSecondary}>READ THE MISSION</a>
         <div style={{

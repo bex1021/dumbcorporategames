@@ -28,6 +28,23 @@ export default function Game() {
   useInteractKey()
   useSlackTicker()
 
+  // Fresh entry into this route: the game store is a module-level singleton,
+  // so SPA navigation keeps it alive between visits. If we arrive here with
+  // the store still in a finished state from a prior run this session (e.g.
+  // replaying Phase 1 from the level-select hub, or coming back after winning),
+  // snap it back to the intro so the phase starts clean instead of dropping
+  // straight onto the ending screen. Runs once on mount only.
+  useEffect(() => {
+    if (useGameStore.getState().phase === 'ended') useGameStore.getState().reset()
+    // Dev-only: expose the store so playtests can force endings / inspect
+    // state (mirrors the window.__JIRARUN__ hook in RunnerWorld). Stripped
+    // from production builds via the import.meta.env.DEV guard.
+    if (import.meta.env.DEV) {
+      const w = window as unknown as { __BLOCKED__?: unknown }
+      w.__BLOCKED__ = useGameStore
+    }
+  }, [])
+
   // WebGL context-lost recovery: when the underlying GL context dies (driver
   // crash, GPU resource exhaustion, OS sleep, tab backgrounding), Three.js
   // does not auto-restore — the canvas stays permanently white. We listen

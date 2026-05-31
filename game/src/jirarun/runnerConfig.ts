@@ -58,6 +58,9 @@ export type Obstacle = {
   // Which lanes it occupies. 'full' spans all three. Otherwise a subset of
   // 0|1|2. A board is always 'full'.
   lanes: 'full' | number[]
+  // Cosmetic only (boards): which update # this gate deposits (1..4), so the
+  // gate can read "TICKET N UPDATED". Has no effect on collision/difficulty.
+  updateNo?: number
 }
 
 // How you clear each kind:
