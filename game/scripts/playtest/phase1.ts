@@ -219,8 +219,13 @@ objSlackChecks['plant-friend'] = (store.getState().copingUseCounts.phyllis ?? 0)
 // inbox-zero: a winning run that opens slack at the end (unread<8)
 const inboxRun = playRun(PERSONAS[0].plan, { openSlackAtEnd: true })
 objSlackChecks['inbox-zero'] = inboxRun.achievements.includes('inbox-zero')
-// calendar-apocalypse ENDING (not just the achievement): embrace the recovery
-const apocRun = playRun({ brent: 2, tasha: 2, priya: 2, chad: 2, diane: 2 }, { recovery: { time: 5, alignment: 1 } })
+// calendar-apocalypse ENDING (not just the achievement): a 4-meeting run that
+// fits under the deadline, then EMBRACE the recovery (no meeting relief) so it
+// lands. (All-5-meetings would time out → missed-standup before recovery.)
+const apocRun = playRun(
+  { brent: 2, tasha: 2, priya: 0, chad: 2, diane: 2 },
+  { order: ['brent', 'tasha', 'chad', 'diane', 'priya'], recovery: { time: 5, alignment: 1 } },
+)
 
 for (const a of ACHIEVEMENTS) {
   const reachable = dialogueReach[a.id] || objSlackChecks[a.id]
