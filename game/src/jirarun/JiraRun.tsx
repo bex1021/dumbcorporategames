@@ -13,15 +13,18 @@ import { Canvas } from '@react-three/fiber'
 import { Link } from 'react-router-dom'
 import { RunnerWorld, type HudState, type Checkpoint } from './RunnerWorld'
 import { TOTAL_UPDATES, PAL } from './runnerConfig'
+import { DesktopBoot } from './DesktopBoot'
 
-type Phase = 'intro' | 'running' | 'dead' | 'won'
+// Phase 2 opens on Leonard's desktop (the "lock in at your desk" beat), then
+// the runner. 'desktop' replaces the old standalone intro screen.
+type Phase = 'desktop' | 'running' | 'dead' | 'won'
 // What a finished run hands back to the screens: the story-point haul + how
 // many updates made it in. Feeds the "$0.00 Productivity Receipt" punchline.
 export type RunResult = { score: number; updates: number }
 const FRESH: Checkpoint = { level: 1, updates: 0, score: 0 }
 
 export default function JiraRun() {
-  const [phase, setPhase] = useState<Phase>('intro')
+  const [phase, setPhase] = useState<Phase>('desktop')
   const [hud, setHud] = useState<HudState>({ updates: 0, level: 1, distance: 0, score: 0, mult: 1 })
   const [fading, setFading] = useState(false)
   const [runnerKey, setRunnerKey] = useState(0)
@@ -30,10 +33,14 @@ export default function JiraRun() {
   const [checkpoint, setCheckpoint] = useState<Checkpoint>(FRESH)
   // The haul from the run that just ended — drives the receipt on dead/won.
   const [result, setResult] = useState<RunResult>({ score: 0, updates: 0 })
+  // Once you've entered the run at least once, returning to the desktop skips
+  // the "you survived standup" boot card.
+  const [bootedOnce, setBootedOnce] = useState(false)
 
   const start = useCallback(() => {
-    // fresh game from the intro → wipe the checkpoint, fade in
+    // entering the run from the desktop → wipe the checkpoint, fade in
     setFading(true)
+    setBootedOnce(true)
     sfx.warp()
     setCheckpoint(FRESH)
     window.setTimeout(() => {
@@ -55,12 +62,18 @@ export default function JiraRun() {
     }, 450)
   }, [checkpoint])
 
+  // Bail out of the run back to Leonard's desktop.
+  const backToDesktop = useCallback(() => {
+    setFading(false)
+    setPhase('desktop')
+  }, [])
+
   // SPACE drives intro-start and retry (RunnerWorld owns in-run input)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== ' ' && e.key !== 'Enter') return
-      if (phase === 'intro') { e.preventDefault(); start() }
-      else if (phase === 'dead') { e.preventDefault(); retry() }
+      // Desktop start is click-driven (inside DesktopBoot); SPACE only retries a death.
+      if (phase === 'dead') { e.preventDefault(); retry() }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -69,7 +82,7 @@ export default function JiraRun() {
   return (
     <div className="fixed inset-0 overflow-hidden" style={{ background: PAL.skyTop }}>
       {/* The 3D world stays mounted through dead/won so the freeze-frame shows */}
-      {phase !== 'intro' && (
+      {phase !== 'desktop' && (
         <Canvas
           key={runnerKey}
           dpr={[1, 1.5]}
@@ -90,9 +103,17 @@ export default function JiraRun() {
       )}
 
       {phase === 'running' && <HUD hud={hud} />}
-      {phase === 'intro' && <IntroScreen onStart={start} />}
-      {phase === 'dead' && <DeadScreen result={result} sprint={checkpoint.level} onRetry={retry} />}
-      {phase === 'won' && <WinScreen result={result} />}
+      {phase === 'running' && (
+        <button
+          onClick={backToDesktop}
+          className="pointer-events-auto fixed bottom-3 left-3 z-40 px-3 py-1.5 rounded-md text-[11px] font-mono uppercase tracking-wide bg-black/40 text-white/80 hover:bg-black/60 backdrop-blur transition"
+        >
+          ⎋ Back to desk
+        </button>
+      )}
+      {phase === 'desktop' && <DesktopBoot onEnter={start} skipBoot={bootedOnce} />}
+      {phase === 'dead' && <DeadScreen result={result} sprint={checkpoint.level} onRetry={retry} onDesktop={backToDesktop} />}
+      {phase === 'won' && <WinScreen result={result} onDesktop={backToDesktop} />}
 
       {/* fade-to-black overlay */}
       <div
@@ -145,49 +166,8 @@ function HUD({ hud }: { hud: HudState }) {
   )
 }
 
-// ---- Intro: Leonard at his Jira board ----
-function IntroScreen({ onStart }: { onStart: () => void }) {
-  return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center p-6"
-      style={{ background: 'radial-gradient(circle at 50% 40%, #0747a6, #091e42)' }}>
-      <div className="max-w-lg w-full text-center font-mono text-white">
-        <div className="inline-block mb-5 px-3 py-1 rounded text-[11px] uppercase tracking-widest"
-          style={{ background: PAL.update, color: '#3a2a00' }}>
-          Phase 2 · 10:45 AM
-        </div>
-        <h1 className="text-3xl font-black mb-3 tracking-tight" style={{ fontFamily: 'sans-serif' }}>
-          UPDATE YOUR TICKETS
-        </h1>
-        <p className="text-white/75 text-sm leading-relaxed mb-2">
-          Standup's over. Leonard opens the Jira board to log his four updates.
-          He stares into the backlog. The backlog stares back.
-        </p>
-        <p className="text-white/55 text-xs leading-relaxed mb-6">
-          Carry all 4 updates through the board and deposit each at a Kanban gate.
-          Dodge the blockers. Don't fall behind.
-        </p>
-        <div className="rounded-lg border border-white/15 bg-black/30 p-4 mb-6 text-left text-xs space-y-1">
-          <div className="text-white/60 uppercase tracking-widest text-[10px] mb-2">Controls</div>
-          <div>← → &nbsp; / &nbsp; A D &nbsp;—&nbsp; switch lane</div>
-          <div>↑ &nbsp; / &nbsp; W &nbsp; / &nbsp; SPACE &nbsp;—&nbsp; jump (blocks & red traps)</div>
-          <div>↓ &nbsp; / &nbsp; S &nbsp;—&nbsp; slide (red banners overhead)</div>
-          <div style={{ color: PAL.wall }}>⬛ purple walls — can't jump, <b>switch lanes!</b></div>
-          <div style={{ color: PAL.update }}>⭐ grab story-point tokens for combo points</div>
-        </div>
-        <button
-          onClick={onStart}
-          className="px-6 py-3 rounded font-bold text-sm uppercase tracking-widest transition hover:brightness-110"
-          style={{ background: PAL.update, color: '#3a2a00' }}
-        >
-          ▶ Press SPACE to enter the board
-        </button>
-      </div>
-    </div>
-  )
-}
-
 // ---- Death ----
-function DeadScreen({ result, sprint, onRetry }: { result: RunResult; sprint: number; onRetry: () => void }) {
+function DeadScreen({ result, sprint, onRetry, onDesktop }: { result: RunResult; sprint: number; onRetry: () => void; onDesktop: () => void }) {
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center p-6 bg-black/70">
       <div className="max-w-md w-full text-center font-mono text-white">
@@ -204,13 +184,21 @@ function DeadScreen({ result, sprint, onRetry }: { result: RunResult; sprint: nu
         >
           ↻ Press SPACE to restart Sprint {sprint}
         </button>
+        <div className="mt-3">
+          <button
+            onClick={onDesktop}
+            className="text-white/55 text-[11px] uppercase tracking-widest hover:text-white/85 transition"
+          >
+            ⎋ Back to desk
+          </button>
+        </div>
       </div>
     </div>
   )
 }
 
 // ---- Win ----
-function WinScreen({ result }: { result: RunResult }) {
+function WinScreen({ result, onDesktop }: { result: RunResult; onDesktop: () => void }) {
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center p-6"
       style={{ background: 'radial-gradient(circle at 50% 40%, #1f7a4d, #06291b)' }}>
@@ -231,13 +219,21 @@ function WinScreen({ result }: { result: RunResult }) {
             style={{ background: '#ffffff22' }}>
             Phase 3 · Lunch Run · coming soon
           </div>
-          <Link
-            to="/"
-            className="px-6 py-3 rounded font-bold text-sm uppercase tracking-widest transition hover:brightness-110"
-            style={{ background: PAL.board, color: '#06291b' }}
-          >
-            ← Back to studio
-          </Link>
+          <div className="flex gap-2">
+            <button
+              onClick={onDesktop}
+              className="px-5 py-3 rounded font-bold text-sm uppercase tracking-widest transition hover:brightness-110 bg-white/15 text-white"
+            >
+              ⎋ Back to desk
+            </button>
+            <Link
+              to="/"
+              className="px-6 py-3 rounded font-bold text-sm uppercase tracking-widest transition hover:brightness-110"
+              style={{ background: PAL.board, color: '#06291b' }}
+            >
+              ← Back to studio
+            </Link>
+          </div>
         </div>
       </div>
     </div>
