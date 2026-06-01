@@ -19,6 +19,7 @@ import {
   LANES, LANE_LERP, GRAVITY, JUMP_V, SLIDE_DUR, CLEAR_JUMP_Y, HIT_Z,
   SPAWN_AHEAD, CULL_BEHIND, LEVEL_DISTANCE, TOTAL_UPDATES, TOKEN_VALUE,
   makeRow, gapRange, speedForLevel, runwayForLevel, isJumpable, isSlideable,
+  isMovingOverhang, bannerLanesAt,
   type Obstacle, type ObstacleKind, type Token,
 } from './runnerConfig'
 import { makeRng } from './rng'
@@ -61,6 +62,10 @@ export class Sim {
   // Was the most recently spawned row a full-width forced action? Used to stop
   // two un-dodgeable forced rows landing back-to-back (an unbeatable chain).
   private lastForcedFull = false
+  // Lane of a single-lane "slide under" overhang in the most recent row (or
+  // null). Used ONLY to route the bonus coin trail through that lane (lure the
+  // player to slide under) — it does not touch collision, gaps, or difficulty.
+  private lastRowOverhangLane: number | null = null
 
   constructor(seed: number, start: StartState) {
     this.rng = makeRng(seed)
@@ -107,10 +112,13 @@ export class Sim {
       (o) => o.lanes === 'full' && (o.kind === 'block' || o.kind === 'overhang' || o.kind === 'gap'),
     )
     let occupied: number[] = []
+    this.lastRowOverhangLane = null
     for (const o of row) {
       s.obstacles.push({ id: s.nextId++, z: s.nextSpawnZ, kind: o.kind, lanes: o.lanes })
       if (o.lanes === 'full') occupied = [0, 1, 2]
       else occupied = occupied.concat(o.lanes)
+      // remember a single-lane slide so the coin trail can lead under it
+      if (o.kind === 'overhang' && o.lanes !== 'full') this.lastRowOverhangLane = o.lanes[0]
     }
     s.obsVersion++
     return occupied
@@ -120,10 +128,24 @@ export class Sim {
     const s = this.state
     const occ = occupied === 'full' ? [0, 1, 2] : occupied
     const open = [0, 1, 2].filter((l) => !occ.includes(l))
+    // NOTE: both rng() draws below happen unconditionally so the seeded stream
+    // is byte-identical whether or not this is an overhang row — the obstacle
+    // layout (makeRow) and difficulty are unchanged; only WHERE the bonus coins
+    // land differs.
     const startLane = open.length
       ? open[Math.floor(this.rng() * open.length)]
       : Math.floor(this.rng() * 3)
     const diagonal = this.rng() < 0.3
+    // SLIDE LURE: if this row is a single-lane "duck under" overhang, run the
+    // coin trail straight THROUGH that lane — leading up to AND past the bar —
+    // so chasing the coins makes you slide under it.
+    if (this.lastRowOverhangLane !== null) {
+      const lane = this.lastRowOverhangLane
+      // 7 coins (~16u) in the slide lane: 3 leading in, 1 under the bar, 3 out
+      for (let i = -3; i <= 3; i++) s.tokens.push({ id: s.nextId++, z: rowZ + i * 2.4, lane })
+      s.tokVersion++
+      return
+    }
     const baseZ = rowZ + 3.5
     for (let i = 0; i < 3; i++) {
       const lane = diagonal ? Math.max(0, Math.min(2, startLane - 1 + i)) : startLane
@@ -188,7 +210,13 @@ export class Sim {
     // ---- collision / deposit ----
     for (const o of s.obstacles) {
       if (Math.abs(o.z - s.z) > HIT_Z) continue
-      const inLane = o.lanes === 'full' || o.lanes.includes(s.lane)
+      // A sweeping banner blocks whichever lane(s) it's currently over (a pure
+      // fn of s.z), not its spawn lane — so what you see is what hits you.
+      const inLane = o.lanes === 'full'
+        ? true
+        : isMovingOverhang(o)
+          ? bannerLanesAt(o, s.z).includes(s.lane)
+          : o.lanes.includes(s.lane)
       if (!inLane) continue
       if (o.kind === 'board') {
         if (o.z <= s.z) {

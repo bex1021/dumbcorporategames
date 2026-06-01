@@ -181,17 +181,15 @@ export function DesktopBoot({ onEnter, skipBoot = false }: { onEnter: () => void
           <div
             className="absolute inset-0"
             style={{
-              // macOS-style "Lake Tahoe" wallpaper — CSS recreation of the
-              // classic clear turquoise water fading to deep teal with submerged
-              // boulders. (Copyright-safe; drop a real royalty-free Tahoe photo
-              // into /public/ and swap this for backgroundImage to use the photo.)
+              // TRON wallpaper — the boot desktop reads as a dark grid-world lit
+              // by neon cyan, setting up the "you're about to fall INTO the
+              // computer" beat before you dive into the board.
               background: [
-                'radial-gradient(60% 42% at 50% 4%, rgba(255,255,255,0.18), transparent 60%)', // surface light
-                'radial-gradient(38% 26% at 27% 74%, rgba(6,36,50,0.58), transparent 62%)',     // boulder
-                'radial-gradient(31% 21% at 60% 88%, rgba(8,42,58,0.52), transparent 62%)',     // boulder
-                'radial-gradient(24% 16% at 83% 70%, rgba(10,48,64,0.46), transparent 62%)',    // boulder
-                'radial-gradient(20% 14% at 13% 92%, rgba(8,42,58,0.5), transparent 62%)',       // boulder
-                'linear-gradient(180deg, #86dee2 0%, #43b8ca 28%, #1f87a6 58%, #0b485f 100%)',   // clear water → depth
+                'radial-gradient(70% 48% at 50% 102%, rgba(0,224,255,0.22), transparent 70%)', // neon horizon glow
+                'radial-gradient(50% 40% at 50% 8%, rgba(40,120,255,0.10), transparent 70%)',  // top wash
+                'repeating-linear-gradient(0deg, rgba(0,229,255,0.11) 0 1px, transparent 1px 46px)',  // grid — horizontal
+                'repeating-linear-gradient(90deg, rgba(0,229,255,0.11) 0 1px, transparent 1px 46px)', // grid — vertical
+                'linear-gradient(180deg, #01040c 0%, #03101f 58%, #04203a 100%)',              // dark base → deep blue floor
               ].join(', '),
             }}
           >

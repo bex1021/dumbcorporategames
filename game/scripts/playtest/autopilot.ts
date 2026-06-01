@@ -22,13 +22,21 @@
 //      made an earlier bot run into walls/gaps it had no need to touch.)
 
 import type { Sim, SimState } from '../../src/jirarun/simulation'
-import { HIT_Z, type Obstacle } from '../../src/jirarun/runnerConfig'
+import { HIT_Z, LANES, BANNER_HALF_W, isMovingOverhang, bannerSweepX, type Obstacle } from '../../src/jirarun/runnerConfig'
 
 const WALL_TTC = 0.85 // start looking to leave a lane when a wall is this close (s)
 const LOOKAHEAD = 60 // only consider obstacles within this many units ahead
 
 function occupies(o: Obstacle, lane: number): boolean {
-  return o.lanes === 'full' || (Array.isArray(o.lanes) && o.lanes.includes(lane))
+  if (o.lanes === 'full') return true
+  // A sweeping banner blocks whichever lane it's over at CONTACT (z ≈ o.z), not
+  // its spawn lane. Add a small margin past the collision half-width so the bot
+  // also reacts when it'd be grazed at the edge of the swing — otherwise a
+  // sub-frame edge case reads as a phantom "unfair" death in the playtest.
+  if (isMovingOverhang(o)) {
+    return Math.abs(LANES[lane] - bannerSweepX(o, o.z)) < BANNER_HALF_W + 0.35
+  }
+  return Array.isArray(o.lanes) && o.lanes.includes(lane)
 }
 
 // "Commit distance": how far ahead counts as must-act-now. Tuned so a jump

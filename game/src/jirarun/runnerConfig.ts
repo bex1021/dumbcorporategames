@@ -73,6 +73,36 @@ export function isSlideable(k: ObstacleKind) {
   return k === 'overhang'
 }
 
+// ---- Moving "calendar invite" banners ----
+// A single-lane overhang banner SWEEPS laterally across the track as Leonard
+// runs toward it, so you must dodge whichever lane it's currently over — or
+// SLIDE under it (a slide clears any overhang no matter where it is, so a
+// moving banner can never become unbeatable). The sweep is a PURE function of
+// the obstacle + Leonard's z, so the headless sim, the autopilot, and the
+// renderer all compute the exact same position every frame — what you see is
+// what hits you. Driving it off leonardZ (which only ever increases) instead of
+// a wall-clock keeps it deterministic, so playtests stay reproducible. It adds
+// NO new RNG draws, so the seeded obstacle layout is byte-identical.
+export const SWEEP_AMP = 2.3 // swing reaches the outer lane centres (LANES = ±2.3)
+export const SWEEP_FREQ = 0.085 // radians of sweep per world-unit of leonardZ (~one L→R→L per ~74u)
+export const BANNER_HALF_W = 1.4 // half collision width; a hair over half a lane gap so a banner mid-transit briefly covers two lanes (never all three → always an escape lane)
+
+// Only SINGLE-lane overhangs sweep. Full-width and two-lane forced slides stay
+// put (no lateral room to dodge into anyway — you just slide).
+export function isMovingOverhang(o: { kind: ObstacleKind; lanes: 'full' | number[] }): boolean {
+  return o.kind === 'overhang' && Array.isArray(o.lanes) && o.lanes.length === 1
+}
+// Current world-X centre of a sweeping banner. o.id offsets the phase so
+// neighbouring banners don't swing in lockstep.
+export function bannerSweepX(o: { id: number }, leonardZ: number): number {
+  return Math.sin(leonardZ * SWEEP_FREQ + o.id * 1.7) * SWEEP_AMP
+}
+// Which lane indices a sweeping banner currently blocks (1, or 2 mid-transit).
+export function bannerLanesAt(o: { id: number }, leonardZ: number): number[] {
+  const bx = bannerSweepX(o, leonardZ)
+  return [0, 1, 2].filter((l) => Math.abs(LANES[l] - bx) < BANNER_HALF_W)
+}
+
 // ---- Pattern generation ----
 // Returns one spawn "event": a list of obstacles sharing (roughly) the same z.
 // Guarantees at least one lane is passable WITHOUT an action, OR the whole
@@ -161,7 +191,7 @@ export function runwayForLevel(level: number): number {
 export const PAL = {
   sky: '#0747a6', // deep Atlassian blue
   skyTop: '#091e42', // navy void up top
-  floor: '#172b4d', // dark slate track
+  floor: '#46598a', // mid slate-blue track — light enough that dark-suited Leonard reads against it
   grid: '#2684ff', // neon blue grid lines
   block: '#0052cc', // ticket-stack blue
   blockEdge: '#4c9aff',

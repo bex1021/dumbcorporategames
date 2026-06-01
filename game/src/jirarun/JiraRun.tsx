@@ -8,20 +8,27 @@
 // All the real-time game state lives in RunnerWorld's refs; this shell owns
 // only the phase, the HUD snapshot, and the screens.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { Link } from 'react-router-dom'
 import { RunnerWorld, type HudState, type Checkpoint } from './RunnerWorld'
 import { TOTAL_UPDATES, PAL } from './runnerConfig'
+import type { DeathCause } from './simulation'
 import { DesktopBoot } from './DesktopBoot'
 import { markBeaten } from '../state/progress'
+import { audio } from '../audio/AudioManager'
 
 // Phase 2 opens on Leonard's desktop (the "lock in at your desk" beat), then
 // the runner. 'desktop' replaces the old standalone intro screen.
 type Phase = 'desktop' | 'running' | 'dead' | 'won'
 // What a finished run hands back to the screens: the story-point haul + how
 // many updates made it in. Feeds the "$0.00 Productivity Receipt" punchline.
-export type RunResult = { score: number; updates: number }
+export type RunResult = {
+  score: number
+  updates: number
+  cause?: DeathCause
+  dodged?: { slack: number; worms: number; invites: number; walls: number }
+}
 const FRESH: Checkpoint = { level: 1, updates: 0, score: 0 }
 
 export default function JiraRun() {
@@ -37,11 +44,15 @@ export default function JiraRun() {
   // Once you've entered the run at least once, returning to the desktop skips
   // the "you survived standup" boot card.
   const [bootedOnce, setBootedOnce] = useState(false)
+  // Mid-run pause. While paused, RunnerWorld gets running=false so the sim +
+  // world freeze and in-run input is ignored; a Resume overlay takes over.
+  const [paused, setPaused] = useState(false)
 
   const start = useCallback(() => {
     // entering the run from the desktop → wipe the checkpoint, fade in
     setFading(true)
     setBootedOnce(true)
+    setPaused(false)
     sfx.warp()
     setCheckpoint(FRESH)
     window.setTimeout(() => {
@@ -55,6 +66,7 @@ export default function JiraRun() {
   const retry = useCallback(() => {
     // resume from the banked sprint checkpoint (do NOT reset it)
     setFading(true)
+    setPaused(false)
     window.setTimeout(() => {
       setHud({ updates: checkpoint.updates, level: checkpoint.level, distance: 0, score: checkpoint.score, mult: 1 })
       setRunnerKey((k) => k + 1)
@@ -66,12 +78,32 @@ export default function JiraRun() {
   // Bail out of the run back to Leonard's desktop.
   const backToDesktop = useCallback(() => {
     setFading(false)
+    setPaused(false)
     setPhase('desktop')
   }, [])
 
-  // SPACE drives intro-start and retry (RunnerWorld owns in-run input)
+  // DEV-only review shortcut: `/play/jira-run?sprint=3` drops straight into
+  // Sprint N (skips the desktop opener + earlier gates) so a later biome can be
+  // reviewed without grinding through two gates. Never ships (DEV-gated).
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const n = Number(new URLSearchParams(window.location.search).get('sprint'))
+    if (n >= 2 && n <= TOTAL_UPDATES) {
+      setCheckpoint({ level: n, updates: n - 1, score: 0 })
+      setHud({ updates: n - 1, level: n, distance: 0, score: 0, mult: 1 })
+      setBootedOnce(true)
+      setRunnerKey((k) => k + 1)
+      setPhase('running')
+    }
+  }, [])
+
+  // SPACE retries a death; ESC / P toggles the in-run pause. (RunnerWorld owns
+  // the in-run movement keys; none of them collide with Esc/P.)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if ((e.key === 'Escape' || e.key === 'p' || e.key === 'P') && phase === 'running') {
+        e.preventDefault(); setPaused((p) => !p); return
+      }
       if (e.key !== ' ' && e.key !== 'Enter') return
       // Desktop start is click-driven (inside DesktopBoot); SPACE only retries a death.
       if (phase === 'dead') { e.preventDefault(); retry() }
@@ -91,14 +123,14 @@ export default function JiraRun() {
           camera={{ position: [0, 3.4, -6.6], fov: 70 }}
         >
           <RunnerWorld
-            running={phase === 'running'}
+            running={phase === 'running' && !paused}
             start={checkpoint}
             onHud={setHud}
             onDeposit={(n) => { sfx.deposit(); if (n >= TOTAL_UPDATES) sfx.win() }}
             onToken={() => sfx.token()}
             onCheckpoint={setCheckpoint}
-            onDeath={(r) => { sfx.crash(); setResult(r); setPhase('dead') }}
-            onWin={(r) => { markBeaten('phase2'); setResult(r); setPhase('won') }}
+            onDeath={(r) => { sfx.crash(); setPaused(false); setResult(r); setPhase('dead') }}
+            onWin={(r) => { markBeaten('phase2'); setPaused(false); setResult(r); setPhase('won') }}
           />
         </Canvas>
       )}
@@ -108,13 +140,49 @@ export default function JiraRun() {
       {phase !== 'desktop' && <CRTOverlay />}
 
       {phase === 'running' && <HUD hud={hud} />}
-      {phase === 'running' && (
-        <button
-          onClick={backToDesktop}
-          className="pointer-events-auto fixed bottom-3 left-3 z-40 px-3 py-1.5 rounded-md text-[11px] font-mono uppercase tracking-wide bg-black/40 text-white/80 hover:bg-black/60 backdrop-blur transition"
-        >
-          ⎋ Back to desk
-        </button>
+      {phase === 'running' && !paused && (
+        <>
+          <button
+            onClick={backToDesktop}
+            className="pointer-events-auto fixed bottom-3 left-3 z-40 px-3 py-1.5 rounded-md text-[11px] font-mono uppercase tracking-wide bg-black/40 text-white/80 hover:bg-black/60 backdrop-blur transition"
+          >
+            ⎋ Back to desk
+          </button>
+          <button
+            onClick={() => setPaused(true)}
+            className="pointer-events-auto fixed bottom-3 right-3 z-40 px-3 py-1.5 rounded-md text-[11px] font-mono uppercase tracking-wide bg-black/40 text-white/80 hover:bg-black/60 backdrop-blur transition"
+          >
+            ⏸ Pause
+          </button>
+        </>
+      )}
+      {/* Mid-run pause overlay — world is frozen behind it */}
+      {phase === 'running' && paused && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="text-center font-mono text-white">
+            <div className="text-5xl mb-3">⏸</div>
+            <h1 className="text-3xl font-black mb-2" style={{ fontFamily: 'sans-serif', color: PAL.update }}>PAUSED</h1>
+            <p className="text-white/55 text-[11px] uppercase tracking-widest mb-6">
+              Sprint {hud.level} · ⭐ {hud.score.toLocaleString()}
+            </p>
+            <button
+              onClick={() => setPaused(false)}
+              className="px-7 py-3 rounded font-bold text-sm uppercase tracking-widest transition hover:brightness-110"
+              style={{ background: PAL.update, color: '#3a2a00' }}
+            >
+              ▶ Resume
+            </button>
+            <div className="mt-4 flex items-center justify-center gap-4">
+              <button onClick={backToDesktop} className="text-white/55 text-[11px] uppercase tracking-widest hover:text-white/85 transition">
+                ⎋ Back to desk
+              </button>
+              <Link to="/play" className="text-white/55 text-[11px] uppercase tracking-widest hover:text-white/85 transition">
+                ☰ Level select
+              </Link>
+            </div>
+            <p className="mt-6 text-white/35 text-[10px] uppercase tracking-widest">Esc or P to resume</p>
+          </div>
+        </div>
       )}
       {phase === 'desktop' && <DesktopBoot onEnter={start} skipBoot={bootedOnce} />}
       {phase === 'dead' && <DeadScreen result={result} sprint={checkpoint.level} onRetry={retry} onDesktop={backToDesktop} />}
@@ -199,15 +267,68 @@ function HUD({ hud }: { hud: HudState }) {
 }
 
 // ---- Death ----
+// Every hazard kills you its own way. Each kind gets a punchy headline + a pool
+// of funny corporate post-mortems; one is picked at random per death.
+const DEATH_COPY: Record<DeathCause, { emoji: string; title: string; lines: string[] }> = {
+  // red floor holes — "scope holes / rabbit holes / cans of worms"
+  gap: {
+    emoji: '🪱',
+    title: 'CAN OF WORMS',
+    lines: [
+      'You opened a can of worms. They’re out, they’re everywhere, and they’ve started a Slack channel. Updates dropped.',
+      'You went down a rabbit hole "just to get the full context." Ninety minutes later, the context won. Updates dropped.',
+      'Scope creep opened a hole in the floor. You said "sure, we can fit that in" and fell straight through.',
+      'You asked one innocent clarifying question and the ground gave way. Updates lost to the backlog.',
+    ],
+  },
+  // purple "BLOCKED — waiting on Legal/Approval" dependency walls
+  wall: {
+    emoji: '🚧',
+    title: 'BLOCKED.',
+    lines: [
+      'Waiting on Legal, who are waiting on Procurement, who are waiting on you. Nobody moved. Updates dropped.',
+      'You hit a hard dependency. It’ll be unblocked "by EOD" — they didn’t specify which day. Updates dropped.',
+      'A wall of approvals you can’t jump or dodge. Someone promised to "circle back." Your updates did not survive the wait.',
+      'You ran into a blocker that can only be escalated, never cleared. Welcome to the dependency. Updates dropped.',
+    ],
+  },
+  // jump-blocks wearing Slack notifications / ticket stacks
+  block: {
+    emoji: '💬',
+    title: '"GOT A SEC?"',
+    lines: [
+      'A Slack ping you "definitely saw" bodychecked you at full speed. Updates dropped.',
+      '"Got a sec?" Narrator: you did not have a sec. Updates dropped.',
+      'A surprise "quick sync" materialized at chest height. You did not survive the sync. Updates dropped.',
+      'You ran face-first into a stack of tickets nobody groomed. Updates dropped.',
+    ],
+  },
+  // slide-under banners: Outlook invites / cookie bars / [EXTERNAL] / town halls
+  overhang: {
+    emoji: '📅',
+    title: 'YOU DIDN’T DUCK',
+    lines: [
+      'You forgot to duck under a recurring invite. The recurring invite does not forget. Updates dropped.',
+      'An [EXTERNAL] banner clotheslined you at neck height. IT did warn you. Updates dropped.',
+      'A "Mandatory Training" bar caught you standing tall. Compliance always wins. Updates dropped.',
+      'You walked straight into a town hall. There were no questions — only your dropped updates.',
+    ],
+  },
+  // never actually fatal (gate), here for type-completeness
+  board: { emoji: '💥', title: 'BLOCKED.', lines: ['Something corporate happened and your updates didn’t make it.'] },
+}
 function DeadScreen({ result, sprint, onRetry, onDesktop }: { result: RunResult; sprint: number; onRetry: () => void; onDesktop: () => void }) {
+  const copy = DEATH_COPY[result.cause ?? 'wall'] ?? DEATH_COPY.wall
+  // pick a line once, when this death screen mounts (stable until next death)
+  const [line] = useState(() => copy.lines[Math.floor(Math.random() * copy.lines.length)])
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center p-6 bg-black/70">
       <div className="max-w-md w-full text-center font-mono text-white">
-        <div className="text-5xl mb-3">💥</div>
+        <div className="text-5xl mb-3">{copy.emoji}</div>
         <h1 className="text-2xl font-black mb-2" style={{ color: PAL.gap, fontFamily: 'sans-serif' }}>
-          BLOCKED.
+          {copy.title}
         </h1>
-        <p className="text-white/70 text-sm mb-4">You hit a blocker and dropped your updates.</p>
+        <p className="text-white/70 text-sm mb-4">{line}</p>
         <Receipt result={result} />
         <button
           onClick={onRetry}
@@ -235,48 +356,150 @@ function DeadScreen({ result, sprint, onRetry, onDesktop }: { result: RunResult;
   )
 }
 
-// ---- Win ----
-function WinScreen({ result, onDesktop }: { result: RunResult; onDesktop: () => void }) {
+// ---- Win: the Sprint-Run Retrospective (matches the Phase-1 ending) ----
+// Crossing the final gate surfaces you out of the computer → this light-Jira
+// retrospective. Thematic, witty achievements run down the right side; the ones
+// you earned this run get the full golden treatment (pop + shimmer + sparkle +
+// chord-ding fanfare), reusing the same CSS/audio as Phase 1.
+const POP_STAGGER_MS = 150
+const SPARKLE_DIRECTIONS = Array.from({ length: 8 }, (_, i) => {
+  const angle = (i / 8) * Math.PI * 2 + Math.PI / 16
+  const r = 38 + (i % 2 === 0 ? 0 : 6)
+  return { dx: Math.cos(angle) * r, dy: Math.sin(angle) * r }
+})
+const totalDodged = (r: RunResult) => {
+  const d = r.dodged
+  return d ? d.slack + d.worms + d.invites + d.walls : 0
+}
+type JRAchv = { id: string; emoji: string; title: string; desc: string; earned: (r: RunResult) => boolean }
+// Thematic, witty achievements — "Aligned but Hated" energy.
+const JR_ACHIEVEMENTS: JRAchv[] = [
+  { id: 'shipped', emoji: '🏁', title: 'Technically Shipped', desc: 'All four tickets updated. The board is, briefly, green.', earned: () => true },
+  { id: 'novalue', emoji: '💸', title: '$0.00 of Value', desc: 'Maximum velocity, zero business value. Textbook.', earned: () => true },
+  { id: 'flow', emoji: '🌊', title: 'Sixty Minutes of Flow', desc: 'One full hour, uninterrupted. A workplace miracle.', earned: () => true },
+  { id: 'dnd', emoji: '🔕', title: 'Do Not Disturb', desc: 'Dodged 12+ Slack pings. “Got a sec?” — no.', earned: (r) => (r.dodged?.slack ?? 0) >= 12 },
+  { id: 'lurker', emoji: '🧘', title: 'Inbox Zero (Spiritually)', desc: 'Ignored 16+ pings into the void. Near-total Slack denial.', earned: (r) => (r.dodged?.slack ?? 0) >= 16 },
+  { id: 'worms', emoji: '🪱', title: 'Worms Stay Canned', desc: 'Left 16+ cans of worms sealed. Scope uncrept, against the odds.', earned: (r) => (r.dodged?.worms ?? 0) >= 16 },
+  { id: 'declined', emoji: '📅', title: 'Declined With Body', desc: 'Slid under 17+ meeting invites. The calendar bows to you.', earned: (r) => (r.dodged?.invites ?? 0) >= 17 },
+  { id: 'unblock', emoji: '🚧', title: 'Unblockable', desc: 'Weaved past 24+ dependency walls. Still technically blocked.', earned: (r) => (r.dodged?.walls ?? 0) >= 24 },
+  { id: 'ninja', emoji: '🥷', title: 'Untouchable', desc: 'Survived 75+ distractions in one hour — a maximally cursed day, cleared.', earned: (r) => totalDodged(r) >= 75 },
+  { id: 'hoarder', emoji: '⭐', title: 'Story-Point Hoarder', desc: 'Banked 10,000+ story points. Worth, as ever, $0.00.', earned: (r) => r.score >= 10000 },
+]
+
+function JiraRunNav() {
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center p-6"
-      style={{ background: 'radial-gradient(circle at 50% 40%, #1f7a4d, #06291b)' }}>
-      <div className="max-w-md w-full text-center font-mono text-white">
-        <div className="text-5xl mb-3">📋✅</div>
-        <h1 className="text-2xl font-black mb-2" style={{ color: PAL.boardEdge, fontFamily: 'sans-serif' }}>
-          ALL TICKETS UPDATED
-        </h1>
-        <p className="text-white/75 text-sm mb-4">
-          Four updates deposited. The board is, briefly, Green.
-        </p>
-        <Receipt result={result} />
-        <p className="text-white/55 text-xs mb-6">
-          It is 11:00 AM. Then your phone buzzes: the SteerCo lunch order just fell through.
-        </p>
-        <div className="flex flex-col gap-2 items-center">
-          <div className="px-4 py-2 rounded text-[11px] uppercase tracking-widest opacity-70"
-            style={{ background: '#ffffff22' }}>
-            Phase 3 · coming soon
+    <div className="flex items-center gap-4 px-4 h-10 bg-white border-b border-[#dfe1e6] flex-shrink-0">
+      <div className="flex items-center gap-2">
+        <div className="w-6 h-6 rounded bg-[#0052cc] text-white flex items-center justify-center text-xs font-bold">A</div>
+        <span className="text-sm font-semibold">Alignly</span>
+      </div>
+      <div className="hidden md:flex items-center gap-4 text-[13px] text-[#42526e]">
+        <span>Your work</span><span>Projects</span><span>Filters</span><span>Dashboards</span>
+      </div>
+      <div className="ml-auto w-7 h-7 rounded-full bg-[#0052cc] text-white flex items-center justify-center text-[11px] font-bold">LC</div>
+    </div>
+  )
+}
+function JRMetric({ label, value, bad }: { label: string; value: string; bad?: boolean }) {
+  return (
+    <div className="flex items-center">
+      <div className="flex-1 text-[#5e6c84]">{label}</div>
+      <div className={`font-mono font-semibold ${bad ? 'text-[#bf2600]' : 'text-[#172b4d]'}`}>{value}</div>
+    </div>
+  )
+}
+function WinScreen({ result, onDesktop }: { result: RunResult; onDesktop: () => void }) {
+  // burst-through-the-screen white flash that fades into the retrospective
+  const [flash, setFlash] = useState(1)
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setFlash(0))
+    return () => cancelAnimationFrame(id)
+  }, [])
+  const total = totalDodged(result)
+  const earned = JR_ACHIEVEMENTS.filter((a) => a.earned(result))
+  const earnedSet = new Set(earned.map((a) => a.id))
+  const popOrder = new Map(earned.map((a, i) => [a.id, i]))
+  // achievement fanfare: a chord-ding per earned card, then a TA-DA finale
+  useEffect(() => {
+    const pops = earned.map((_, i) => setTimeout(() => audio.playAchievementPop(i), i * POP_STAGGER_MS))
+    const fan = setTimeout(() => audio.playAchievementFanfare(), (earned.length - 1) * POP_STAGGER_MS + 550)
+    return () => { pops.forEach(clearTimeout); clearTimeout(fan) }
+    // run once on mount (result is fixed for this win)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  return (
+    <div className="fixed inset-0 z-40 bg-[#f4f5f7] text-[#172b4d] flex flex-col overflow-hidden">
+      <div className="pointer-events-none fixed inset-0 z-50 bg-white transition-opacity duration-700" style={{ opacity: flash }} />
+      <JiraRunNav />
+      <div className="px-6 pt-3 pb-2 flex-shrink-0">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-[12px] text-[#5e6c84]">Projects › Customer Happiness Portal Refresh › Jira Run › Retrospective</div>
+          <div className="flex items-baseline justify-between mt-0.5 gap-3 flex-wrap">
+            <h1 className="text-[20px] font-semibold">
+              Ticket-update run — <span className="text-[#006644]">Complete</span>
+            </h1>
+            <div className="text-[12px] text-[#5e6c84]">4/4 updates · {earned.length}/{JR_ACHIEVEMENTS.length} achievements</div>
           </div>
-          <div className="flex flex-wrap gap-2 justify-center">
-            <button
-              onClick={onDesktop}
-              className="px-5 py-3 rounded font-bold text-sm uppercase tracking-widest transition hover:brightness-110 bg-white/15 text-white"
-            >
-              ⎋ Back to desk
-            </button>
-            <Link
-              to="/play"
-              className="px-6 py-3 rounded font-bold text-sm uppercase tracking-widest transition hover:brightness-110"
-              style={{ background: PAL.board, color: '#06291b' }}
-            >
-              ☰ Level select
-            </Link>
-            <Link
-              to="/"
-              className="px-5 py-3 rounded font-bold text-sm uppercase tracking-widest transition hover:brightness-110 bg-white/15 text-white"
-            >
-              ← Studio
-            </Link>
+        </div>
+      </div>
+      <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-4">
+        <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 pt-1">
+          {/* LEFT: outcome + metrics + CTAs */}
+          <div className="max-w-2xl w-full mx-auto flex flex-col gap-3">
+            <div className="rounded border px-4 py-3" style={{ backgroundColor: '#e3fcef', borderColor: '#abf5d1' }}>
+              <div className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: '#006644' }}>Sprint goal · ✓ Met</div>
+              <div className="text-[20px] font-semibold mt-0.5">One (1) full hour, uninterrupted</div>
+              <div className="text-[13px] text-[#42526e] mt-2 leading-relaxed">
+                Congratulations — you worked one full hour uninterrupted by the constant barrage of
+                Slack pings and calendar invites. You surfaced back out of the screen and blinked awake
+                at your own desk. <span className="font-semibold text-[#172b4d]">You created zero business value.</span>
+              </div>
+            </div>
+            <div className="bg-white border border-[#dfe1e6] rounded p-3">
+              <div className="text-[10px] uppercase tracking-widest text-[#5e6c84] mb-1.5">Run metrics</div>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-0.5 text-[12px]">
+                <JRMetric label="Updates deposited" value="4 / 4" />
+                <JRMetric label="Story points" value={result.score.toLocaleString()} />
+                <JRMetric label="Distractions survived" value={String(total)} />
+                <JRMetric label="Actual business value" value="$0.00" bad />
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <div className="self-start px-3 py-1.5 rounded text-[11px] uppercase tracking-widest text-[#5e6c84] bg-[#eef1f4] border border-[#dfe1e6]">Phase 3 · coming soon</div>
+              <div className="flex gap-2 flex-wrap">
+                <button onClick={onDesktop} className="px-4 py-2.5 rounded border border-[#dfe1e6] bg-white text-[#42526e] text-[13px] font-medium hover:bg-[#f4f5f7] transition">⎋ Back to desk</button>
+                <Link to="/play" className="px-5 py-2.5 rounded bg-[#0052cc] text-white text-[13px] font-semibold hover:bg-[#0747a6] transition text-center">☰ Level select</Link>
+                <Link to="/" className="px-4 py-2.5 rounded border border-[#dfe1e6] bg-white text-[#42526e] text-[13px] font-medium hover:bg-[#f4f5f7] transition text-center">← Studio</Link>
+              </div>
+            </div>
+          </div>
+          {/* RIGHT: thematic achievements with golden effects */}
+          <div className="grid grid-cols-2 gap-2 self-start">
+            {JR_ACHIEVEMENTS.map((a) => {
+              const got = earnedSet.has(a.id)
+              const idx = popOrder.get(a.id)
+              const delay = got && idx !== undefined ? `${idx * POP_STAGGER_MS}ms` : undefined
+              return (
+                <div
+                  key={a.id}
+                  className={['relative px-2.5 py-2 rounded border', got ? 'border-[#f5cd47] bg-[#fff7d6] text-[#172b4d] achievement-pop' : 'border-[#dfe1e6] bg-[#f4f5f7] text-[#5e6c84]'].join(' ')}
+                  style={delay ? ({ '--pop-delay': delay } as CSSProperties) : undefined}
+                >
+                  {got && <span className="achievement-shimmer" />}
+                  {got && SPARKLE_DIRECTIONS.map((dir, i) => (
+                    <span key={i} className={`achievement-sparkle${i % 2 === 0 ? '' : ' cream'}`} style={{ '--dx': `${dir.dx}px`, '--dy': `${dir.dy}px` } as CSSProperties} />
+                  ))}
+                  <div className="relative z-10">
+                    <div className="flex items-start gap-1.5">
+                      <span className="text-sm leading-none flex-shrink-0 mt-0.5" style={!got ? { filter: 'grayscale(1)', opacity: 0.45 } : undefined}>{a.emoji}</span>
+                      <span className="text-[11px] font-semibold leading-tight flex-1 min-w-0">{a.title}</span>
+                    </div>
+                    <div className="text-[10px] leading-snug mt-1 opacity-80">{a.desc}</div>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       </div>
