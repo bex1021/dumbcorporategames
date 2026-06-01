@@ -128,11 +128,17 @@ function survive(sim: Sim, noSlide = false): boolean {
   if (imm) {
     if (imm.kind === 'wall') { escapeLane(sim, s, imm.z, noSlide); return true }
     if (imm.kind === 'overhang') {
-      if (noSlide) escapeLane(sim, s, imm.z, noSlide)
-      // Edge-trigger: TAP slide once, don't hold. Re-calling slide() every
-      // frame kept resetting the 0.62s timer, so the bot stayed locked in a
-      // slide into the next obstacle — and you can't jump out of a slide.
-      else if (s.grounded && !s.sliding) sim.slide()
+      // Prefer dodging into an open lane: it keeps us GROUNDED (so we can still
+      // jump whatever's right behind it) and it works even mid-air, when a slide
+      // is impossible. Only a FULL-width overhang has no open lane and truly
+      // forces a slide. (This is what a sharp human does — slide-locking yourself
+      // low right before a block is the trap.)
+      const clean = cleanLane(s, s.lane, imm.z)
+      if (clean !== null) { sim.setLane(clean); return true }
+      // No open lane (full-width). Edge-trigger the slide — TAP once, don't hold
+      // (re-calling slide() resets the 0.62s timer and locks you low; you can't
+      // jump out of a slide).
+      if (!noSlide && s.grounded && !s.sliding) sim.slide()
       return true
     }
     // block / gap

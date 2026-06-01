@@ -17,6 +17,7 @@ import type { DeathCause } from './simulation'
 import { DesktopBoot } from './DesktopBoot'
 import { markBeaten } from '../state/progress'
 import { audio } from '../audio/AudioManager'
+import { jiraMusic } from './jiraMusic'
 
 // Phase 2 opens on Leonard's desktop (the "lock in at your desk" beat), then
 // the runner. 'desktop' replaces the old standalone intro screen.
@@ -47,6 +48,16 @@ export default function JiraRun() {
   // Mid-run pause. While paused, RunnerWorld gets running=false so the sim +
   // world freeze and in-run input is ignored; a Resume overlay takes over.
   const [paused, setPaused] = useState(false)
+  // Sound on/off (music + SFX), persisted. The chiptune is the prominent new
+  // layer, so the toggle rides in the HUD and survives reloads.
+  const [muted, setMutedState] = useState(() => {
+    try { return localStorage.getItem('jr-muted') === '1' } catch { return false }
+  })
+  useEffect(() => {
+    jiraMusic.setMuted(muted)
+    sfx.setMuted(muted)
+    try { localStorage.setItem('jr-muted', muted ? '1' : '0') } catch { /* ignore */ }
+  }, [muted])
 
   const start = useCallback(() => {
     // entering the run from the desktop → wipe the checkpoint, fade in
@@ -54,6 +65,7 @@ export default function JiraRun() {
     setBootedOnce(true)
     setPaused(false)
     sfx.warp()
+    jiraMusic.start(1) // kick the chiptune in on the gesture (loop swells in under the fade)
     setCheckpoint(FRESH)
     window.setTimeout(() => {
       setHud({ updates: 0, level: 1, distance: 0, score: 0, mult: 1 })
@@ -67,6 +79,7 @@ export default function JiraRun() {
     // resume from the banked sprint checkpoint (do NOT reset it)
     setFading(true)
     setPaused(false)
+    jiraMusic.start(checkpoint.level) // restart the loop at this sprint's intensity
     window.setTimeout(() => {
       setHud({ updates: checkpoint.updates, level: checkpoint.level, distance: 0, score: checkpoint.score, mult: 1 })
       setRunnerKey((k) => k + 1)
@@ -79,6 +92,7 @@ export default function JiraRun() {
   const backToDesktop = useCallback(() => {
     setFading(false)
     setPaused(false)
+    jiraMusic.stop()
     setPhase('desktop')
   }, [])
 
@@ -112,6 +126,17 @@ export default function JiraRun() {
     return () => window.removeEventListener('keydown', onKey)
   }, [phase, start, retry])
 
+  // ── Adaptive chiptune lifecycle ──
+  // Backstop start (covers the dev ?sprint shortcut, which skips start()/retry);
+  // no-ops if the loop is already grooving from the gesture handlers above.
+  useEffect(() => { if (phase === 'running') jiraMusic.start(checkpoint.level) }, [phase, checkpoint.level])
+  // Escalate layers + tempo as the live sprint advances.
+  useEffect(() => { if (phase === 'running') jiraMusic.setLevel(hud.level) }, [hud.level, phase])
+  // Freeze/unfreeze the loop with the pause overlay.
+  useEffect(() => { if (phase === 'running') jiraMusic.setPaused(paused) }, [paused, phase])
+  // Kill the music if Jira Run unmounts (navigating away mid-run).
+  useEffect(() => () => jiraMusic.stop(), [])
+
   return (
     <div className="fixed inset-0 overflow-hidden" style={{ background: PAL.skyTop }}>
       {/* The 3D world stays mounted through dead/won so the freeze-frame shows */}
@@ -126,10 +151,10 @@ export default function JiraRun() {
             running={phase === 'running' && !paused}
             start={checkpoint}
             onHud={setHud}
-            onDeposit={(n) => { sfx.deposit(); if (n >= TOTAL_UPDATES) sfx.win() }}
+            onDeposit={(n) => { sfx.deposit(); if (n >= TOTAL_UPDATES) { sfx.win(); jiraMusic.victory() } }}
             onToken={() => sfx.token()}
             onCheckpoint={setCheckpoint}
-            onDeath={(r) => { sfx.crash(); setPaused(false); setResult(r); setPhase('dead') }}
+            onDeath={(r) => { sfx.crash(); jiraMusic.death(); setPaused(false); setResult(r); setPhase('dead') }}
             onWin={(r) => { markBeaten('phase2'); setPaused(false); setResult(r); setPhase('won') }}
           />
         </Canvas>
@@ -140,6 +165,16 @@ export default function JiraRun() {
       {phase !== 'desktop' && <CRTOverlay />}
 
       {phase === 'running' && <HUD hud={hud} />}
+      {/* Sound toggle — always reachable during a run (even while paused) */}
+      {phase === 'running' && (
+        <button
+          onClick={() => setMutedState((m) => !m)}
+          title={muted ? 'Unmute sound' : 'Mute sound'}
+          className="pointer-events-auto fixed bottom-3 right-3 z-40 px-3 py-1.5 rounded-md text-[13px] font-mono bg-black/40 text-white/80 hover:bg-black/60 backdrop-blur transition"
+        >
+          {muted ? '🔇' : '🔊'}
+        </button>
+      )}
       {phase === 'running' && !paused && (
         <>
           <button
@@ -150,7 +185,7 @@ export default function JiraRun() {
           </button>
           <button
             onClick={() => setPaused(true)}
-            className="pointer-events-auto fixed bottom-3 right-3 z-40 px-3 py-1.5 rounded-md text-[11px] font-mono uppercase tracking-wide bg-black/40 text-white/80 hover:bg-black/60 backdrop-blur transition"
+            className="pointer-events-auto fixed bottom-14 right-3 z-40 px-3 py-1.5 rounded-md text-[11px] font-mono uppercase tracking-wide bg-black/40 text-white/80 hover:bg-black/60 backdrop-blur transition"
           >
             ⏸ Pause
           </button>
@@ -544,8 +579,10 @@ function ReceiptRow({ label, value }: { label: string; value: string }) {
 // ---- tiny chiptune SFX (self-contained Web Audio, no assets) ----
 const sfx = (() => {
   let ctx: AudioContext | null = null
+  let muted = false
   const ac = () => (ctx ??= new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)())
   function blip(freq: number, dur: number, type: OscillatorType = 'square', vol = 0.12, slideTo?: number) {
+    if (muted) return
     try {
       const c = ac(); const t = c.currentTime
       const o = c.createOscillator(); const g = c.createGain()
@@ -558,6 +595,7 @@ const sfx = (() => {
     } catch { /* ignore */ }
   }
   return {
+    setMuted: (m: boolean) => { muted = m },
     warp: () => { blip(180, 0.5, 'sawtooth', 0.1, 900) },
     token: () => { blip(880, 0.08, 'square', 0.09, 1320) },
     deposit: () => { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => blip(f, 0.12, 'square', 0.12), i * 70)) },

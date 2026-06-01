@@ -961,11 +961,16 @@ export function RunnerWorld({ running, start, onHud, onDeposit, onToken, onCheck
     const bTowersBack = bGate3 + 0.62 * s4len // Sprint-1 corporate towers return for the final stretch
 
     // per-landscape "up" amount at a world-z (1 = at rest, 0 = parked underground).
-    // Sprint 4 reverses with a SHORTER lead so each leg reads inside one sprint.
+    // Forward biomes CROSS-DISSOLVE: the outgoing one recedes by exactly the
+    // amount the incoming one rises (presence = 1 − next.rise), so the two
+    // landscapes trade off smoothly across the gate instead of both standing at
+    // full height at once (which made canyon→lake a cluttered pile-up that then
+    // yanked the canyon away). Sprint 4 reverses with a SHORTER lead so each leg
+    // reads inside one sprint — its reverse terms (sinkAt-based) are unchanged.
     const upCorp = (z: number) =>
-      Math.max(1 - sinkAt(z, bFile), inS4 ? riseAtL(z, bTowersBack, REV_LEAD) : 0)
+      Math.max(1 - riseAt(z, bFile), inS4 ? riseAtL(z, bTowersBack, REV_LEAD) : 0)
     const upCanyon = (z: number) => {
-      const fwd = riseAt(z, bFile) * (1 - sinkAt(z, bDesk)) // Sprint 2
+      const fwd = riseAt(z, bFile) * (1 - riseAt(z, bDesk)) // Sprint 2: up after gate 1, dissolves into the desktop as it rises toward gate 2
       return inS4 ? Math.max(fwd, riseAtL(z, bCanyonBack, REV_LEAD) * (1 - sinkAt(z, bTowersBack))) : fwd
     }
     const upDesk = (z: number) => (inS4 ? riseAt(z, bDesk) * (1 - sinkAt(z, bCanyonBack)) : riseAt(z, bDesk))
@@ -988,7 +993,11 @@ export function RunnerWorld({ running, start, onHud, onDeposit, onToken, onCheck
 
     // sky + fog + light, blended by which landscape(s) you're standing in. This
     // handles the forward journey AND Sprint 4's reverse home automatically.
-    const wCorp = upCorp(s.z), wCanyon = upCanyon(s.z), wDesk = upDesk(s.z)
+    // Sample the light/sky AHEAD of Leonard (see LIGHT_LEAD) so the new biome's
+    // mood leads its landscape in, smoothing the cross-gate jump. Geometry below
+    // still rises/sinks on its own (un-led) timing.
+    const lz = s.z + LIGHT_LEAD
+    const wCorp = upCorp(lz), wCanyon = upCanyon(lz), wDesk = upDesk(lz)
     const skyCol = blendBiome(_skyScratch, SKY_NAVY, SKY_CANYON, SKY_TAHOE, wCorp, wCanyon, wDesk)
     if ((scene.background as THREE.Color)?.isColor) (scene.background as THREE.Color).copy(skyCol)
     if (scene.fog) {
@@ -1424,19 +1433,21 @@ function FileWalls() {
 // corporate towers (S1 + S4 return), the canyon (S2 + S4 return), the desktop
 // (S3). The office is the win SCREEN, not a run biome. ──
 const SKY_NAVY = new THREE.Color(PAL.skyTop) // corporate tower world
-const SKY_CANYON = new THREE.Color('#bf7a30') // Antelope-canyon gold
+const SKY_CANYON = new THREE.Color('#e6c79c') // bright sunlit sandstone (was a dark brown-gold that read as "polluted")
 const SKY_TAHOE = new THREE.Color('#cdecff') // sunny Mac-desktop sky
 // ambient (fill) colour per biome
 const AMB_CORP = new THREE.Color('#ffffff')
-const AMB_CANYON = new THREE.Color('#ffb060') // amber fill — Antelope sandstone
+const AMB_CANYON = new THREE.Color('#ffe6c8') // soft warm cream fill — warm, but no orange-brown cast
 const AMB_DESK = new THREE.Color('#fff4e0') // warm sunlight fill
 // directional (key/sun) colour per biome
 const DIR_CORP = new THREE.Color('#ffffff')
-const DIR_CANYON = new THREE.Color('#ffd58a') // golden sun shaft
+const DIR_CANYON = new THREE.Color('#fff2da') // bright clean warm sun (was a saturated gold)
 const DIR_DESK = new THREE.Color('#fff1cf') // bright warm sun
 // light intensities per biome, indices [corp, canyon, desk(sunny)]
-const AMB_I = [1.0, 0.9, 1.2]
-const DIR_I = [0.95, 1.3, 1.5]
+// canyon fill bumped 0.9 → 1.3: it used to be DIMMER than the office, which made
+// the warm tint read as murky/polluted. Brighter fill = clean sunlit vibe.
+const AMB_I = [1.0, 1.3, 1.2]
+const DIR_I = [0.95, 1.4, 1.5]
 const _skyScratch = new THREE.Color()
 const _ambScratch = new THREE.Color()
 const _dirScratch = new THREE.Color()
@@ -1460,6 +1471,12 @@ const DESK_LEN = DESK_SPAN * DESK_N
 const BIOME_HIDDEN = 130 // units a landscape sits below the floor when inactive
 const BIOME_LEAD = 130 // units before a gate the next landscape starts rising (see it coming)
 const BIOME_TRAIL = 95 // units after a gate the previous landscape finishes sinking — long enough that the outgoing biome's light/scene crossfades out gently instead of yanking away at the gate
+// The sky/light is sampled this far AHEAD of Leonard so a biome's MOOD arrives
+// while its landscape is rising into view — and so the gate isn't the muddy
+// 50/50 colour midpoint. That midpoint-at-the-gate is what made sprint 1→2
+// (deep navy → warm sand, the biggest hue jump) feel jarring; leading the light
+// means you're already ~3/4 into the new look by the time you cross.
+const LIGHT_LEAD = 60
 function levelSpan(L: number): number { return runwayForLevel(L) + LEVEL_DISTANCE + 8 }
 function clamp01(v: number): number { return v < 0 ? 0 : v > 1 ? 1 : v }
 // smoothstep easing — zero slope at both ends, so a landscape (and its sky/
