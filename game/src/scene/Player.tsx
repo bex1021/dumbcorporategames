@@ -22,6 +22,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF, useAnimations } from '@react-three/drei'
 import { Group, AnimationClip, type Object3D } from 'three'
+import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { useKeyboard } from '../hooks/useKeyboard'
 import { OFFICE, PLAYER, ROOM_COLLIDERS } from '../config/constants'
 import { playerPosition, playerVelocity, playerFacing } from '../state/playerState'
@@ -62,6 +63,15 @@ export function Player() {
   const idle = useGLTF('/models/Player_Idle.glb')
   // Walking GLB is loaded purely for its clip; its own scene is unused.
   const walking = useGLTF('/models/Player_Walking.glb')
+
+  // Per-mount clone of the idle scene (SkeletonUtils, same as the NPCs do).
+  // We MUST NOT render the cached `idle.scene` singleton directly: it's shared
+  // across the whole app, so when the <Canvas> remounts (the WebGL
+  // context-lost recovery in Game.tsx bumps its key), the singleton detaches
+  // from the dead tree and Leonard silently vanishes. A fresh clone per mount
+  // owns its own object and survives remounts. Clip tracks bind by bone name,
+  // which the clone preserves, so animation is unaffected.
+  const playerScene = useMemo(() => cloneSkinned(idle.scene), [idle.scene])
 
   // Build a combined animations list. Mixamo's raw clip names are "mixamo.com"
   // or "Take 001" — both useless. Pick the non-empty clip from each file and
@@ -328,10 +338,11 @@ export function Player() {
           the character face +Z instead of Mixamo's default -Z. */}
       <group rotation={[0, Math.PI, 0]} scale={0.01}>
         <group ref={animRef}>
-          {/* Mount Player_Idle.glb's scene — this is what's rendered. The
-              mesh is skinned to the unsuffixed bones in this scene; Walk
-              clip's tracks (from Walking.glb) target those same names. */}
-          <primitive object={idle.scene} />
+          {/* Mount a per-mount CLONE of Player_Idle.glb's scene (not the shared
+              cached singleton — see playerScene above). The mesh is skinned to
+              the unsuffixed bones; Walk clip's tracks (from Walking.glb) target
+              those same names, preserved by the clone. */}
+          <primitive object={playerScene} />
         </group>
       </group>
     </group>

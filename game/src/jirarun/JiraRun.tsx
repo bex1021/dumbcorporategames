@@ -18,6 +18,7 @@ import { DesktopBoot } from './DesktopBoot'
 import { markBeaten } from '../state/progress'
 import { audio } from '../audio/AudioManager'
 import { jiraMusic } from './jiraMusic'
+import { JR_ACHIEVEMENTS_CATALOG, saveJRUnlocked, type JRAchievementMeta } from '../content/jrAchievements'
 
 // Phase 2 opens on Leonard's desktop (the "lock in at your desk" beat), then
 // the runner. 'desktop' replaces the old standalone intro screen.
@@ -406,20 +407,24 @@ const totalDodged = (r: RunResult) => {
   const d = r.dodged
   return d ? d.slack + d.worms + d.invites + d.walls : 0
 }
-type JRAchv = { id: string; emoji: string; title: string; desc: string; earned: (r: RunResult) => boolean }
-// Thematic, witty achievements — "Aligned but Hated" energy.
-const JR_ACHIEVEMENTS: JRAchv[] = [
-  { id: 'shipped', emoji: '🏁', title: 'Technically Shipped', desc: 'All four tickets updated. The board is, briefly, green.', earned: () => true },
-  { id: 'novalue', emoji: '💸', title: '$0.00 of Value', desc: 'Maximum velocity, zero business value. Textbook.', earned: () => true },
-  { id: 'flow', emoji: '🌊', title: 'Sixty Minutes of Flow', desc: 'One full hour, uninterrupted. A workplace miracle.', earned: () => true },
-  { id: 'dnd', emoji: '🔕', title: 'Do Not Disturb', desc: 'Dodged 12+ Slack pings. “Got a sec?” — no.', earned: (r) => (r.dodged?.slack ?? 0) >= 12 },
-  { id: 'lurker', emoji: '🧘', title: 'Inbox Zero (Spiritually)', desc: 'Ignored 16+ pings into the void. Near-total Slack denial.', earned: (r) => (r.dodged?.slack ?? 0) >= 16 },
-  { id: 'worms', emoji: '🪱', title: 'Worms Stay Canned', desc: 'Left 16+ cans of worms sealed. Scope uncrept, against the odds.', earned: (r) => (r.dodged?.worms ?? 0) >= 16 },
-  { id: 'declined', emoji: '📅', title: 'Declined With Body', desc: 'Slid under 17+ meeting invites. The calendar bows to you.', earned: (r) => (r.dodged?.invites ?? 0) >= 17 },
-  { id: 'unblock', emoji: '🚧', title: 'Unblockable', desc: 'Weaved past 24+ dependency walls. Still technically blocked.', earned: (r) => (r.dodged?.walls ?? 0) >= 24 },
-  { id: 'ninja', emoji: '🥷', title: 'Untouchable', desc: 'Survived 75+ distractions in one hour — a maximally cursed day, cleared.', earned: (r) => totalDodged(r) >= 75 },
-  { id: 'hoarder', emoji: '⭐', title: 'Story-Point Hoarder', desc: 'Banked 10,000+ story points. Worth, as ever, $0.00.', earned: (r) => r.score >= 10000 },
-]
+type JRAchv = JRAchievementMeta & { earned: (r: RunResult) => boolean }
+// Earned-conditions keyed by id. The badge METADATA (emoji/title/desc) lives in
+// the shared catalog (content/jrAchievements.ts) so the level-select menu can
+// list these without importing the heavy runner; here we just attach the
+// per-run predicate to each catalog entry.
+const JR_EARNED: Record<string, (r: RunResult) => boolean> = {
+  shipped: () => true,
+  novalue: () => true,
+  flow: () => true,
+  dnd: (r) => (r.dodged?.slack ?? 0) >= 12,
+  lurker: (r) => (r.dodged?.slack ?? 0) >= 16,
+  worms: (r) => (r.dodged?.worms ?? 0) >= 16,
+  declined: (r) => (r.dodged?.invites ?? 0) >= 17,
+  unblock: (r) => (r.dodged?.walls ?? 0) >= 24,
+  ninja: (r) => totalDodged(r) >= 75,
+  hoarder: (r) => r.score >= 10000,
+}
+const JR_ACHIEVEMENTS: JRAchv[] = JR_ACHIEVEMENTS_CATALOG.map((a) => ({ ...a, earned: JR_EARNED[a.id] }))
 
 function JiraRunNav() {
   return (
@@ -456,6 +461,8 @@ function WinScreen({ result, onDesktop }: { result: RunResult; onDesktop: () => 
   const popOrder = new Map(earned.map((a, i) => [a.id, i]))
   // achievement fanfare: a chord-ding per earned card, then a TA-DA finale
   useEffect(() => {
+    // persist what was earned this win so the level-select menu can show it
+    saveJRUnlocked(earned.map((a) => a.id))
     const pops = earned.map((_, i) => setTimeout(() => audio.playAchievementPop(i), i * POP_STAGGER_MS))
     const fan = setTimeout(() => audio.playAchievementFanfare(), (earned.length - 1) * POP_STAGGER_MS + 550)
     return () => { pops.forEach(clearTimeout); clearTimeout(fan) }

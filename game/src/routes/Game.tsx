@@ -9,6 +9,7 @@ import { Lights } from '../scene/Lights'
 import { ProximityDetector } from '../scene/ProximityDetector'
 import { CAMERA, PLAYER } from '../config/constants'
 import { useGameStore } from '../state/gameStore'
+import { audio } from '../audio/AudioManager'
 import { useInteractKey } from '../hooks/useInteractKey'
 import { useSlackTicker } from '../hooks/useSlackTicker'
 import { HUD } from '../ui/HUD'
@@ -27,6 +28,27 @@ export default function Game() {
   const phase = useGameStore((s) => s.phase)
   useInteractKey()
   useSlackTicker()
+
+  // Phase 1 ambient music: the eerie corporate-calm bed plays only during
+  // gameplay — it eases in when the office is live and fades out on the
+  // standup/ending. A second effect stops it if we leave the route mid-run
+  // (e.g. into Phase 2), so it never bleeds into the Jira Run chiptune.
+  useEffect(() => {
+    if (phase === 'playing') audio.startOfficeMusic()
+    else audio.stopOfficeMusic()
+  }, [phase])
+  useEffect(() => () => audio.stopOfficeMusic(), [])
+
+  // Sound on/off for Phase 1 (music + HVAC + pings), persisted. Applied even
+  // before the audio context exists — setMuted latches the flag, which start()
+  // honours when it spins up on the first intro gesture.
+  const [muted, setMuted] = useState(() => {
+    try { return localStorage.getItem('office-muted') === '1' } catch { return false }
+  })
+  useEffect(() => {
+    audio.setMuted(muted)
+    try { localStorage.setItem('office-muted', muted ? '1' : '0') } catch { /* ignore */ }
+  }, [muted])
 
   // Fresh entry into this route: the game store is a module-level singleton,
   // so SPA navigation keeps it alive between visits. If we arrive here with
@@ -142,6 +164,17 @@ export default function Game() {
 
       {/* Exit run button (top-center) — visible only during playing */}
       <ExitButton />
+
+      {/* Sound on/off (bottom-right) — music + HVAC + pings */}
+      {phase === 'playing' && (
+        <button
+          onClick={() => setMuted((m) => !m)}
+          title={muted ? 'Unmute sound' : 'Mute sound'}
+          className="pointer-events-auto fixed bottom-4 right-4 z-30 px-3 py-1.5 rounded text-[13px] bg-ink-900/85 hover:bg-ink-900 border border-beige-300/30 text-beige-300 backdrop-blur-sm transition"
+        >
+          {muted ? '🔇' : '🔊'}
+        </button>
+      )}
 
       {/* Ending screen overlay */}
       <EndingScreen />

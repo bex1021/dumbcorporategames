@@ -178,27 +178,14 @@ function SlackDMScreen({ onDismiss }: { onDismiss: () => void }) {
                     <span className="text-[#abadb1] text-[11px]">8:58 AM</span>
                   </div>
                   <div className="text-[#d1d2d3] text-[14px] leading-relaxed space-y-2">
-                    <p>
-                      Hey 👋 wanted to touch base on the Customer Happiness
-                      vertical before standup.
-                    </p>
-                    <p>
-                      Need ownership clarity around our end-state. Quick favor
-                      — circle up with the stakeholders, drive alignment,
-                      surface any blockers (or lack thereof). Big morning
-                      ahead.
-                    </p>
-                    <p>
-                      Really leaning into impact this quarter. Looking forward
-                      to seeing some leadership presence in the standup
-                      conversation. Let&apos;s make sure we&apos;re all rowing
-                      in the same direction on this.
-                    </p>
-                    <p className="text-[#f4b800]">
-                      PS — status must remain{' '}
-                      <span className="font-bold text-[#2ebb77]">GREEN</span>.
-                      This is non-negotiable. Thx!
-                    </p>
+                    <p>Hey 👋 standup&apos;s at 10:15. Before then, three quick things:</p>
+                    <ul className="space-y-0.5 pl-1">
+                      <li>• Sync 1:1 with all 5 stakeholders.</li>
+                      <li>• Surface — and clear — any blockers.</li>
+                      <li>• Keep project status <span className="font-bold text-[#2ebb77]">GREEN</span>.</li>
+                    </ul>
+                    <p>There are no blockers, to be clear. Please confirm there are no blockers.</p>
+                    <p className="text-[#f4b800]">Non-negotiable. Thx! 🙏</p>
                   </div>
                 </div>
               </div>
@@ -332,97 +319,31 @@ function JiraEpicScreen({ onStart }: { onStart: () => void }) {
       {/* Single-column centered body */}
       <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-4">
         <div className="max-w-2xl mx-auto flex flex-col gap-3 pt-1">
-          {/* Description + Today's mission card */}
+          {/* Mission card — the only thing you actually need to know */}
           <div className="bg-white border border-[#dfe1e6] rounded p-4 text-[13px] leading-snug">
-            <div className="text-[10px] uppercase tracking-widest text-[#5e6c84] mb-1">
-              Description
+            <div className="flex items-baseline gap-2 mb-1.5 flex-wrap">
+              <span className="text-[9px] uppercase tracking-widest text-[#5e6c84]">Phase 1 of 3</span>
+              <span className="text-[14px] font-semibold text-[#172b4d]">Pre-Standup Alignment</span>
             </div>
-            <p className="mb-1.5">
-              The Refresh is a strategic enabler for the Customer Happiness
-              vertical. Mission-critical. ~80% defined.
+            <p className="text-[#42526e]">
+              Sync all 5 stakeholders before the 10:15 standup. Don&apos;t walk in with surprises.
+              Don&apos;t walk in with the truth, either. Find the third option.
             </p>
-            <p>
-              <span className="font-semibold text-[#006644]">
-                It must remain Green.
-              </span>{' '}
-              There are no plans to make it not-Green. Plans to make it
-              not-Green would themselves not be Green.
-            </p>
-
-            <div className="mt-3 pt-3 border-t border-[#f4f5f7]">
-              <div className="flex items-baseline gap-2 mb-1 flex-wrap">
-                <span className="text-[9px] uppercase tracking-widest text-[#5e6c84]">
-                  Today&apos;s mission · Phase 1 of 3
-                </span>
-                <span className="text-[14px] font-semibold text-[#172b4d]">
-                  Pre-Standup Alignment
-                </span>
-              </div>
-              <p className="text-[#42526e]">
-                Sync with each stakeholder before the 10:15 AM standup. You
-                can&apos;t enter with surprises. You also can&apos;t enter
-                with the actual truth. Find a third option.
-              </p>
-              <div className="mt-2 px-2.5 py-1.5 rounded bg-[#e3fcef] border border-[#abf5d1] text-[12px] flex items-start gap-2">
-                <span className="leading-none mt-0.5 text-[#006644]">◎</span>
-                <div className="text-[#172b4d]">
-                  <span className="text-[#006644] font-semibold">Goal:</span>{' '}
-                  Talk to all 5 stakeholders. Keep your meters out of red.
-                </div>
+            <div className="mt-2 px-2.5 py-1.5 rounded bg-[#e3fcef] border border-[#abf5d1] text-[12px] flex items-start gap-2">
+              <span className="leading-none mt-0.5 text-[#006644]">◎</span>
+              <div className="text-[#172b4d]">
+                <span className="text-[#006644] font-semibold">Goal:</span>{' '}
+                Talk to all 5. Keep your meters out of the red.
               </div>
             </div>
           </div>
 
-          {/* Details — compact horizontal strip with the essentials */}
-          <div className="bg-white border border-[#dfe1e6] rounded p-3">
-            <div className="text-[10px] uppercase tracking-widest text-[#5e6c84] mb-1.5">
-              Details
-            </div>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[12px]">
-              <DetailRow label="Assignee">
-                <Avatar text="LC" color="#0052cc" />
-                <span>Leonard Chen</span>
-              </DetailRow>
-              <DetailRow label="Reporter">
-                <Avatar text="E" color="#4a154b" />
-                <span>Exec</span>
-              </DetailRow>
-              <DetailRow label="Sprint">Sprint 47</DetailRow>
-              <DetailRow label="Target ship">EOD today</DetailRow>
-            </div>
-          </div>
-
-          {/* Controls quick-reference */}
-          <div className="bg-white border border-[#dfe1e6] rounded p-3">
-            <div className="text-[10px] uppercase tracking-widest text-[#5e6c84] mb-1.5">
-              Controls
-            </div>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[12px] font-mono">
-              <div>
-                <span className="text-[#5e6c84]">↑ ↓</span>
-                <span className="text-[#172b4d] ml-2">walk fwd / back</span>
-              </div>
-              <div>
-                <span className="text-[#5e6c84]">← →</span>
-                <span className="text-[#172b4d] ml-2">turn</span>
-              </div>
-              <div>
-                <span className="text-[#5e6c84]">E</span>
-                <span className="text-[#172b4d] ml-3">talk / interact</span>
-              </div>
-              <div>
-                <span className="text-[#5e6c84]">1–4</span>
-                <span className="text-[#172b4d] ml-2">pick dialogue</span>
-              </div>
-              <div>
-                <span className="text-[#5e6c84]">Esc</span>
-                <span className="text-[#172b4d] ml-2">close dialog</span>
-              </div>
-              <div>
-                <span className="text-[#5e6c84]">Enter</span>
-                <span className="text-[#172b4d] ml-2">continue</span>
-              </div>
-            </div>
+          {/* Controls — one compact line */}
+          <div className="bg-white border border-[#dfe1e6] rounded px-3 py-2 text-[12px] font-mono text-[#42526e] flex flex-wrap gap-x-4 gap-y-1">
+            <span><span className="text-[#5e6c84]">↑↓</span> move</span>
+            <span><span className="text-[#5e6c84]">←→</span> turn</span>
+            <span><span className="text-[#5e6c84]">E</span> talk</span>
+            <span><span className="text-[#5e6c84]">1–4</span> choose</span>
           </div>
 
           {/* CTA */}
@@ -493,23 +414,4 @@ function StatusPill({ label, tone }: { label: string; tone: StatusTone }) {
   )
 }
 
-function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-center py-1.5 border-b border-[#f4f5f7] last:border-b-0">
-      <div className="w-28 text-[#5e6c84] text-[12px]">{label}</div>
-      <div className="flex-1 text-[#172b4d] flex items-center gap-2">{children}</div>
-    </div>
-  )
-}
-
-function Avatar({ text, color }: { text: string; color: string }) {
-  return (
-    <span
-      className="w-5 h-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center"
-      style={{ backgroundColor: color }}
-    >
-      {text}
-    </span>
-  )
-}
 

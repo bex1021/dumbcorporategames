@@ -13,6 +13,7 @@ import { Suspense, lazy } from 'react'
 import Landing from './routes/Landing'
 import Blocked from './routes/Blocked'
 import Play from './routes/Play'
+import MusicLab from './routes/MusicLab'
 
 const Game = lazy(() => import('./routes/Game'))
 // Phase 2 — Jira Run (8-bit endless runner). Lazy so its R3F chunk only
@@ -25,6 +26,7 @@ export default function App() {
       <Routes>
         <Route path="/"            element={<Landing />} />
         <Route path="/play"        element={<Play />} />
+        <Route path="/play/music"  element={<MusicLab />} />
         <Route path="/blocked"     element={<Blocked />} />
         <Route
           path="/play/blocked"

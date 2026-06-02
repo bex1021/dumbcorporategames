@@ -9,6 +9,8 @@
 // AudioBufferSourceNode — these are cheap and can overlap freely, so we
 // don't rate-limit at the audio layer.
 
+import { OfficeMusic } from './OfficeMusic'
+
 type SoundCue =
   | 'slack'
   | 'gmail'
@@ -51,6 +53,9 @@ class AudioManager {
   // Cached white-noise buffer for footstep synthesis. Generated once on first
   // playFootstep() call and reused — cheaper than creating a new buffer per step.
   private footstepBuffer: AudioBuffer | null = null
+  // Phase 1 ambient music bed (eerie corporate calm). Created once the ctx
+  // exists; started/stopped by the office gameplay lifecycle.
+  private officeMusic: OfficeMusic | null = null
 
   /** Must be called from a user gesture (click, key) — browser autoplay rules. */
   start() {
@@ -58,6 +63,7 @@ class AudioManager {
     try {
       this.ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
       this.startHvac()
+      this.officeMusic = new OfficeMusic(this.ctx, this.muted)
       this.started = true
       // Kick off async sample loads. Don't await — first ping might fall
       // back to synth if it fires before the network completes, that's OK.
@@ -696,6 +702,16 @@ class AudioManager {
     osc.stop(ctx.currentTime + dur + 0.05)
   }
 
+  /** Start the Phase 1 eerie-ambient bed (called when office gameplay begins). */
+  startOfficeMusic() {
+    this.officeMusic?.start()
+  }
+
+  /** Fade out + stop the ambient bed (standup/ending, or leaving Phase 1). */
+  stopOfficeMusic() {
+    this.officeMusic?.stop()
+  }
+
   setMuted(muted: boolean) {
     this.muted = muted
     if (this.ctx && this.hvacGain) {
@@ -704,6 +720,7 @@ class AudioManager {
         this.ctx.currentTime + 0.1
       )
     }
+    this.officeMusic?.setMuted(muted)
   }
 
   isStarted() {

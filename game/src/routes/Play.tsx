@@ -1,15 +1,16 @@
 // src/routes/Play.tsx — the campaign hub / level select (/play)
 //
-// Framed as a corporate "onboarding path": a linear ladder of phases the
-// player works through. Each phase unlocks only when the previous one is
-// beaten (a winning ending) — gating read from state/progress.ts, which the
-// two games write to on a win. Cleared phases can be replayed freely.
+// An in-game "Alignly" screen (jira-board *inspired*, not the marketing site):
+// a left-to-right PROGRESSION track — completed phases on the left, the one
+// you're on next, then what's locked ahead, like a game's level path — plus a
+// showcase of every achievement collected across both games.
 //
-// Reached from the studio site's primary PLAY button and from each game's
-// win/lose screen ("← Level select").
+// Level cards are intentionally light placeholders for now; the per-phase
+// detail can be filled in later. The linear unlock gating and the "keep what's
+// next a surprise" reveal (only the opener + cleared phases show their name)
+// are unchanged from before.
 
 import { Link } from 'react-router-dom'
-import { PageScroll, Nav, Footer, BR, brFont, brMono, useIsMobile, type NavLink } from '../brutalist'
 import {
   CAMPAIGN,
   loadBeaten,
@@ -18,282 +19,221 @@ import {
   type CampaignPhase,
   type PhaseId,
 } from '../state/progress'
+import { ACHIEVEMENTS, loadUnlocked } from '../content/achievements'
+import { JR_ACHIEVEMENTS_CATALOG, loadJRUnlocked } from '../content/jrAchievements'
 
-const NAV_LINKS: NavLink[] = [
-  { label: 'STUDIO', href: '/' },
-  { label: 'BLOCKED', href: '/blocked' },
-  { label: 'CONTACT', href: 'mailto:hello@dumbcorporategames.com' },
-]
+type Tone = 'cleared' | 'current' | 'locked' | 'soon'
 
-export default function Play() {
-  // Client-only SPA — no SSR — so reading localStorage at first render is
-  // safe and avoids a locked→unlocked flash. Fresh read on every mount means
-  // arriving here right after a win shows the newly-unlocked phase.
-  const beaten = loadBeaten()
-  const clearedCount = CAMPAIGN.filter((p) => beaten.has(p.id)).length
-  const isMobile = useIsMobile()
-
-  return (
-    <PageScroll>
-      <Nav links={NAV_LINKS} badge={<>● {clearedCount}/{CAMPAIGN.length} PHASES CLEARED</>} />
-
-      {/* Header */}
-      <section style={{ borderBottom: `4px solid ${BR.ink}` }}>
-        <div
-          style={{
-            padding: isMobile ? '24px 20px 18px' : '34px 32px 26px',
-            display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : '1fr auto',
-            gap: isMobile ? 14 : 32,
-            alignItems: 'end',
-          }}
-        >
-          <div>
-            <div
-              style={{
-                fontFamily: brMono, fontSize: 11, color: BR.muted,
-                textTransform: 'uppercase', letterSpacing: '0.16em', marginBottom: 10,
-              }}
-            >
-              <span style={{ color: BR.accent, marginRight: 8 }}>●</span>
-              CAMPAIGN · ONBOARDING PATH · COMPLETE IN ORDER
-            </div>
-            <h1
-              style={{
-                margin: 0, fontFamily: brFont, fontWeight: 900,
-                fontSize: 'clamp(44px, 7vw, 96px)',
-                lineHeight: 0.9, letterSpacing: '-0.04em', textTransform: 'uppercase',
-              }}
-            >
-              SELECT YOUR PHASE<span style={{ color: BR.accent }}>.</span>
-            </h1>
-          </div>
-          <div
-            style={{
-              fontFamily: brMono, fontSize: 11, color: BR.muted,
-              textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: isMobile ? 'left' : 'right',
-              maxWidth: 320, lineHeight: 1.6,
-            }}
-          >
-            EACH PHASE IS ROUGHLY ONE MEETING LONG. CLEAR ONE TO UNLOCK THE NEXT. CLEARED PHASES CAN BE REPLAYED ANY TIME.
-          </div>
-        </div>
-      </section>
-
-      {/* Phase ladder */}
-      <section>
-        {CAMPAIGN.map((p) => (
-          <PhaseRow key={p.id} phase={p} beaten={beaten} isMobile={isMobile} />
-        ))}
-      </section>
-
-      {/* Footer note */}
-      <div
-        style={{
-          borderTop: `1px solid ${BR.ink}`,
-          padding: '18px 28px', background: BR.paper,
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          gap: 24, flexWrap: 'wrap',
-          fontFamily: brMono, fontSize: 11, color: BR.muted,
-          textTransform: 'uppercase', letterSpacing: '0.1em',
-        }}
-      >
-        <span>PROGRESS SAVES TO THIS BROWSER · NO ACCOUNT · CLEARING COOKIES RESETS THE LADDER</span>
-        <Link
-          to="/"
-          style={{
-            color: BR.ink, fontWeight: 700, textDecoration: 'none',
-            borderBottom: `2px solid ${BR.accent}`,
-          }}
-        >
-          ← BACK TO STUDIO
-        </Link>
-      </div>
-
-      <Footer />
-    </PageScroll>
-  )
+function toneOf(p: CampaignPhase, beaten: Set<PhaseId>): Tone {
+  if (beaten.has(p.id)) return 'cleared'
+  if (!isUnlocked(p, beaten)) return 'locked'
+  if (p.route === null) return 'soon'
+  return 'current'
 }
 
-// ─── A single rung on the ladder ────────────────────────────────────────────
-function PhaseRow({
-  phase, beaten, isMobile,
-}: {
-  phase: CampaignPhase
-  beaten: Set<PhaseId>
-  isMobile: boolean
-}) {
-  const unlocked = isUnlocked(phase, beaten)
-  const built = phase.route !== null
-  const cleared = beaten.has(phase.id)
-  const playable = unlocked && built
+export default function Play() {
+  // Client-only SPA — reading localStorage at first render is safe and shows a
+  // just-won phase/achievement immediately on return.
+  const beaten = loadBeaten()
+  const clearedCount = CAMPAIGN.filter((p) => beaten.has(p.id)).length
 
-  // Keep what's coming a surprise. Reveal a phase's real name, tagline,
-  // blurb and stats only once the player has CLEARED it — or for the
-  // always-open entry phase (the known front door, requires === null).
-  // Everything else shows a "classified" placeholder even after it unlocks,
-  // so the actual reveal happens when you step into the level.
-  const reveal = cleared || phase.requires === null
-  const displayTitle = reveal ? phase.title : '???'
-  const displaySub = reveal ? phase.sub : 'NEED-TO-KNOW BASIS'
-  const displayBlurb = reveal
-    ? phase.blurb
-    : "The studio does not pre-announce roadmap items. Clear the current phase to find out what's next."
-  const displayTags = reveal
-    ? [phase.minutes, phase.controls, 'BROWSER', 'FREE']
-    : ['BROWSER', 'FREE']
-
-  // Four visual tones. The "current" tone (unlocked, built, not yet cleared)
-  // is the orange-highlighted one drawing the eye to what to play next.
-  const tone: 'cleared' | 'current' | 'locked' | 'soon' = cleared
-    ? 'cleared'
-    : !unlocked
-      ? 'locked'
-      : !built
-        ? 'soon'
-        : 'current'
-
-  const C = {
-    cleared: { bg: BR.bg, fg: BR.ink, num: BR.green, badgeBg: BR.green, badgeFg: '#fff', badge: '✓ CLEARED' },
-    current: { bg: BR.ink, fg: BR.bg, num: BR.accent, badgeBg: BR.accent, badgeFg: '#000', badge: '● UNLOCKED' },
-    locked:  { bg: '#eeece7', fg: BR.dim, num: '#cdc7b8', badgeBg: '#dcd9d0', badgeFg: BR.muted, badge: '🔒 LOCKED' },
-    soon:    { bg: '#eeece7', fg: BR.dim, num: '#cdc7b8', badgeBg: '#dcd9d0', badgeFg: BR.muted, badge: '● IN DEVELOPMENT' },
-  }[tone]
+  const p1Earned = loadUnlocked()
+  const p2Earned = loadJRUnlocked()
+  const totalEarned = p1Earned.size + p2Earned.size
+  const totalAchv = ACHIEVEMENTS.length + JR_ACHIEVEMENTS_CATALOG.length
 
   return (
-    <div
-      style={{
-        borderBottom: `1px solid ${BR.ink}`,
-        background: C.bg, color: C.fg,
-        display: 'grid',
-        gridTemplateColumns: isMobile ? '1fr' : 'auto 1fr auto',
-        gap: isMobile ? 12 : 28,
-        alignItems: 'center',
-        padding: isMobile ? '22px 20px' : '26px 32px',
-      }}
-    >
-      {/* Big phase number */}
-      <div
-        style={{
-          fontFamily: brFont, fontWeight: 900,
-          fontSize: isMobile ? 56 : 86, lineHeight: 0.8,
-          letterSpacing: '-0.06em', color: C.num,
-          fontVariantNumeric: 'tabular-nums',
-        }}
-      >
-        {String(phase.n).padStart(2, '0')}
-      </div>
+    <div className="min-h-screen w-full bg-[#f4f5f7] text-[#172b4d] flex flex-col" style={{ fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif' }}>
+      {/* ── Alignly top bar (in-game, not the studio site) ── */}
+      <nav className="flex items-center justify-between px-4 sm:px-6 h-12 bg-white border-b border-[#dfe1e6] flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <span className="w-6 h-6 rounded-[5px] grid place-items-center text-white text-[13px] font-black" style={{ background: '#5e9a96' }}>A</span>
+          <span className="font-semibold text-[15px]">Alignly</span>
+          <span className="text-[#5e6c84] text-[13px] hidden sm:inline">· Career</span>
+        </div>
+        <div className="flex items-center gap-3 text-[#5e6c84]">
+          <span className="text-[12px] hidden sm:inline">Probity · Verve · Wit</span>
+          <span className="w-7 h-7 rounded-full grid place-items-center text-white text-[11px] font-bold" style={{ background: '#2a2f33' }}>LB</span>
+        </div>
+      </nav>
 
-      {/* Middle: label, title, blurb, tags */}
-      <div style={{ minWidth: 0 }}>
-        <div
-          style={{
-            display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
-            fontFamily: brMono, fontSize: 11, fontWeight: 700,
-            textTransform: 'uppercase', letterSpacing: '0.14em',
-            color: tone === 'current' ? BR.accent : tone === 'cleared' ? BR.green : BR.muted,
-          }}
-        >
-          <span>{phase.label}</span>
-          <StatusBadge bg={C.badgeBg} fg={C.badgeFg}>{C.badge}</StatusBadge>
-        </div>
-        <h2
-          style={{
-            margin: '8px 0 0', fontFamily: brFont, fontWeight: 900,
-            fontSize: isMobile ? 30 : 'clamp(30px, 3.4vw, 46px)',
-            lineHeight: 0.95, letterSpacing: '-0.03em', textTransform: 'uppercase',
-            color: tone === 'locked' || tone === 'soon' ? BR.dim : C.fg,
-          }}
-        >
-          {displayTitle}
-        </h2>
-        <div
-          style={{
-            marginTop: 6, fontFamily: brFont, fontWeight: 700, fontSize: 14,
-            letterSpacing: '0.04em', textTransform: 'uppercase',
-            color: tone === 'current' ? '#bbb' : BR.muted,
-          }}
-        >
-          {displaySub}
-        </div>
-        <p
-          style={{
-            margin: '12px 0 0', maxWidth: 640,
-            fontFamily: brFont, fontSize: 14, lineHeight: 1.55,
-            color: tone === 'current' ? '#ddd' : tone === 'cleared' ? '#333' : BR.muted,
-          }}
-        >
-          {displayBlurb}
-        </p>
-        <div style={{ marginTop: 12, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {displayTags.map((t) => (
-            <span
-              key={t}
-              style={{
-                fontFamily: brMono, fontSize: 10, fontWeight: 700,
-                padding: '4px 8px', letterSpacing: '0.1em', textTransform: 'uppercase',
-                border: `1px solid ${tone === 'current' ? BR.bg : BR.ink}`,
-                color: tone === 'current' ? BR.bg : tone === 'locked' || tone === 'soon' ? BR.dim : BR.ink,
-                opacity: tone === 'locked' || tone === 'soon' ? 0.7 : 1,
-              }}
-            >
-              {t}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* Right: action */}
-      <div style={{ justifySelf: isMobile ? 'start' : 'end' }}>
-        {playable ? (
-          <Link
-            to={phase.route!}
-            style={{
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              minWidth: isMobile ? 0 : 168,
-              background: cleared ? BR.ink : BR.accent,
-              color: cleared ? BR.bg : '#000',
-              border: 'none', padding: '18px 28px',
-              fontFamily: brFont, fontWeight: 900, fontSize: 16,
-              textTransform: 'uppercase', letterSpacing: '0.04em',
-              textDecoration: 'none', cursor: 'pointer',
-            }}
-          >
-            {cleared ? '↻ REPLAY' : reveal ? '▶ PLAY' : '▶ PROCEED'}
-          </Link>
-        ) : (
-          <div
-            style={{
-              display: 'inline-flex', flexDirection: 'column', alignItems: isMobile ? 'flex-start' : 'flex-end',
-              gap: 4, color: BR.muted,
-              fontFamily: brMono, fontSize: 11, fontWeight: 700,
-              textTransform: 'uppercase', letterSpacing: '0.12em',
-            }}
-          >
-            <span style={{ fontSize: 22 }}>{tone === 'locked' ? '🔒' : '🛠'}</span>
-            <span style={{ maxWidth: 168, textAlign: isMobile ? 'left' : 'right', lineHeight: 1.4 }}>
-              {tone === 'locked' && phase.requires
-                ? `BEAT ${phaseLabel(phase.requires)} TO UNLOCK`
-                : 'COMING SOON'}
+      {/* ── Header ── */}
+      <div className="px-4 sm:px-6 pt-4 pb-3 flex-shrink-0">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-[12px] text-[#5e6c84]">Projects › Blocked › Career path</div>
+          <div className="flex items-end justify-between gap-3 flex-wrap mt-1">
+            <div>
+              <h1 className="text-[24px] font-semibold leading-tight">Your onboarding path</h1>
+              <p className="text-[13px] text-[#5e6c84] mt-0.5">Clear a phase to unlock the next. Cleared phases replay any time.</p>
+            </div>
+            <span className="px-2.5 py-1 rounded text-[11px] font-semibold uppercase tracking-wider" style={{ background: '#e3fcef', color: '#006644', border: '1px solid #abf5d1' }}>
+              {clearedCount} / {CAMPAIGN.length} phases shipped
             </span>
           </div>
-        )}
+        </div>
+      </div>
+
+      <div className="flex-1 px-4 sm:px-6 pb-8">
+        <div className="max-w-5xl mx-auto">
+          {/* ── PROGRESSION TRACK — done on the left → locked on the right ── */}
+          <div className="flex items-stretch overflow-x-auto pb-3 pt-1">
+            {CAMPAIGN.map((p, i) => {
+              const tone = toneOf(p, beaten)
+              return (
+                <div key={p.id} className="flex items-stretch">
+                  <PhaseNode phase={p} tone={tone} beaten={beaten} />
+                  {i < CAMPAIGN.length - 1 && <Connector done={beaten.has(p.id)} />}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* ── ACHIEVEMENTS SHOWCASE ── */}
+          <div className="mt-9">
+            <div className="flex items-baseline gap-3 mb-3">
+              <h2 className="text-[17px] font-semibold">Achievements</h2>
+              <span className="text-[12px] text-[#5e6c84]">{totalEarned} / {totalAchv} collected</span>
+            </div>
+            <AchvGroup
+              label="Pre-Standup Alignment"
+              items={ACHIEVEMENTS.map((a) => ({ id: a.id, emoji: a.emoji, title: a.title, earned: p1Earned.has(a.id) }))}
+            />
+            <div className="mt-5">
+              <AchvGroup
+                label="Jira Run"
+                items={JR_ACHIEVEMENTS_CATALOG.map((a) => ({ id: a.id, emoji: a.emoji, title: a.title, earned: p2Earned.has(a.id) }))}
+              />
+            </div>
+          </div>
+
+          <p className="mt-7 text-[11px] text-[#8993a4]">
+            Progress saves to this browser · no account · clearing cookies resets the path.
+          </p>
+        </div>
       </div>
     </div>
   )
 }
 
-function StatusBadge({ bg, fg, children }: { bg: string; fg: string; children: React.ReactNode }) {
-  return (
-    <span
-      style={{
-        display: 'inline-flex', alignItems: 'center',
-        background: bg, color: fg,
-        fontFamily: brMono, fontSize: 10, fontWeight: 700,
-        padding: '4px 9px', letterSpacing: '0.1em', textTransform: 'uppercase',
-      }}
+// ─── One node on the progression track (placeholder level card) ──────────────
+function PhaseNode({ phase, tone, beaten }: { phase: CampaignPhase; tone: Tone; beaten: Set<PhaseId> }) {
+  const reveal = beaten.has(phase.id) || phase.requires === null
+  const title = reveal ? phase.title : '???'
+  const playable = tone === 'cleared' || tone === 'current'
+  const dim = tone === 'locked' || tone === 'soon'
+  const accent = tone === 'cleared' ? '#36b37e' : tone === 'current' ? '#0052cc' : '#c1c7d0'
+
+  const card = (
+    <div
+      className={[
+        'w-[210px] flex-shrink-0 rounded-lg bg-white border p-4 flex flex-col items-center text-center transition',
+        playable ? 'hover:shadow-md cursor-pointer' : '',
+        dim ? 'opacity-90' : '',
+      ].join(' ')}
+      style={{ borderColor: tone === 'current' ? '#0052cc' : '#dfe1e6', borderWidth: tone === 'current' ? 2 : 1 }}
     >
-      {children}
+      {/* level chip */}
+      <div className="flex items-center justify-between w-full text-[11px] font-medium text-[#5e6c84]">
+        <span>ALGN-{phase.n}</span>
+        <StatusPill tone={tone} />
+      </div>
+
+      {/* big phase number / status medallion */}
+      <div
+        className="mt-3 w-16 h-16 rounded-full grid place-items-center text-[26px] font-black"
+        style={{ background: tone === 'cleared' ? '#e3fcef' : tone === 'current' ? '#deebff' : '#ebecf0', color: accent }}
+      >
+        {tone === 'cleared' ? '✓' : tone === 'locked' ? '🔒' : tone === 'soon' ? '🛠' : phase.n}
+      </div>
+
+      <div className={`mt-3 text-[15px] font-semibold leading-snug ${dim ? 'text-[#5e6c84]' : ''}`}>{title}</div>
+      <div className="text-[10px] uppercase tracking-wider text-[#8993a4] mt-0.5">{phase.label}</div>
+
+      {/* action */}
+      <div className="mt-3 w-full">
+        {tone === 'current' && (
+          <span className="block w-full py-1.5 rounded text-[13px] font-semibold text-white" style={{ background: '#0052cc' }}>
+            {reveal ? '▶ Play' : '▶ Proceed'}
+          </span>
+        )}
+        {tone === 'cleared' && (
+          <span className="block w-full py-1.5 rounded text-[13px] font-semibold border" style={{ borderColor: '#dfe1e6', color: '#0052cc' }}>
+            ↻ Replay
+          </span>
+        )}
+        {tone === 'locked' && (
+          <span className="block text-[11px] text-[#8993a4]">Beat {phase.requires ? phaseLabel(phase.requires) : ''} to unlock</span>
+        )}
+        {tone === 'soon' && <span className="block text-[11px] text-[#8993a4]">Coming soon</span>}
+      </div>
+    </div>
+  )
+
+  return playable && phase.route ? (
+    <Link to={phase.route} className="block no-underline text-inherit">{card}</Link>
+  ) : (
+    card
+  )
+}
+
+function Connector({ done }: { done: boolean }) {
+  return (
+    <div className="flex-shrink-0 self-center w-7 sm:w-10 flex items-center" aria-hidden>
+      <div
+        className="w-full h-[3px] rounded-full"
+        style={{ background: done ? '#36b37e' : '#c1c7d0', opacity: done ? 1 : 0.6 }}
+      />
+    </div>
+  )
+}
+
+function StatusPill({ tone }: { tone: Tone }) {
+  const map: Record<Tone, { label: string; bg: string; fg: string }> = {
+    cleared: { label: 'Done', bg: '#e3fcef', fg: '#006644' },
+    current: { label: 'Now', bg: '#deebff', fg: '#0747a6' },
+    locked: { label: 'Locked', bg: '#dfe1e6', fg: '#5e6c84' },
+    soon: { label: 'Backlog', bg: '#dfe1e6', fg: '#5e6c84' },
+  }
+  const s = map[tone]
+  return (
+    <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded" style={{ background: s.bg, color: s.fg }}>
+      {s.label}
     </span>
+  )
+}
+
+// ─── Achievement showcase group ──────────────────────────────────────────────
+type AchvItem = { id: string; emoji: string; title: string; earned: boolean }
+
+function AchvGroup({ label, items }: { label: string; items: AchvItem[] }) {
+  const earned = items.filter((a) => a.earned).length
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-[12px] font-semibold uppercase tracking-wider text-[#5e6c84]">{label}</span>
+        <span className="text-[11px] text-[#8993a4]">{earned}/{items.length}</span>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+        {items.map((a) => (
+          <div
+            key={a.id}
+            title={a.earned ? a.title : 'Locked — earn it in-game'}
+            className="rounded-lg border p-2.5 flex flex-col items-center text-center transition"
+            style={
+              a.earned
+                ? { background: '#fff7d6', borderColor: '#f5cd47' }
+                : { background: '#f4f5f7', borderColor: '#dfe1e6' }
+            }
+          >
+            <span className="text-[22px]" style={{ filter: a.earned ? 'none' : 'grayscale(1)', opacity: a.earned ? 1 : 0.45 }}>
+              {a.emoji}
+            </span>
+            <span className={`mt-1 text-[10px] leading-tight font-medium ${a.earned ? 'text-[#172b4d]' : 'text-[#8993a4]'}`}>
+              {a.earned ? a.title : 'Locked'}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }

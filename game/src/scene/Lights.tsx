@@ -39,12 +39,12 @@ const ROOM_LIGHTS: { x: number; y: number; z: number }[] = [
 export function Lights() {
   return (
     <>
-      <ambientLight intensity={0.95} color="#eef2f5" />
-      <hemisphereLight args={['#e2eaef', '#9aa7ad', 0.5]} />
+      <ambientLight intensity={0.97} color="#f4efe6" />
+      <hemisphereLight args={['#f0e9dc', '#a19c90', 0.5]} />
       <directionalLight
         position={[4, 8, -OFFICE.halfDepth]}
-        intensity={0.45}
-        color="#d6e4ec"
+        intensity={0.5}
+        color="#eadec6"
         castShadow
         // 1024 instead of 2048: cuts shadow VRAM 4× (16 MB → 4 MB) and
         // halves shadow-map render time per frame. The office is small
@@ -64,7 +64,7 @@ export function Lights() {
           key={`room-${i}`}
           position={[p.x, p.y, p.z]}
           intensity={0.4}
-          color="#e8eef2"
+          color="#f3e8d7"
           distance={14}
           decay={1.3}
         />
@@ -86,9 +86,9 @@ function CeilingPanel({ x, z }: { x: number; z: number }) {
       <mesh position={[x, PANEL_Y, z]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[PANEL_W, PANEL_D]} />
         <meshStandardMaterial
-          color="#ffffff"
-          emissive="#ffffff"
-          emissiveIntensity={1.4}
+          color="#fff9f0"
+          emissive="#fff7ea"
+          emissiveIntensity={1.35}
           side={2}
         />
       </mesh>
