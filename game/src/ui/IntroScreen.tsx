@@ -340,8 +340,8 @@ function JiraEpicScreen({ onStart }: { onStart: () => void }) {
 
           {/* Controls — one compact line */}
           <div className="bg-white border border-[#dfe1e6] rounded px-3 py-2 text-[12px] font-mono text-[#42526e] flex flex-wrap gap-x-4 gap-y-1">
-            <span><span className="text-[#5e6c84]">↑↓</span> move</span>
-            <span><span className="text-[#5e6c84]">←→</span> turn</span>
+            <span><span className="text-[#5e6c84]">W S</span> move</span>
+            <span><span className="text-[#5e6c84]">A D</span> turn</span>
             <span><span className="text-[#5e6c84]">E</span> talk</span>
             <span><span className="text-[#5e6c84]">1–4</span> choose</span>
           </div>

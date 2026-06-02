@@ -61,6 +61,9 @@ export type Obstacle = {
   // Cosmetic only (boards): which update # this gate deposits (1..4), so the
   // gate can read "TICKET N UPDATED". Has no effect on collision/difficulty.
   updateNo?: number
+  // Cosmetic: the sprint this obstacle spawned in. The renderer shows tutorial
+  // action prompts (JUMP / SLIDE / DODGE) over Sprint-1 obstacles only.
+  level?: number
 }
 
 // How you clear each kind:
@@ -127,10 +130,11 @@ export function makeRow(level: number, rand: () => number, prevForcedFull = fals
   // is fatal from the start. Level 1 stays gentle otherwise; later levels add
   // full-width forced jumps/slides, two-lane squeezes, and more walls.
   if (level <= 1) {
-    if (r < 0.26) return [{ kind: 'block', lanes: [pickLane(rand)] }]
-    if (r < 0.48) return [{ kind: 'gap', lanes: [pickLane(rand)] }]
-    if (r < 0.66) return [{ kind: 'overhang', lanes: [pickLane(rand)] }]
-    if (r < 0.85) return [{ kind: 'wall', lanes: wallLanes(rand) }] // MUST switch lanes
+    if (r < 0.22) return [{ kind: 'block', lanes: [pickLane(rand)] }]
+    if (r < 0.40) return [{ kind: 'gap', lanes: [pickLane(rand)] }]
+    if (r < 0.56) return [{ kind: 'overhang', lanes: [pickLane(rand)] }] // single-lane banner — sweeps; dodge OR slide
+    if (r < 0.70) return forced('overhang') // the BIG full-width banner — can't dodge, you MUST slide (teaches the slide)
+    if (r < 0.88) return [{ kind: 'wall', lanes: wallLanes(rand) }] // MUST switch lanes
     return [{ kind: 'block', lanes: twoLanes(rand) }] // dodge to the open lane
   }
 
@@ -183,8 +187,13 @@ export function speedForLevel(level: number): number {
 // get faster. (Without this, the first obstacle of a new sprint can land <1s
 // after the gate, which felt like an instant forced jump.)
 export const SPRINT_GRACE_SECONDS = 3.6
+// Sprint 1 gets a longer empty opening (the tutorial breather) so the player
+// can read the controls + the first action prompt before any hazard arrives.
+// Pure runway (initial nextSpawnZ) — no RNG draws, so the obstacle layout is
+// unchanged, just pushed further down the track.
+export const INTRO_GRACE_SECONDS = 7
 export function runwayForLevel(level: number): number {
-  return speedForLevel(level) * SPRINT_GRACE_SECONDS
+  return speedForLevel(level) * (level === 1 ? INTRO_GRACE_SECONDS : SPRINT_GRACE_SECONDS)
 }
 
 // ---- 8-bit Atlassian palette ----

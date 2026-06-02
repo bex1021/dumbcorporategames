@@ -166,6 +166,14 @@ export default function JiraRun() {
       {phase !== 'desktop' && <CRTOverlay />}
 
       {phase === 'running' && <HUD hud={hud} />}
+      {/* Sprint-1 controls legend (the tutorial) — auto-hides once you reach Sprint 2 */}
+      {phase === 'running' && !paused && hud.level === 1 && (
+        <div className="pointer-events-none fixed bottom-3 left-1/2 -translate-x-1/2 z-40 px-4 py-1.5 rounded-md text-[12px] font-mono uppercase tracking-wide bg-black/45 text-white/85 backdrop-blur flex gap-4">
+          <span><span className="text-[#36b37e]">W</span>/Space jump</span>
+          <span><span className="text-[#ff7a45]">S</span> slide</span>
+          <span><span className="text-[#a08bff]">A D</span> move</span>
+        </div>
+      )}
       {/* Sound toggle — always reachable during a run (even while paused) */}
       {phase === 'running' && (
         <button

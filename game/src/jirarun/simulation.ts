@@ -114,7 +114,7 @@ export class Sim {
     let occupied: number[] = []
     this.lastRowOverhangLane = null
     for (const o of row) {
-      s.obstacles.push({ id: s.nextId++, z: s.nextSpawnZ, kind: o.kind, lanes: o.lanes })
+      s.obstacles.push({ id: s.nextId++, z: s.nextSpawnZ, kind: o.kind, lanes: o.lanes, level: s.level })
       if (o.lanes === 'full') occupied = [0, 1, 2]
       else occupied = occupied.concat(o.lanes)
       // remember a single-lane slide so the coin trail can lead under it

@@ -93,7 +93,7 @@ export function InteractPrompt() {
         )
       ) : (
         <div className="bg-ink-900/65 backdrop-blur-sm px-4 py-2 rounded text-beige-300 font-mono text-xs tracking-wider">
-          ↑ forward · ↓ back · ← → turn · approach an NPC to interact
+          W / S move · A / D turn · E to interact with an NPC
         </div>
       )}
     </div>

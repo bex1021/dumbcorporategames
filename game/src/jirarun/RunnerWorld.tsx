@@ -153,6 +153,35 @@ function labelTexture(text: string): THREE.Texture {
   return _labelTex[text]
 }
 
+// ---- Sprint-1 tutorial action prompts (float above each obstacle) ----
+type HintAction = 'jump' | 'slide' | 'move'
+function hintActionFor(kind: ObstacleKind): HintAction | null {
+  if (kind === 'block' || kind === 'gap') return 'jump'
+  if (kind === 'overhang') return 'slide'
+  if (kind === 'wall') return 'move'
+  return null // boards get no prompt
+}
+const HINT_STYLE: Record<HintAction, { text: string; bg: string }> = {
+  jump: { text: 'W — JUMP', bg: '#1f9d57' },
+  slide: { text: 'S — SLIDE', bg: '#e8590c' },
+  move: { text: 'A / D — MOVE', bg: '#6f4fd8' },
+}
+function drawHint(ctx: CanvasRenderingContext2D, action: HintAction) {
+  const W = 512, H = 128
+  ctx.clearRect(0, 0, W, H)
+  const s = HINT_STYLE[action]
+  ctx.fillStyle = s.bg; ctx.fillRect(20, 30, W - 40, 68)
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 5; ctx.strokeRect(20, 30, W - 40, 68)
+  ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  ctx.font = 'bold 52px "IBM Plex Mono", ui-monospace, monospace'
+  ctx.fillText(s.text, W / 2, 65)
+}
+const _hintTex: Partial<Record<HintAction, THREE.Texture>> = {}
+function hintTexture(action: HintAction): THREE.Texture {
+  if (!_hintTex[action]) _hintTex[action] = makeTex(512, 128, (ctx) => drawHint(ctx, action))
+  return _hintTex[action]!
+}
+
 // ---- Slack messages (the "got a sec? / quick sync" jump-blocks) ----
 type SlackMsg = { from: string; color: string; text: string; time: string }
 const SLACK_MSGS: SlackMsg[] = [
@@ -1857,11 +1886,15 @@ function ObstacleMesh({ obstacle }: { obstacle: Obstacle }) {
     obstacle.lanes === 'full' ? [0] : obstacle.lanes.map((l) => LANES[l])
   const full = obstacle.lanes === 'full'
   const moving = isMovingOverhang(obstacle) // single-lane "calendar invite" banner that sweeps the lanes
+  // Sprint-1 tutorial: a floating JUMP / SLIDE / DODGE prompt over each obstacle.
+  const hintAction = obstacle.level === 1 ? hintActionFor(obstacle.kind) : null
+  const hintX = full ? 0 : laneXs[0]
 
   // Slack notifications POP UP as they come into range (like a ping appearing),
   // scaling in with a little overshoot. Other obstacles are unaffected.
   const grpRef = useRef<THREE.Group>(null)
   const sweepRef = useRef<THREE.Group>(null) // carries the live lateral sweep of a moving banner
+  const hintRef = useRef<THREE.Group>(null) // bobs the tutorial prompt
   const pop = useRef({ started: false, t: 0 })
   const isSlack = obstacle.kind === 'block'
   useFrame((_, dt) => {
@@ -1876,7 +1909,14 @@ function ObstacleMesh({ obstacle }: { obstacle: Obstacle }) {
     // The banner physically slides across the lanes — exactly tracking the
     // collision position (a pure fn of Leonard's z), so dodging it actually
     // matters. runnerAnim.z is refreshed earlier this frame by the main loop.
-    if (moving && sweepRef.current) sweepRef.current.position.x = bannerSweepX(obstacle, runnerAnim.z)
+    if (moving) {
+      const bx = bannerSweepX(obstacle, runnerAnim.z)
+      if (sweepRef.current) sweepRef.current.position.x = bx
+      // the SLIDE prompt rides along with the banner so it's clearly pointing at
+      // the moving thing you need to slide under, not parked off to the side.
+      if (hintRef.current) hintRef.current.position.x = bx
+    }
+    if (hintRef.current) hintRef.current.position.y = 4.3 + Math.sin(runnerAnim.z * 0.35 + obstacle.id) * 0.13 // gentle bob
   })
 
   return (
@@ -1891,6 +1931,11 @@ function ObstacleMesh({ obstacle }: { obstacle: Obstacle }) {
           // first piece only, so multi-lane hazards don't repeat it twice.
           <ObstaclePiece key={i} kind={obstacle.kind} x={full ? 0 : x} full={full} seedId={obstacle.id} face={i === 0} updateNo={obstacle.updateNo ?? 1} />
         ))
+      )}
+      {hintAction && (
+        <group ref={hintRef} position={[hintX, 4.3, 0]}>
+          <SignPlane tex={hintTexture(hintAction)} position={[0, 0, 0]} scale={[3.0, 0.75]} />
+        </group>
       )}
     </group>
   )

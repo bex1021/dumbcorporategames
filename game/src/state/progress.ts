@@ -52,7 +52,7 @@ export const CAMPAIGN: CampaignPhase[] = [
     route: '/play/jira-run',
     requires: 'phase1',
     minutes: '2–4 MIN',
-    controls: '← → ↑ ↓',
+    controls: 'WASD',
   },
   {
     id: 'phase3',
