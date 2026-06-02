@@ -136,7 +136,7 @@ export class Sim {
       ? open[Math.floor(this.rng() * open.length)]
       : Math.floor(this.rng() * 3)
     const diagonal = this.rng() < 0.3
-    // SLIDE LURE: if this row is a single-lane "duck under" overhang, run the
+    // SLIDE LURE: if this row is a single-lane "slide under" overhang, run the
     // coin trail straight THROUGH that lane — leading up to AND past the bar —
     // so chasing the coins makes you slide under it.
     if (this.lastRowOverhangLane !== null) {

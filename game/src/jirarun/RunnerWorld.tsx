@@ -17,9 +17,11 @@ import { Sim, multForCombo, type DeathCause } from './simulation'
 const LEONARD_URL = '/models/Player_Idle.glb' // hosts the mesh we render
 const RUN_URL = '/models/Player_run.glb' // real Mixamo running clip (anim-only, ~73KB)
 const JUMP_URL = '/models/Player_jump.glb' // real Mixamo running-jump clip (anim-only)
+const SLIDE_URL = '/models/Player_slide.glb' // real Mixamo running-slide clip (anim-only)
 useGLTF.preload(LEONARD_URL)
 useGLTF.preload(RUN_URL)
 useGLTF.preload(JUMP_URL)
+useGLTF.preload(SLIDE_URL)
 // Real run clip now — slight speed-up so the stride cadence reads at game
 // pace (we drive forward motion ourselves; this is purely cosmetic tempo).
 const RUN_TIMESCALE = 1.2
@@ -27,7 +29,7 @@ const RUN_TIMESCALE = 1.2
 // Shared jump signal: the game loop sets this each frame from grounded
 // state; LeonardModel reads it to crossfade Run ↔ Jump. Module-level mutable
 // (same pattern as playerState) so we don't thread props through Suspense.
-const runnerAnim = { jumping: false, z: 0 }
+const runnerAnim = { jumping: false, sliding: false, z: 0 }
 
 // ─────────────────────────────────────────────────────────────────────────
 // 8-bit corporate hellscape — COSMETIC backdrop + obstacle labels only.
@@ -941,7 +943,7 @@ export function RunnerWorld({ running, start, onHud, onDeposit, onToken, onCheck
     }
     // Drive the animation state machine: airborne → Jump clip, else Run.
     runnerAnim.jumping = !s.grounded
-    if (modelRef.current) modelRef.current.scale.y = s.sliding ? 0.5 : 1 // slide squash
+    runnerAnim.sliding = s.sliding // drives the Slide animation clip (no more scale squash)
     // camera follows behind, slight lateral lean toward lane
     camera.position.set(s.x * 0.35, 3.4, s.z - 6.6)
     camera.lookAt(s.x * 0.18, 1.0, s.z + 12)
@@ -1172,16 +1174,19 @@ function LeonardModel() {
   const idle = useGLTF(LEONARD_URL)
   const run = useGLTF(RUN_URL)
   const jump = useGLTF(JUMP_URL)
+  const slide = useGLTF(SLIDE_URL)
   const clips = useMemo(() => {
     const out: AnimationClip[] = []
     const r = pickClip(run.animations)
     const j = pickClip(jump.animations)
+    const s = pickClip(slide.animations)
     if (r) out.push(stripRootMotion(r, 'Run'))
     if (j) out.push(stripRootMotion(j, 'Jump'))
+    if (s) out.push(stripRootMotion(s, 'Slide'))
     return out
-  }, [run.animations, jump.animations])
+  }, [run.animations, jump.animations, slide.animations])
   const { actions } = useAnimations(clips, group)
-  const wasJumping = useRef(false)
+  const state = useRef<'Run' | 'Jump' | 'Slide'>('Run')
 
   useEffect(() => {
     const runA = actions['Run']
@@ -1189,20 +1194,17 @@ function LeonardModel() {
     return () => { Object.values(actions).forEach((a) => a?.stop()) }
   }, [actions])
 
-  // Crossfade Run ↔ Jump on the shared signal (edge-triggered).
+  // Crossfade Run / Jump / Slide on the shared signals (edge-triggered).
+  // Jump wins over slide (you can't slide mid-air); else slide, else run.
   useFrame(() => {
-    const j = runnerAnim.jumping
-    if (j === wasJumping.current) return
-    wasJumping.current = j
-    const runA = actions['Run']
-    const jumpA = actions['Jump']
-    if (j) {
-      jumpA?.reset().fadeIn(0.1).play()
-      runA?.fadeOut(0.1)
-    } else {
-      runA?.reset().fadeIn(0.15).play()
-      jumpA?.fadeOut(0.15)
-    }
+    const desired: 'Run' | 'Jump' | 'Slide' = runnerAnim.jumping ? 'Jump' : runnerAnim.sliding ? 'Slide' : 'Run'
+    if (desired === state.current) return
+    const prev = actions[state.current]
+    const next = actions[desired]
+    state.current = desired
+    next?.reset().fadeIn(0.12).play()
+    if (desired === 'Run' && next) next.timeScale = RUN_TIMESCALE
+    prev?.fadeOut(0.12)
   })
 
   // 0.01 = Mixamo cm→m correction (matches Phase 1 Player.tsx). Without it
@@ -1844,7 +1846,7 @@ function SlackCard({ seedId, full }: { seedId: number; full: boolean }) {
 }
 
 // Slide-under banner face: a mix of Outlook invites, cookie-consent bars, and
-// [EXTERNAL] email warnings (town halls / popups you duck under). Single-lane
+// [EXTERNAL] email warnings (town halls / popups you slide under). Single-lane
 // banners SWEEP across the track for real (their parent group is driven by
 // bannerSweepX in ObstacleMesh) — so here we only add a gentle tilt to keep it
 // feeling alive; the lateral motion lives one level up where collision can see

@@ -350,9 +350,9 @@ const DEATH_COPY: Record<DeathCause, { emoji: string; title: string; lines: stri
   // slide-under banners: Outlook invites / cookie bars / [EXTERNAL] / town halls
   overhang: {
     emoji: '📅',
-    title: 'YOU DIDN’T DUCK',
+    title: 'YOU DIDN’T SLIDE',
     lines: [
-      'You forgot to duck under a recurring invite. The recurring invite does not forget. Updates dropped.',
+      'You forgot to slide under a recurring invite. The recurring invite does not forget. Updates dropped.',
       'An [EXTERNAL] banner clotheslined you at neck height. IT did warn you. Updates dropped.',
       'A "Mandatory Training" bar caught you standing tall. Compliance always wins. Updates dropped.',
       'You walked straight into a town hall. There were no questions — only your dropped updates.',
