@@ -23,20 +23,20 @@ export default function Landing() {
     <PageScroll>
       <Nav
         links={NAV_LINKS}
-        badge={<>● 1 GAME · NOW LIVE</>}
+        badge={<>● 3 GAMES · ALL LIVE</>}
       />
       <Hero />
       <Ticker
         accent
         items={[
-          '1 GAME LIVE',
-          '2 IN THE PARKING LOT',
+          '3 GAMES LIVE',
+          'A FULL MORNING · 9 AM TO NOON',
           'PLAY IN YOUR BROWSER',
           'NO INSTALL · NO ACCOUNT',
           'ALL TITLES FREE',
           'BUILT BY ONE PERSON',
           'STATUS · GREEN',
-          'NEW TITLE WHEN PHASE 2 SHIPS',
+          'BACK BY LUNCH',
         ]}
       />
       <Portfolio />
@@ -86,7 +86,7 @@ function Hero() {
         fontFamily: brMono, fontSize: 11,
         textTransform: 'uppercase', letterSpacing: '0.14em', color: BR.muted,
       }}>
-        <span><b style={{ color: BR.ink }}>STUDIO INDEX</b> · Q2 · ONE GAME · MORE PENDING</span>
+        <span><b style={{ color: BR.ink }}>STUDIO INDEX</b> · Q2 · THREE GAMES · ALL LIVE</span>
         <span>HQ · <b style={{ color: BR.ink }}>WHEREVER · ANYWHERE WITH WIFI</b></span>
         <span>STATUS · <b style={{ color: BR.green }}>● OPERATING</b></span>
       </div>
@@ -136,7 +136,7 @@ function Hero() {
           fontFamily: brMono, fontSize: 11, lineHeight: 1.7, color: BR.ink,
           textTransform: 'uppercase', letterSpacing: '0.06em',
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: BR.muted }}>GAMES SHIPPED</span><b>1</b></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: BR.muted }}>GAMES SHIPPED</span><b>3</b></div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: BR.muted }}>HEADCOUNT</span><b>1</b></div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: BR.muted }}>FUNDING</span><b>FEELINGS</b></div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: BR.muted }}>STATUS</span><b style={{ color: BR.green }}>● GREEN</b></div>
@@ -285,25 +285,31 @@ const GAMES: Game[] = [
   },
   {
     n: '02',
-    title: '[UNANNOUNCED]',
-    sub: 'CODENAME · 4:30 EXECUTIVE REVIEW',
+    title: 'JIRA RUN',
+    sub: 'PHASE 2 · 10:45 AM · UPDATE YOUR TICKETS',
     blurb:
-      'The next title from the studio. A standup is one meeting. The next one is the meeting after the standup. Details when we have them. Probably involves an executive, a deck, and a question that should have been an email.',
-    tags: ['IN DEVELOPMENT', 'PHASE 2 OF 3', 'BROWSER', 'FREE'],
-    status: 'IN DEVELOPMENT',
-    statusKind: 'wip',
-    cta: [{ label: 'STAY TUNED →', href: '#signup' }],
+      'Standup is over. Leonard opens the Jira board to log his four updates. He stares into the backlog. The backlog stares back. An 8-bit auto-runner gauntlet through Kanban gates — deposit 4 updates, dodge the blockers, do not fall behind.',
+    tags: ['8-BIT RUNNER', '~5 MIN', 'A/D + SPACE', 'BROWSER', 'FREE'],
+    status: 'LIVE',
+    statusKind: 'live',
+    cta: [
+      { label: '▶ PLAY NOW',   to: '/play/jira-run' },
+      { label: 'PLAY ALL 3 →', to: '/play' },
+    ],
   },
   {
     n: '03',
-    title: '[REDACTED]',
-    sub: 'CODENAME · PARKING LOT',
+    title: 'LUNCH DASH',
+    sub: 'PHASE 3 · 11:00 AM · BACK BY NOON',
     blurb:
-      'A third title is in the parking lot. The parking lot is itself a dependency we are actively managing. The Registrant has considered this enough; we are not yet shipping.',
-    tags: ['CONCEPT', 'NO ETA', 'VIBE ONLY'],
-    status: 'PARKING LOT',
-    statusKind: 'idea',
-    cta: [],
+      'Walk out of the lobby. Get in your car. Drive across town for lunch and the executive\'s salmon bowl. Back by noon. The bowl is in the cupholder. The bowl is judging.',
+    tags: ['DRIVING', '~5 MIN', 'WASD / ARROWS', 'BROWSER', 'FREE'],
+    status: 'LIVE',
+    statusKind: 'live',
+    cta: [
+      { label: '▶ PLAY NOW',   to: '/play/lunch-dash' },
+      { label: 'PLAY ALL 3 →', to: '/play' },
+    ],
   },
 ]
 
@@ -459,16 +465,16 @@ function WhatsNext() {
         'PRE-STANDUP ALIGNMENT. A PM HAS 75 MINUTES TO EXTRACT THE TRUTH FROM FIVE LIARS. SHIPPED. PLAYABLE NOW.',
     },
     {
-      phase: 'PHASE 2', state: 'IN DEVELOPMENT', tone: 'wip',
-      title: '4:30 EXECUTIVE REVIEW',
+      phase: 'PHASE 2', state: 'LIVE', tone: 'live',
+      title: 'JIRA RUN',
       blurb:
-        'CODENAME. THE MEETING AFTER THE STANDUP. A DECK EXISTS. ITS PURPOSE DOES NOT. ESTIMATED LANDING: WHEN IT LANDS.',
+        'STANDUP IS OVER. LEONARD OPENS THE JIRA BOARD. THE BACKLOG STARES BACK. 4 UPDATES, 4 KANBAN GATES, DO NOT FALL BEHIND.',
     },
     {
-      phase: 'PHASE 3', state: 'PARKING LOT', tone: 'idea',
-      title: '[REDACTED]',
+      phase: 'PHASE 3', state: 'LIVE', tone: 'live',
+      title: 'LUNCH DASH',
       blurb:
-        'A THIRD TITLE IS IN THE PARKING LOT. THE PARKING LOT IS ITSELF A DEPENDENCY WE ARE ACTIVELY MANAGING.',
+        'OFFICE → CAR → ACROSS TOWN → THE EXEC\'S SALMON BOWL → BACK BY NOON. THE BOWL IS JUDGING.',
     },
   ]
   const isMobile = useIsMobile()
@@ -500,7 +506,7 @@ function WhatsNext() {
           textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: 'right',
           maxWidth: 280, lineHeight: 1.55,
         }}>
-          THREE PHASES · ONE SHIPPED · ONE BUILDING · ONE BREWING
+          THREE PHASES · ALL LIVE · 9 AM TO NOON · BACK BY LUNCH
         </div>
       </div>
 
@@ -566,7 +572,7 @@ function Portfolio() {
             textTransform: 'uppercase', letterSpacing: '0.16em', marginBottom: 10,
           }}>
             <span style={{ color: BR.accent, marginRight: 8 }}>●</span>
-            PORTFOLIO · 1 SHIPPED · 2 PENDING
+            PORTFOLIO · 3 SHIPPED · 0 PENDING
           </div>
           <h2 style={{
             margin: 0, fontFamily: brFont, fontWeight: 900,
