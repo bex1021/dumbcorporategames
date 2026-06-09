@@ -4,8 +4,10 @@
 
 import { Suspense, useLayoutEffect, useMemo, useRef } from 'react'
 import { Text, Billboard } from '@react-three/drei'
-import { Object3D, Color, InstancedMesh, PlaneGeometry, Float32BufferAttribute, BufferGeometry, DoubleSide } from 'three'
+import { useFrame } from '@react-three/fiber'
+import { Object3D, Color, InstancedMesh, PlaneGeometry, Float32BufferAttribute, BufferGeometry, DoubleSide, MeshStandardMaterial } from 'three'
 import { terrainHeight } from './terrain'
+import { signalState } from './signalState'
 import { DRIVE_WORLD } from './driveConfig'
 import { DESTINATIONS, type Destination } from './destinations'
 import {
@@ -370,24 +372,41 @@ function TrafficLight({ x, z }: { x: number; z: number }) {
         <boxGeometry args={[armLen, 0.22, 0.22]} />
         <meshStandardMaterial color="#2f3236" />
       </mesh>
-      <group position={[headX, armY - 1.1, cz]}>
-        <mesh>
-          <boxGeometry args={[0.7, 1.7, 0.6]} />
-          <meshStandardMaterial color="#17191b" />
-        </mesh>
-        <mesh position={[0, 0.5, 0.33]}>
-          <sphereGeometry args={[0.2, 10, 10]} />
-          <meshStandardMaterial color="#d23b2b" emissive="#d23b2b" emissiveIntensity={0.9} />
-        </mesh>
-        <mesh position={[0, 0, 0.33]}>
-          <sphereGeometry args={[0.2, 10, 10]} />
-          <meshStandardMaterial color="#3a3318" />
-        </mesh>
-        <mesh position={[0, -0.5, 0.33]}>
-          <sphereGeometry args={[0.2, 10, 10]} />
-          <meshStandardMaterial color="#1f3a22" />
-        </mesh>
-      </group>
+      <TrafficLightHead position={[headX, armY - 1.1, cz]} />
+    </group>
+  )
+}
+
+// The signal head — three lamps whose glow tracks the live N–S signal (the mast
+// arm hangs over the arterial, so it shows the arterial's light).
+function TrafficLightHead({ position }: { position: [number, number, number] }) {
+  const red = useRef<MeshStandardMaterial>(null)
+  const yellow = useRef<MeshStandardMaterial>(null)
+  const green = useRef<MeshStandardMaterial>(null)
+  useFrame(() => {
+    const st = signalState('ns')
+    if (red.current) red.current.emissiveIntensity = st === 'red' ? 1.3 : 0.05
+    if (yellow.current) yellow.current.emissiveIntensity = st === 'yellow' ? 1.3 : 0.05
+    if (green.current) green.current.emissiveIntensity = st === 'green' ? 1.3 : 0.05
+  })
+  return (
+    <group position={position}>
+      <mesh>
+        <boxGeometry args={[0.7, 1.7, 0.6]} />
+        <meshStandardMaterial color="#17191b" />
+      </mesh>
+      <mesh position={[0, 0.5, 0.33]}>
+        <sphereGeometry args={[0.2, 10, 10]} />
+        <meshStandardMaterial ref={red} color="#d23b2b" emissive="#d23b2b" emissiveIntensity={1.3} />
+      </mesh>
+      <mesh position={[0, 0, 0.33]}>
+        <sphereGeometry args={[0.2, 10, 10]} />
+        <meshStandardMaterial ref={yellow} color="#e0b23a" emissive="#e0b23a" emissiveIntensity={0.05} />
+      </mesh>
+      <mesh position={[0, -0.5, 0.33]}>
+        <sphereGeometry args={[0.2, 10, 10]} />
+        <meshStandardMaterial ref={green} color="#3fae54" emissive="#3fae54" emissiveIntensity={0.05} />
+      </mesh>
     </group>
   )
 }

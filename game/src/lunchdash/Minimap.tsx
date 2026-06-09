@@ -97,6 +97,22 @@ export function Minimap() {
       ctx.stroke()
       ctx.restore()
 
+      // compass — N up (–Z), S down (+Z), E right (+X), W left (–X)
+      ctx.font = 'bold 12px ui-monospace, monospace'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.lineWidth = 3
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)'
+      ctx.fillStyle = '#243044'
+      const card = (ch: string, x: number, y: number) => {
+        ctx.strokeText(ch, x, y)
+        ctx.fillText(ch, x, y)
+      }
+      card('N', SIZE / 2, 11)
+      card('S', SIZE / 2, SIZE - 11)
+      card('E', SIZE - 10, SIZE / 2)
+      card('W', 10, SIZE / 2)
+
       raf = requestAnimationFrame(draw)
     }
 

@@ -11,9 +11,10 @@
 //   - parked cars are just cars with `parked: true`: they never move and always
 //     act as solid obstacles.
 
-import { ROADS, paintGaps, roadWidth, type Road } from './cityLayout'
+import { ROADS, paintGaps, roadWidth, SIGNALS, type Road } from './cityLayout'
 import { carPosition } from './carState'
 import { honk } from './honk'
+import { tickSignals, signalState } from './signalState'
 
 export type TrafficCar = {
   parked: boolean
@@ -142,6 +143,7 @@ let globalHonkCd = 0 // throttle so honks don't pile into a wall of noise
 export function updateTraffic(dt: number) {
   const cars = traffic.cars
   globalHonkCd = Math.max(0, globalHonkCd - dt)
+  tickSignals(dt)
   for (const c of cars) {
     if (c.parked) continue
     c.honkCd = Math.max(0, c.honkCd - dt)
@@ -152,6 +154,7 @@ export function updateTraffic(dt: number) {
     const L = roadLen(c.road!)
     const fx = -Math.sin(c.heading) // forward unit vector (front is -Z at heading 0)
     const fz = -Math.cos(c.heading)
+    const carNS = c.road!.a.x === c.road!.b.x // travelling N–S vs E–W
     // SPATIAL awareness: slow to keep a gap behind ANYTHING ahead in my path —
     // the car in front, a car crossing the intersection, OR the player. This is
     // what stops cars merging through each other and makes them queue + yield.
@@ -173,6 +176,19 @@ export function updateTraffic(dt: number) {
           gap = fwd
           playerBlocking = true
         }
+      }
+    }
+    // stop at a RED (or yellow) light on our approach — treat the stop line as a
+    // blocker. When our axis is green there's no blocker and we roll through.
+    if (signalState(carNS ? 'ns' : 'ew') !== 'green') {
+      for (const s of SIGNALS) {
+        const fwdSig = (s.x - c.x) * fx + (s.z - c.z) * fz
+        if (fwdSig <= 0.3) continue // signal is behind us / we're already in it
+        const latSig = Math.abs((s.x - c.x) * -fz + (s.z - c.z) * fx)
+        if (latSig > 3) continue // not the signal on our road
+        const crossHalf = (carNS ? (s.z === -22 || s.z === 215 ? 18 : 12) : 18) / 2
+        const stopDist = fwdSig - crossHalf - 3.5 // pull up at the stop bar, not in the box
+        if (stopDist > 0.2 && stopDist < gap) gap = stopDist
       }
     }
     let v = c.speed
