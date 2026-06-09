@@ -45,6 +45,11 @@ export function TrafficCars() {
       const hF = terrainHeight(car.x + fx * L, car.z + fz * L)
       const hB = terrainHeight(car.x - fx * L, car.z - fz * L)
       const pitch = Math.atan2(hF - hB, 2 * L)
+      // moving cars shrink away in the last few metres of their road, so the
+      // loop-around teleport at the map edge happens while they're invisible —
+      // no popping in/out of view. Parked cars always stay full size.
+      const s = car.parked ? 1 : Math.max(0.001, Math.min(1, Math.min(car.t, 1 - car.t) / 0.012))
+      _o.scale.setScalar(s)
       _o.position.set(car.x, terrainHeight(car.x, car.z), car.z)
       _o.rotation.set(pitch, car.heading, 0)
       _o.updateMatrix()
