@@ -19,7 +19,7 @@ import { GameClock } from './GameClock'
 import { DRIVE_CAMERA } from './driveConfig'
 import { carPosition, carFacing, carTelemetry, carAir } from './carState'
 import { driveClock, START_MIN } from './clockState'
-import { SPAWN } from './cityLayout'
+import { SPAWN, ALLEYS, ALLEY_W, ALLEY_PROPS, BUILDINGS, ROADS } from './cityLayout'
 import { terrainHeight } from './terrain'
 import { boundary } from './boundaryState'
 import { crash } from './crashState'
@@ -86,6 +86,12 @@ export default function LunchDash() {
         hr,
         resolveTrafficCollision,
         updatePeds,
+        // layout inspection hooks
+        alleys: ALLEYS,
+        alleyW: ALLEY_W,
+        alleyProps: ALLEY_PROPS,
+        buildings: BUILDINGS,
+        roads: ROADS,
       }
     }
   }, [])

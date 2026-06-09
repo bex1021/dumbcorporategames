@@ -29,6 +29,9 @@ import {
   paintGaps,
   GREEN_AREAS,
   DISTRICT_REGIONS,
+  ALLEYS,
+  ALLEY_W,
+  ALLEY_PROPS,
   SIGNALS,
   type Rect,
   type Landmark,
@@ -67,6 +70,7 @@ export function DriveWorld() {
       <Patches rects={COUNTRY_FIELDS} y={0.015} color="#7e8a55" />
       <ParkingLots />
       <Avenues />
+      <Alleys />
       <Roads />
       <SignalMarkings />
       <Bridges />
@@ -77,6 +81,7 @@ export function DriveWorld() {
       <InstancedBoxes items={BOX_ITEMS} />
       <InstancedTrees />
       <Palms />
+      <AlleyProps />
       <Landmarks />
       <TrafficCars />
       <Pedestrians />
@@ -434,6 +439,82 @@ function SignalMarkings() {
     <mesh geometry={geo}>
       <meshBasicMaterial color={RD_PAINT} side={DoubleSide} />
     </mesh>
+  )
+}
+
+// Alleyways — the whole grid as ONE terrain-draped dark-asphalt ribbon (1 draw
+// call). Sits just above the ground; the main roads draw over it at crossings.
+function Alleys() {
+  const geo = useMemo(() => {
+    const pos: number[] = []
+    const idx: number[] = []
+    const hw = ALLEY_W / 2
+    for (const s of ALLEYS) {
+      const dx = s.b.x - s.a.x
+      const dz = s.b.z - s.a.z
+      const len = Math.hypot(dx, dz) || 1
+      const px = (dz / len) * hw
+      const pz = (-dx / len) * hw
+      const steps = Math.max(2, Math.ceil(len / 4))
+      const base = pos.length / 3
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps
+        const cx = s.a.x + dx * t
+        const cz = s.a.z + dz * t
+        pos.push(cx - px, terrainHeight(cx - px, cz - pz) + 0.06, cz - pz, cx + px, terrainHeight(cx + px, cz + pz) + 0.06, cz + pz)
+      }
+      for (let i = 0; i < steps; i++) {
+        const a0 = base + i * 2
+        idx.push(a0, a0 + 2, a0 + 1, a0 + 1, a0 + 2, a0 + 3)
+      }
+    }
+    const g = new BufferGeometry()
+    g.setAttribute('position', new Float32BufferAttribute(new Float32Array(pos), 3))
+    g.setIndex(idx)
+    g.computeVertexNormals()
+    return g
+  }, [])
+  return (
+    <mesh geometry={geo}>
+      <meshStandardMaterial color="#33353a" side={DoubleSide} />
+    </mesh>
+  )
+}
+
+// Trash cans + dumpsters along the alleys — two InstancedMeshes.
+function AlleyProps() {
+  const canRef = useRef<InstancedMesh>(null)
+  const dumpRef = useRef<InstancedMesh>(null)
+  const cans = useMemo(() => ALLEY_PROPS.filter((p) => p.kind === 'can'), [])
+  const dumps = useMemo(() => ALLEY_PROPS.filter((p) => p.kind === 'dumpster'), [])
+  useLayoutEffect(() => {
+    const o = new Object3D()
+    cans.forEach((p, i) => {
+      o.position.set(p.x, terrainHeight(p.x, p.z) + 0.45, p.z)
+      o.rotation.set(0, p.rot, 0)
+      o.updateMatrix()
+      canRef.current?.setMatrixAt(i, o.matrix)
+    })
+    if (canRef.current) canRef.current.instanceMatrix.needsUpdate = true
+    dumps.forEach((p, i) => {
+      o.position.set(p.x, terrainHeight(p.x, p.z) + 0.5, p.z)
+      o.rotation.set(0, p.rot, 0)
+      o.updateMatrix()
+      dumpRef.current?.setMatrixAt(i, o.matrix)
+    })
+    if (dumpRef.current) dumpRef.current.instanceMatrix.needsUpdate = true
+  }, [cans, dumps])
+  return (
+    <>
+      <instancedMesh ref={canRef} args={[undefined, undefined, cans.length]}>
+        <cylinderGeometry args={[0.32, 0.36, 0.9, 8]} />
+        <meshStandardMaterial color="#474a40" />
+      </instancedMesh>
+      <instancedMesh ref={dumpRef} args={[undefined, undefined, dumps.length]}>
+        <boxGeometry args={[2, 1, 1.2]} />
+        <meshStandardMaterial color="#3f5e47" />
+      </instancedMesh>
+    </>
   )
 }
 

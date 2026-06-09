@@ -174,6 +174,13 @@ export const ROADS: Road[] = [
   { a: { x: -43, z: -75 }, b: { x: 111, z: -75 }, type: 'collector' }, // downtown cross-street
   { a: { x: 30, z: -22 }, b: { x: 30, z: 108 }, type: 'collector' },
   { a: { x: -150, z: -22 }, b: { x: -150, z: 108 }, type: 'collector' },
+  // perimeter connectors — close the loops so roads don't dead-end at the edge.
+  // Routed only where they clear the river and the SE stadium / SW golf course.
+  { a: { x: -43, z: -295 }, b: { x: 111, z: -295 }, type: 'arterial' }, // north edge: links the two N–S spines
+  { a: { x: -43, z: 295 }, b: { x: 111, z: 295 }, type: 'arterial' }, // south edge
+  { a: { x: -295, z: -22 }, b: { x: -295, z: 108 }, type: 'collector' }, // west: E–W arterial → riverbank collector (north of the river)
+  { a: { x: 295, z: -22 }, b: { x: 295, z: 108 }, type: 'collector' }, // east, north of the river
+  { a: { x: 295, z: 186 }, b: { x: 295, z: 215 }, type: 'collector' }, // east, south of the river
 ]
 function pointToSeg(px: number, pz: number, ax: number, az: number, bx: number, bz: number): number {
   const dx = bx - ax
@@ -259,6 +266,60 @@ const DISTRICTS: DistrictSpec[] = [
 // (not grass) between buildings — even where a neighborhood sits on a hill.
 export const DISTRICT_REGIONS: Rect[] = DISTRICTS.map((d) => d.region)
 
+// ---------- alleyways (narrow service streets threading between buildings) ----------
+// A grid of skinny streets running BETWEEN the building rows (offset half a block
+// off the building grid). Buildings avoid them (see clearOf), so they're clean,
+// drivable gaps — the connective tissue that makes the city read as a real grid
+// instead of buildings on a field. Unmarked (local streets get no lane paint).
+export type AlleySeg = { a: { x: number; z: number }; b: { x: number; z: number } }
+export const ALLEY_W = 5
+function genAlleys(): AlleySeg[] {
+  const out: AlleySeg[] = []
+  for (const d of DISTRICTS) {
+    const r = d.region
+    for (let x = r.minX + d.step / 2; x < r.maxX - 1; x += d.step) out.push({ a: { x, z: r.minZ }, b: { x, z: r.maxZ } })
+    for (let z = r.minZ + d.step / 2; z < r.maxZ - 1; z += d.step) out.push({ a: { x: r.minX, z }, b: { x: r.maxX, z } })
+  }
+  return out
+}
+export const ALLEYS: AlleySeg[] = genAlleys()
+function onAlley(x: number, z: number, rad = 0): boolean {
+  for (const s of ALLEYS) {
+    if (pointToSeg(x, z, s.a.x, s.a.z, s.b.x, s.b.z) < ALLEY_W / 2 + rad + 0.5) return true
+  }
+  return false
+}
+
+// Trash cans + dumpsters tucked against the alley sides — cosmetic city clutter.
+export type AlleyProp = { x: number; z: number; rot: number; kind: 'can' | 'dumpster' }
+function genAlleyProps(): AlleyProp[] {
+  const out: AlleyProp[] = []
+  ALLEYS.forEach((s, si) => {
+    const dx = s.b.x - s.a.x
+    const dz = s.b.z - s.a.z
+    const len = Math.hypot(dx, dz) || 1
+    const ux = dx / len
+    const uz = dz / len
+    const px = -uz // perpendicular (toward an alley side)
+    const pz = ux
+    const n = Math.floor(len / 24)
+    for (let i = 1; i <= n; i++) {
+      if (h2(si * 5 + i, 17) < 0.45) continue // sparse — not every spot
+      const t = (i / (n + 1)) * len
+      const side = h2(si, i * 3) < 0.5 ? 1 : -1
+      const off = (ALLEY_W / 2 - 0.5) * side
+      out.push({
+        x: s.a.x + ux * t + px * off,
+        z: s.a.z + uz * t + pz * off,
+        rot: Math.atan2(px, pz),
+        kind: h2(si + i, 23) < 0.3 ? 'dumpster' : 'can',
+      })
+    }
+  })
+  return out
+}
+export const ALLEY_PROPS: AlleyProp[] = genAlleyProps()
+
 // ---------- office parks (gap-filler: cluster of mid-rise around a lot) ----------
 const OFFICE_PARK_CENTERS = [
   { x: 150, z: 78 },
@@ -283,7 +344,7 @@ function genOfficeParks(): { buildings: Building[]; lots: Rect[] } {
     offs.forEach(([ox, oz], j) => {
       const bx = c.x + ox
       const bz = c.z + oz
-      if (onRoad(bx, bz, 5)) return // don't drop an office building on a road
+      if (onRoad(bx, bz, 5) || onAlley(bx, bz, 5)) return // keep office buildings off roads AND alleys
       buildings.push({ x: bx, z: bz, w: 10, d: 8, h: 12 + h2(i, j) * 8, color: pick(greys, h2(i + j, 1)) })
     })
   })
@@ -296,6 +357,7 @@ function clearOf(x: number, z: number, rad = 0): boolean {
   for (const r of BLOCKED) if (inRect(x, z, r, 4 + rad)) return false
   if (distToAvenues(x, z) < 9 + rad) return false
   if (onRoad(x, z, rad)) return false
+  if (onAlley(x, z, rad)) return false // keep the alley grid clear of buildings
   if (Math.hypot(x - SPAWN.x, z - SPAWN.z) < 18) return false
   for (const p of Object.values(DEST_POINTS)) if (Math.hypot(x - p.x, z - p.z) < 16) return false
   return true
