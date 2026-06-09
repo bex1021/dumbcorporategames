@@ -19,6 +19,9 @@ const Game = lazy(() => import('./routes/Game'))
 // Phase 2 — Jira Run (8-bit endless runner). Lazy so its R3F chunk only
 // loads when someone hits /play/jira-run.
 const JiraRun = lazy(() => import('./jirarun/JiraRun'))
+// Phase 3 — Lunch Dash (driving). Lazy so its R3F chunk only loads at
+// /play/lunch-dash.
+const LunchDash = lazy(() => import('./lunchdash/LunchDash'))
 
 export default function App() {
   return (
@@ -41,6 +44,14 @@ export default function App() {
           element={
             <Suspense fallback={<RouteSplash />}>
               <JiraRun />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/play/lunch-dash"
+          element={
+            <Suspense fallback={<RouteSplash />}>
+              <LunchDash />
             </Suspense>
           }
         />
