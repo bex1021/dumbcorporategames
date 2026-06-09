@@ -118,7 +118,8 @@ export function Car() {
 
     // traffic + parked cars — bump moving cars aside, hit parked ones like walls.
     // Lighter than a building: cars give, so less recoil and less damage.
-    const tcol = resolveTrafficCollision(carPosition.x, carPosition.z, DRIVE.carRadius)
+    // tighter than the building radius — a car "hit" should need real contact
+    const tcol = resolveTrafficCollision(carPosition.x, carPosition.z, 1.1)
     if (tcol.hit) {
       const nx = tcol.x - carPosition.x
       const nz = tcol.z - carPosition.z
