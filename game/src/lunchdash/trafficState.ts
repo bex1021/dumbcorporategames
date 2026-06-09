@@ -129,14 +129,32 @@ export function initTraffic() {
   traffic.cars = cars
 }
 
+const FOLLOW_DIST = 15 // start slowing when the car ahead is within this many metres
+const STOP_GAP = 6.5 // come to a full stop at this gap, so cars queue bumper-to-bumper-ish
+
 export function updateTraffic(dt: number) {
-  for (const c of traffic.cars) {
+  const cars = traffic.cars
+  for (const c of cars) {
     if (c.parked) continue
     if (c.stall > 0) {
       c.stall = Math.max(0, c.stall - dt)
       continue
     }
-    c.t += (c.dir * c.speed * dt) / roadLen(c.road!)
+    const L = roadLen(c.road!)
+    // car-following: find the nearest car AHEAD in this same lane (same road +
+    // direction; parked cars are on the curb, not the travel lane) and slow to
+    // hold a gap — so traffic queues one-after-another instead of merging.
+    let gap = Infinity
+    for (const o of cars) {
+      if (o === c || o.parked || o.road !== c.road || o.dir !== c.dir) continue
+      let ahead = ((o.t - c.t) * c.dir) % 1
+      ahead = (ahead + 1) % 1 // forward fractional distance to o, in [0,1)
+      const d = ahead * L
+      if (d > 0.01 && d < gap) gap = d
+    }
+    let v = c.speed
+    if (gap < FOLLOW_DIST) v = c.speed * Math.max(0, (gap - STOP_GAP) / (FOLLOW_DIST - STOP_GAP))
+    c.t += (c.dir * v * dt) / L
     c.t = ((c.t % 1) + 1) % 1
     placeMoving(c)
   }

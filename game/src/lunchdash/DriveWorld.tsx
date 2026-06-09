@@ -343,19 +343,29 @@ function TrafficLights() {
 }
 
 function TrafficLight({ x, z }: { x: number; z: number }) {
-  const py = terrainHeight(x - 12, z)
+  // Plant the pole on the CORNER, clear of both roadways — offset in x by the
+  // N–S arterial half-width and in z by the cross-road half-width — then reach a
+  // mast arm out over the arterial so the head hangs above the lanes (not in the
+  // middle of the intersection).
+  const halfV = 9 // N–S arterial half-width
+  const halfE = z === -22 || z === 215 ? 9 : 6 // cross-road half-width at this signal
+  const cx = x - halfV - 2.5
+  const cz = z - halfE - 2.5
+  const py = terrainHeight(cx, cz)
+  const armLen = halfV + 4
+  const headX = cx + armLen
   const armY = py + 7
   return (
     <group>
-      <mesh position={[x - 12, py + 3.5, z]}>
+      <mesh position={[cx, py + 3.5, cz]}>
         <cylinderGeometry args={[0.22, 0.28, 7, 8]} />
         <meshStandardMaterial color="#2f3236" />
       </mesh>
-      <mesh position={[x - 6, armY, z]}>
-        <boxGeometry args={[12, 0.22, 0.22]} />
+      <mesh position={[cx + armLen / 2, armY, cz]}>
+        <boxGeometry args={[armLen, 0.22, 0.22]} />
         <meshStandardMaterial color="#2f3236" />
       </mesh>
-      <group position={[x, armY - 1.1, z]}>
+      <group position={[headX, armY - 1.1, cz]}>
         <mesh>
           <boxGeometry args={[0.7, 1.7, 0.6]} />
           <meshStandardMaterial color="#17191b" />
