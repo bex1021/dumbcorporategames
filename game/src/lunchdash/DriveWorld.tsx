@@ -17,6 +17,8 @@ import {
   BackSide,
   MeshStandardMaterial,
   DirectionalLight,
+  CylinderGeometry,
+  BoxGeometry,
 } from 'three'
 import { terrainHeight } from './terrain'
 import { signalState } from './signalState'
@@ -157,6 +159,50 @@ const WATER_TOWERS = ROOFS.filter(
     WT_RECTS.some((q) => r.x >= q.minX && r.x <= q.maxX && r.z >= q.minZ && r.z <= q.maxZ),
 )
 
+// ---- street furniture (Phase C) — lamps alternate sides of every road; the
+// arm reaches out over the lanes. Hydrants dot the opposite sidewalk. ----
+const LAMP_POSTS: { x: number; z: number; rot: number }[] = []
+const HYDRANTS: { x: number; z: number }[] = []
+ROADS.forEach((r, ri) => {
+  const dx = r.b.x - r.a.x
+  const dz = r.b.z - r.a.z
+  const len = Math.hypot(dx, dz) || 1
+  const ux = dx / len
+  const uz = dz / len
+  const px = -uz
+  const pz = ux
+  const W = roadWidth(r.type)
+  for (let d = 22; d < len - 22; d += 38) {
+    const side = Math.floor(d / 38) % 2 === 0 ? 1 : -1
+    const x = r.a.x + ux * d + px * (W / 2 + 1.1) * side
+    const z = r.a.z + uz * d + pz * (W / 2 + 1.1) * side
+    if (SIGNALS.some((s) => Math.hypot(s.x - x, s.z - z) < 16)) continue
+    LAMP_POSTS.push({ x, z, rot: Math.atan2(-px * side, -pz * side) }) // arm faces the road
+    if (d + 12 < len - 16 && bh(ri, Math.round(d)) < 0.3) {
+      HYDRANTS.push({
+        x: r.a.x + ux * (d + 12) + px * (W / 2 + 1.7) * -side,
+        z: r.a.z + uz * (d + 12) + pz * (W / 2 + 1.7) * -side,
+      })
+    }
+  }
+})
+
+// Satire billboards — placed in the cleared bridge-approach / countryside
+// strips so they never clip a building. The ads ARE the world-building.
+const BILLBOARDS: { x: number; z: number; ry: number; top: string; sub: string }[] = [
+  { x: -58, z: 90, ry: 0, top: 'CORPORATE SLOP BOWLZ', sub: 'we feed the masses™' },
+  { x: 100, z: 90, ry: 0, top: 'ShipMart', sub: 'we lose it differently™' },
+  { x: -58, z: 206, ry: Math.PI, top: 'Alignly', sub: 'alignment-as-a-service™' },
+  { x: 100, z: 206, ry: Math.PI, top: 'SYNERGY LINKS', sub: 'golf for stakeholders™' },
+  { x: -55, z: -260, ry: Math.PI / 2, top: 'Suds & Fold', sub: 'your weekend, professionally dry-cleaned™' },
+  { x: 123, z: -250, ry: -Math.PI / 2, top: 'DEPRECATED MEMORIAL', sub: 'rest in production™' },
+]
+
+// tree variety — most park/country trees stay conifers; 2 in 5 become
+// round-canopy deciduous so the greenery stops being identical cones
+const CONE_TREES = TREE_ITEMS.filter((_, i) => i % 5 < 3)
+const ROUND_TREES = TREE_ITEMS.filter((_, i) => i % 5 >= 3)
+
 export function DriveWorld() {
   return (
     <>
@@ -177,7 +223,10 @@ export function DriveWorld() {
       <InstancedBoxes items={CITY_BOXES} />
       <BasePlinths />
       <WaterTowers />
-      <InstancedTrees />
+      <Trees />
+      <StreetLights />
+      <Hydrants />
+      <Billboards />
       <Palms />
       <AlleyProps />
       <Landmarks />
@@ -871,29 +920,159 @@ function WaterTowers() {
   )
 }
 
-function InstancedTrees() {
+// Trees — conifer cones (with width jitter) + round-canopy deciduous, so the
+// greenery stops being a field of identical cones. Three instanced draws.
+function Trees() {
+  const coneRef = useRef<InstancedMesh>(null)
+  const trunkRef = useRef<InstancedMesh>(null)
+  const canopyRef = useRef<InstancedMesh>(null)
+  useLayoutEffect(() => {
+    const o = new Object3D()
+    const c = new Color()
+    const cone = coneRef.current
+    if (cone) {
+      CONE_TREES.forEach((t, i) => {
+        const w = 1.25 + (i % 4) * 0.14
+        o.position.set(t.x, terrainHeight(t.x, t.z) + t.h * 0.6, t.z)
+        o.scale.set(w, t.h * 1.2, w)
+        o.updateMatrix()
+        cone.setMatrixAt(i, o.matrix)
+        c.setHSL(0.27, 0.34, 0.3 + (i % 5) * 0.02)
+        cone.setColorAt(i, c)
+      })
+      cone.instanceMatrix.needsUpdate = true
+      if (cone.instanceColor) cone.instanceColor.needsUpdate = true
+    }
+    const trunk = trunkRef.current
+    const canopy = canopyRef.current
+    if (trunk && canopy) {
+      ROUND_TREES.forEach((t, i) => {
+        const gy = terrainHeight(t.x, t.z)
+        o.position.set(t.x, gy + 0.75, t.z)
+        o.scale.set(1, 1, 1)
+        o.updateMatrix()
+        trunk.setMatrixAt(i, o.matrix)
+        const s = 1.5 + (i % 5) * 0.2
+        o.position.set(t.x, gy + 1.3 + t.h * 0.42, t.z)
+        o.scale.set(s, t.h * 0.42 + 1.0, s)
+        o.updateMatrix()
+        canopy.setMatrixAt(i, o.matrix)
+        c.setHSL(0.24, 0.32, 0.3 + (i % 4) * 0.025)
+        canopy.setColorAt(i, c)
+      })
+      trunk.instanceMatrix.needsUpdate = true
+      canopy.instanceMatrix.needsUpdate = true
+      if (canopy.instanceColor) canopy.instanceColor.needsUpdate = true
+    }
+  }, [])
+  return (
+    <>
+      <instancedMesh ref={coneRef} args={[undefined, undefined, CONE_TREES.length]} castShadow>
+        <coneGeometry args={[1, 1, 7]} />
+        <meshStandardMaterial />
+      </instancedMesh>
+      <instancedMesh ref={trunkRef} args={[undefined, undefined, ROUND_TREES.length]} castShadow>
+        <cylinderGeometry args={[0.13, 0.18, 1.5, 5]} />
+        <meshStandardMaterial color="#7a5f48" />
+      </instancedMesh>
+      <instancedMesh ref={canopyRef} args={[undefined, undefined, ROUND_TREES.length]} castShadow>
+        <sphereGeometry args={[1, 8, 6]} />
+        <meshStandardMaterial />
+      </instancedMesh>
+    </>
+  )
+}
+
+// Street lights — pole + arm reaching over the lanes + a warm lamp head.
+// Three instanced draws for ~200 lamps.
+function StreetLights() {
+  const poleRef = useRef<InstancedMesh>(null)
+  const armRef = useRef<InstancedMesh>(null)
+  const headRef = useRef<InstancedMesh>(null)
+  const poleGeo = useMemo(() => new CylinderGeometry(0.09, 0.13, 5.6, 6).translate(0, 2.8, 0), [])
+  const armGeo = useMemo(() => new BoxGeometry(0.12, 0.12, 1.8).translate(0, 5.5, 0.9), [])
+  const headGeo = useMemo(() => new BoxGeometry(0.32, 0.16, 0.55).translate(0, 5.42, 1.7), [])
+  useLayoutEffect(() => {
+    const o = new Object3D()
+    LAMP_POSTS.forEach((p, i) => {
+      o.position.set(p.x, terrainHeight(p.x, p.z), p.z)
+      o.rotation.set(0, p.rot, 0)
+      o.updateMatrix()
+      poleRef.current?.setMatrixAt(i, o.matrix)
+      armRef.current?.setMatrixAt(i, o.matrix)
+      headRef.current?.setMatrixAt(i, o.matrix)
+    })
+    for (const r of [poleRef, armRef, headRef]) if (r.current) r.current.instanceMatrix.needsUpdate = true
+  }, [])
+  return (
+    <>
+      <instancedMesh ref={poleRef} args={[poleGeo, undefined, LAMP_POSTS.length]} castShadow>
+        <meshStandardMaterial color="#41454a" />
+      </instancedMesh>
+      <instancedMesh ref={armRef} args={[armGeo, undefined, LAMP_POSTS.length]}>
+        <meshStandardMaterial color="#41454a" />
+      </instancedMesh>
+      <instancedMesh ref={headRef} args={[headGeo, undefined, LAMP_POSTS.length]}>
+        <meshStandardMaterial color="#f2e3b8" emissive="#f2e3b8" emissiveIntensity={0.25} />
+      </instancedMesh>
+    </>
+  )
+}
+
+// Fire hydrants — squat muted-red posts on the sidewalks.
+function Hydrants() {
   const ref = useRef<InstancedMesh>(null)
   useLayoutEffect(() => {
     const m = ref.current
     if (!m) return
     const o = new Object3D()
-    const c = new Color()
-    TREE_ITEMS.forEach((t, i) => {
-      o.position.set(t.x, terrainHeight(t.x, t.z) + t.h * 0.6, t.z)
-      o.scale.set(1.5, t.h * 1.2, 1.5)
+    HYDRANTS.forEach((p, i) => {
+      o.position.set(p.x, terrainHeight(p.x, p.z) + 0.31, p.z)
       o.updateMatrix()
       m.setMatrixAt(i, o.matrix)
-      c.setHSL(0.27, 0.34, 0.3 + (i % 5) * 0.02)
-      m.setColorAt(i, c)
     })
     m.instanceMatrix.needsUpdate = true
-    if (m.instanceColor) m.instanceColor.needsUpdate = true
   }, [])
   return (
-    <instancedMesh ref={ref} args={[undefined, undefined, TREE_ITEMS.length]} castShadow>
-      <coneGeometry args={[1, 1, 7]} />
-      <meshStandardMaterial />
+    <instancedMesh ref={ref} args={[undefined, undefined, HYDRANTS.length]} castShadow>
+      <cylinderGeometry args={[0.17, 0.21, 0.62, 8]} />
+      <meshStandardMaterial color="#a8442f" />
     </instancedMesh>
+  )
+}
+
+// Satire billboards — two poles + a panel + the ad copy.
+function Billboards() {
+  return (
+    <>
+      {BILLBOARDS.map((b, i) => {
+        const y = terrainHeight(b.x, b.z)
+        return (
+          <group key={i} position={[b.x, y, b.z]} rotation={[0, b.ry, 0]}>
+            <mesh position={[-2.4, 2.6, 0]} castShadow>
+              <cylinderGeometry args={[0.14, 0.18, 5.2, 6]} />
+              <meshStandardMaterial color="#4a4d52" />
+            </mesh>
+            <mesh position={[2.4, 2.6, 0]} castShadow>
+              <cylinderGeometry args={[0.14, 0.18, 5.2, 6]} />
+              <meshStandardMaterial color="#4a4d52" />
+            </mesh>
+            <mesh position={[0, 6.6, 0]} castShadow>
+              <boxGeometry args={[8, 3.6, 0.22]} />
+              <meshStandardMaterial color="#ece7db" />
+            </mesh>
+            <Suspense fallback={null}>
+              <Text position={[0, 7.25, 0.14]} fontSize={0.78} color="#23262b" anchorX="center" anchorY="middle" maxWidth={7.4}>
+                {b.top}
+              </Text>
+              <Text position={[0, 5.85, 0.14]} fontSize={0.48} color="#8a4a3a" anchorX="center" anchorY="middle">
+                {b.sub}
+              </Text>
+            </Suspense>
+          </group>
+        )
+      })}
+    </>
   )
 }
 

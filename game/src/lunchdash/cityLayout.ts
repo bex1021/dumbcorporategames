@@ -290,7 +290,10 @@ function onAlley(x: number, z: number, rad = 0): boolean {
   return false
 }
 
-// Trash cans + dumpsters tucked against the alley sides — cosmetic city clutter.
+// Alley clutter — placed with a GRAMMAR, not a scatter: a dumpster cluster
+// (dumpster + 0–2 cans huddled beside it) sits against an alley wall, only deep
+// in the block where you'd actually find one — never within eyeshot of a real
+// road. Dumpsters are SOLID (see SOLIDS); cans stay knock-through cosmetic.
 export type AlleyProp = { x: number; z: number; rot: number; kind: 'can' | 'dumpster' }
 function genAlleyProps(): AlleyProp[] {
   const out: AlleyProp[] = []
@@ -302,18 +305,19 @@ function genAlleyProps(): AlleyProp[] {
     const uz = dz / len
     const px = -uz // perpendicular (toward an alley side)
     const pz = ux
-    const n = Math.floor(len / 24)
-    for (let i = 1; i <= n; i++) {
-      if (h2(si * 5 + i, 17) < 0.45) continue // sparse — not every spot
-      const t = (i / (n + 1)) * len
-      const side = h2(si, i * 3) < 0.5 ? 1 : -1
-      const off = (ALLEY_W / 2 - 0.5) * side
-      out.push({
-        x: s.a.x + ux * t + px * off,
-        z: s.a.z + uz * t + pz * off,
-        rot: Math.atan2(px, pz),
-        kind: h2(si + i, 23) < 0.3 ? 'dumpster' : 'can',
-      })
+    for (let d = 26; d < len - 26; d += 44) {
+      if (h2(si * 9 + d, 17) < 0.62) continue // most candidate spots stay empty
+      const cx = s.a.x + ux * d
+      const cz = s.a.z + uz * d
+      if (onRoad(cx, cz, 12)) continue // keep clutter out of sight of real streets
+      const side = h2(si, d) < 0.5 ? 1 : -1
+      const off = (ALLEY_W / 2 - 0.7) * side
+      const ax = cx + px * off
+      const az = cz + pz * off
+      const rot = Math.atan2(px * side, pz * side) // back against the alley wall
+      out.push({ x: ax, z: az, rot, kind: 'dumpster' })
+      const cans = Math.floor(h2(si + d, 23) * 3) // 0–2 cans huddled next to it
+      for (let k = 1; k <= cans; k++) out.push({ x: ax + ux * 1.6 * k, z: az + uz * 1.6 * k, rot, kind: 'can' })
     }
   })
   return out
@@ -469,6 +473,8 @@ const SOLIDS: Rect[] = [
   ...LANDMARK_SOLIDS,
   ...BRIDGE_RAILS,
   ...TREES.map((t) => rect(t.x, t.z, 1.4, 1.4)),
+  // dumpsters are real obstacles (cans stay knock-through)
+  ...ALLEY_PROPS.filter((p) => p.kind === 'dumpster').map((p) => rect(p.x, p.z, 2.2, 1.6)),
 ]
 
 function pushOutOfRect(cx: number, cz: number, r: Rect, rad: number): { x: number; z: number; hit: boolean } {
