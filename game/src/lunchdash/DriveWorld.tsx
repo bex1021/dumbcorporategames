@@ -77,6 +77,86 @@ const BOX_ITEMS = [...BUILDINGS, HQ_BUILDING, ...BARNS].map((b) => {
 })
 const TREE_ITEMS = [...TREES, ...COUNTRY_TREES]
 
+// ---- building detail (Phase B) — all derived once, rendered in ONE instanced draw ----
+function shade(hex: string, f: number): string {
+  return '#' + new Color(hex).multiplyScalar(f).getHexString()
+}
+
+// Tall buildings become 2–3 stacked tiers with setbacks (real towers step in as
+// they rise); ROOFS tracks each building's final top for rooftop clutter.
+const TIER_ITEMS: BoxItem[] = []
+const ROOFS: { x: number; z: number; w: number; d: number; topY: number; srcH: number }[] = []
+BOX_ITEMS.forEach((b) => {
+  let top = b.y + b.h / 2
+  let tw = b.w
+  let td = b.d
+  if (b.h > 30) {
+    const t2 = b.h * 0.24
+    tw *= 0.78
+    td *= 0.78
+    TIER_ITEMS.push({ x: b.x, y: top + t2 / 2, z: b.z, w: tw, h: t2, d: td, color: shade(b.color, 0.93) })
+    top += t2
+    if (b.h > 52) {
+      const t3 = b.h * 0.16
+      tw *= 0.72
+      td *= 0.72
+      TIER_ITEMS.push({ x: b.x, y: top + t3 / 2, z: b.z, w: tw, h: t3, d: td, color: shade(b.color, 0.86) })
+      top += t3
+    }
+  }
+  ROOFS.push({ x: b.x, z: b.z, w: tw, d: td, topY: top, srcH: b.h })
+})
+
+// Horizontal window bands every floor-ish — the single thing that makes a box
+// read as a building. Slightly proud of the facade so they catch the light.
+const BAND_ITEMS: BoxItem[] = []
+for (const it of [...BOX_ITEMS, ...TIER_ITEMS]) {
+  if (it.h < 9) continue
+  const bot = it.y - it.h / 2
+  for (let y = bot + 5; y < it.y + it.h / 2 - 2; y += 3.4) {
+    BAND_ITEMS.push({ x: it.x, y, z: it.z, w: it.w + 0.1, h: 1.05, d: it.d + 0.1, color: '#2c333d' })
+  }
+}
+
+// Darker glass storefront band at street level (flat city blocks only — hill
+// houses keep their clean faces).
+const STORE_ITEMS: BoxItem[] = BOX_ITEMS.filter((b) => b.h >= 10 && terrainHeight(b.x, b.z) < 1.5).map((b) => ({
+  x: b.x,
+  y: b.y - b.h / 2 + 3,
+  z: b.z,
+  w: b.w + 0.14,
+  h: 3,
+  d: b.d + 0.14,
+  color: '#24272c',
+}))
+
+// Rooftop AC units — 1–2 small boxes per mid/large roof, hashed placement.
+const AC_ITEMS: BoxItem[] = []
+ROOFS.forEach((r, i) => {
+  if (r.srcH < 14 || r.w < 6) return
+  const n = 1 + Math.floor(bh(i, 91) * 2)
+  for (let k = 0; k < n; k++) {
+    const ox = (bh(i, 92 + k) - 0.5) * (r.w - 3)
+    const oz = (bh(i, 95 + k) - 0.5) * (r.d - 3)
+    AC_ITEMS.push({ x: r.x + ox, y: r.topY + 0.55, z: r.z + oz, w: 1.6, h: 1.1, d: 1.3, color: '#8e9298' })
+  }
+})
+
+const CITY_BOXES: BoxItem[] = [...BOX_ITEMS, ...TIER_ITEMS, ...BAND_ITEMS, ...STORE_ITEMS, ...AC_ITEMS]
+
+// Wooden water towers — the NYC silhouette — on brownstone + Manhattan roofs.
+const WT_RECTS: Rect[] = [
+  { minX: -300, maxX: -120, minZ: -188, maxZ: -48 }, // brownstones
+  { minX: -92, maxX: 20, minZ: -120, maxZ: 46 }, // Manhattan core
+]
+const WATER_TOWERS = ROOFS.filter(
+  (r, i) =>
+    r.srcH > 10 &&
+    r.srcH < 48 &&
+    bh(i, 77) < 0.32 &&
+    WT_RECTS.some((q) => r.x >= q.minX && r.x <= q.maxX && r.z >= q.minZ && r.z <= q.maxZ),
+)
+
 export function DriveWorld() {
   return (
     <>
@@ -94,8 +174,9 @@ export function DriveWorld() {
       <Docks />
       <Tunnel />
       <Overpass />
-      <InstancedBoxes items={BOX_ITEMS} />
+      <InstancedBoxes items={CITY_BOXES} />
       <BasePlinths />
+      <WaterTowers />
       <InstancedTrees />
       <Palms />
       <AlleyProps />
@@ -754,6 +835,39 @@ function BasePlinths() {
       <boxGeometry args={[1, 1, 1]} />
       <meshStandardMaterial color="#3a3d41" />
     </instancedMesh>
+  )
+}
+
+// Wooden rooftop water towers (tank + conical lid), instanced — pure NYC.
+function WaterTowers() {
+  const tankRef = useRef<InstancedMesh>(null)
+  const lidRef = useRef<InstancedMesh>(null)
+  useLayoutEffect(() => {
+    const o = new Object3D()
+    WATER_TOWERS.forEach((r, i) => {
+      const wx = r.x + r.w * 0.18
+      const wz = r.z - r.d * 0.15
+      o.position.set(wx, r.topY + 1.5, wz)
+      o.updateMatrix()
+      tankRef.current?.setMatrixAt(i, o.matrix)
+      o.position.set(wx, r.topY + 3.55, wz)
+      o.updateMatrix()
+      lidRef.current?.setMatrixAt(i, o.matrix)
+    })
+    if (tankRef.current) tankRef.current.instanceMatrix.needsUpdate = true
+    if (lidRef.current) lidRef.current.instanceMatrix.needsUpdate = true
+  }, [])
+  return (
+    <>
+      <instancedMesh ref={tankRef} args={[undefined, undefined, WATER_TOWERS.length]} castShadow>
+        <cylinderGeometry args={[1.15, 1.3, 3, 10]} />
+        <meshStandardMaterial color="#6b5743" />
+      </instancedMesh>
+      <instancedMesh ref={lidRef} args={[undefined, undefined, WATER_TOWERS.length]} castShadow>
+        <coneGeometry args={[1.45, 1.1, 10]} />
+        <meshStandardMaterial color="#4a3f33" />
+      </instancedMesh>
+    </>
   )
 }
 
