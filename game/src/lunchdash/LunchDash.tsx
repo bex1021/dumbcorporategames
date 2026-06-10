@@ -101,14 +101,15 @@ export default function LunchDash() {
       <Canvas
         dpr={[1, 1.5]}
         frameloop={frameloop}
+        shadows
         camera={{
           position: [SPAWN.x, DRIVE_CAMERA.height, SPAWN.z + DRIVE_CAMERA.distance],
           fov: DRIVE_CAMERA.fov,
         }}
         gl={{ antialias: true }}
       >
-        <color attach="background" args={['#c4ccd2']} />
-        <fog attach="fog" args={['#c4ccd2', 170, 520]} />
+        <color attach="background" args={['#cfd8dd']} />
+        <fog attach="fog" args={['#d4dadc', 180, 540]} />
         <Suspense fallback={null}>
           <DriveWorld />
           <Car />

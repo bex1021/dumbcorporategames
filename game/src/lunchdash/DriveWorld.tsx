@@ -2,12 +2,25 @@
 // Boston/Austin/LA) plus office parks, landmarks, and countryside. Buildings &
 // park trees render as InstancedMesh (one draw call each). See cityLayout.
 
-import { Suspense, useLayoutEffect, useMemo, useRef } from 'react'
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { Text, Billboard } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
-import { Object3D, Color, InstancedMesh, PlaneGeometry, Float32BufferAttribute, BufferGeometry, DoubleSide, MeshStandardMaterial } from 'three'
+import {
+  Object3D,
+  Color,
+  InstancedMesh,
+  PlaneGeometry,
+  SphereGeometry,
+  Float32BufferAttribute,
+  BufferGeometry,
+  DoubleSide,
+  BackSide,
+  MeshStandardMaterial,
+  DirectionalLight,
+} from 'three'
 import { terrainHeight } from './terrain'
 import { signalState } from './signalState'
+import { carPosition } from './carState'
 import { DRIVE_WORLD } from './driveConfig'
 import { DESTINATIONS, type Destination } from './destinations'
 import {
@@ -67,6 +80,7 @@ const TREE_ITEMS = [...TREES, ...COUNTRY_TREES]
 export function DriveWorld() {
   return (
     <>
+      <SkyDome />
       <DriveLights />
       <Ground />
       <Patches rects={COUNTRY_FIELDS} y={0.015} color="#7e8a55" />
@@ -81,6 +95,7 @@ export function DriveWorld() {
       <Tunnel />
       <Overpass />
       <InstancedBoxes items={BOX_ITEMS} />
+      <BasePlinths />
       <InstancedTrees />
       <Palms />
       <AlleyProps />
@@ -93,13 +108,92 @@ export function DriveWorld() {
 }
 
 function DriveLights() {
+  // Lower fill so the sun's shadows actually read; the sun carries the scene.
   return (
     <>
-      <ambientLight intensity={0.6} color="#f0eee8" />
-      <hemisphereLight args={['#dfe3e6', '#9a978f', 0.35]} />
-      <directionalLight position={[140, 180, 90]} intensity={0.95} color="#f3ecdd" />
+      <ambientLight intensity={0.42} color="#f0eee8" />
+      <hemisphereLight args={['#dfe3e6', '#9a978f', 0.3]} />
+      <SunLight />
     </>
   )
+}
+
+// The sun: one shadow-casting directional light whose shadow window FOLLOWS the
+// car (the standard open-world trick — crisp shadows near the camera, none paid
+// for across the whole 1.1 km world). Snapped to a coarse grid so the shadow
+// texels don't shimmer while driving.
+function SunLight() {
+  const ref = useRef<DirectionalLight>(null)
+  const target = useMemo(() => new Object3D(), [])
+  useEffect(() => {
+    if (ref.current) ref.current.target = target
+  }, [target])
+  useFrame(() => {
+    const l = ref.current
+    if (!l) return
+    const ax = Math.round(carPosition.x / 8) * 8
+    const az = Math.round(carPosition.z / 8) * 8
+    l.position.set(ax + 110, 170, az + 70)
+    target.position.set(ax, 0, az)
+    target.updateMatrixWorld()
+  })
+  return (
+    <>
+      <directionalLight
+        ref={ref}
+        castShadow
+        intensity={1.1}
+        color="#f3ecdd"
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
+        shadow-camera-left={-95}
+        shadow-camera-right={95}
+        shadow-camera-top={95}
+        shadow-camera-bottom={-95}
+        shadow-camera-near={20}
+        shadow-camera-far={430}
+        shadow-bias={-0.0005}
+        shadow-normalBias={1.0}
+      />
+      <primitive object={target} />
+    </>
+  )
+}
+
+// Gradient sky dome — pale haze at the horizon rising to a soft noon blue, so
+// the world stops ending in a flat grey wall. Fog is tuned to the horizon band
+// so distant blocks melt into it.
+function SkyDome() {
+  const geo = useMemo(() => {
+    const g = new SphereGeometry(880, 24, 12)
+    const pos = g.attributes.position
+    const zen = new Color('#8fb3d4')
+    const hor = new Color('#d6dde1')
+    const low = new Color('#e2e4e0')
+    const c = new Color()
+    const colors = new Float32Array(pos.count * 3)
+    for (let i = 0; i < pos.count; i++) {
+      const t = pos.getY(i) / 880
+      if (t >= 0) c.copy(hor).lerp(zen, Math.min(1, t * 1.5))
+      else c.copy(hor).lerp(low, Math.min(1, -t * 3))
+      colors[i * 3] = c.r
+      colors[i * 3 + 1] = c.g
+      colors[i * 3 + 2] = c.b
+    }
+    g.setAttribute('color', new Float32BufferAttribute(colors, 3))
+    return g
+  }, [])
+  return (
+    <mesh geometry={geo}>
+      <meshBasicMaterial vertexColors side={BackSide} fog={false} depthWrite={false} />
+    </mesh>
+  )
+}
+
+// tiny deterministic hash for per-block tint variety (same recipe as cityLayout)
+function bh(i: number, j: number): number {
+  const n = Math.sin(i * 127.1 + j * 311.7) * 43758.5453
+  return n - Math.floor(n)
 }
 
 function Ground() {
@@ -127,7 +221,8 @@ function Ground() {
       pos.setZ(i, t)
       if (inAny(x, wz, WATER)) col.copy(water) // river + pond, painted blue
       else if (inAny(x, wz, GREEN_AREAS)) col.copy(grass) // parks, golf, cemetery
-      else if (inAny(x, wz, DISTRICT_REGIONS)) col.copy(grey) // paved city block — grey even on a hill
+      else if (inAny(x, wz, DISTRICT_REGIONS))
+        col.copy(grey).multiplyScalar(0.95 + bh(Math.floor(x / 36), Math.floor(wz / 36)) * 0.1) // paved block — tint varies block to block
       else col.copy(grey).lerp(grass, Math.min(t / 7, 1)) // asphalt → grass on the open hills
       colors[i * 3] = col.r
       colors[i * 3 + 1] = col.g
@@ -139,7 +234,7 @@ function Ground() {
     return g
   }, [])
   return (
-    <mesh geometry={geo} rotation={[-Math.PI / 2, 0, 0]}>
+    <mesh geometry={geo} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
       <meshStandardMaterial vertexColors />
     </mesh>
   )
@@ -149,7 +244,7 @@ function Patches({ rects, y, color }: { rects: Rect[]; y: number; color: string 
   return (
     <>
       {rects.map((r, i) => (
-        <mesh key={i} rotation={[-Math.PI / 2, 0, 0]} position={[(r.minX + r.maxX) / 2, y, (r.minZ + r.maxZ) / 2]}>
+        <mesh key={i} rotation={[-Math.PI / 2, 0, 0]} position={[(r.minX + r.maxX) / 2, y, (r.minZ + r.maxZ) / 2]} receiveShadow>
           <planeGeometry args={[r.maxX - r.minX, r.maxZ - r.minZ]} />
           <meshStandardMaterial color={color} />
         </mesh>
@@ -162,7 +257,7 @@ function ParkingLots() {
   return (
     <>
       {PARKING.map((r, i) => (
-        <mesh key={i} rotation={[-Math.PI / 2, 0, 0]} position={[(r.minX + r.maxX) / 2, 0.03, (r.minZ + r.maxZ) / 2]}>
+        <mesh key={i} rotation={[-Math.PI / 2, 0, 0]} position={[(r.minX + r.maxX) / 2, 0.03, (r.minZ + r.maxZ) / 2]} receiveShadow>
           <planeGeometry args={[r.maxX - r.minX, r.maxZ - r.minZ]} />
           <meshStandardMaterial color="#4f5256" />
         </mesh>
@@ -175,7 +270,7 @@ function Avenues() {
   return (
     <>
       {AVENUES.map((a, i) => (
-        <mesh key={i} rotation={[-Math.PI / 2, 0, a.rotY]} position={[a.x, 0.05, a.z]}>
+        <mesh key={i} rotation={[-Math.PI / 2, 0, a.rotY]} position={[a.x, 0.05, a.z]} receiveShadow>
           <planeGeometry args={[a.width, a.len]} />
           <meshStandardMaterial color="#585b60" />
         </mesh>
@@ -200,7 +295,8 @@ function Roads() {
 const RD_YELLOW = '#e8c13a' // golden centerline (research: real paint, not lemon)
 const RD_WHITE = '#eef0ef'
 const RD_ASPHALT = '#3b3d41'
-const RD_CURB = '#8d8f91'
+const RD_WALK = '#a6a8a4' // concrete sidewalk — lighter than asphalt for value pop
+const RD_CURBSTONE = '#b4b6b2' // the curb line between asphalt and walk
 const RD_PAINT = '#e8e6df' // off-white crosswalk / stop-bar paint
 
 // Build a terrain-draped ribbon geometry along a centerline (shifted sideways
@@ -214,13 +310,14 @@ function ribbonGeo(
   width: number,
   yOff: number,
   gaps?: [number, number][],
+  step = 2.5,
 ) {
   const dx = bx - ax
   const dz = bz - az
   const len = Math.hypot(dx, dz) || 1
   const px = dz / len // unit perpendicular
   const pz = -dx / len
-  const steps = Math.max(2, Math.ceil(len / 2.5)) // fine enough to hug hills (no grass poking through)
+  const steps = Math.max(2, Math.ceil(len / step)) // fine enough to hug hills (no grass poking through)
   const pos = new Float32Array((steps + 1) * 6)
   const idx: number[] = []
   for (let i = 0; i <= steps; i++) {
@@ -258,44 +355,64 @@ function ribbonGeo(
   return g
 }
 
+// Add a 3 m-dash / 9 m-gap pattern (the real 10:30 ft standard) on top of the
+// intersection gaps, so inner lane dividers read as dashed instead of solid.
+function dashGaps(len: number, base: [number, number][]): [number, number][] {
+  const gaps: [number, number][] = [...base]
+  for (let s = 3; s < len; s += 12) gaps.push([s / len, Math.min((s + 9) / len, 1)])
+  return gaps
+}
+
 function RoadSeg({ road }: { road: Road }) {
   const W = roadWidth(road.type)
   const arterial = road.type === 'arterial'
-  const { asphalt, walks, lines } = useMemo(() => {
+  const { asphalt, walks, curbs, lines } = useMemo(() => {
     const a = road.a
     const b = road.b
+    const len = Math.hypot(b.x - a.x, b.z - a.z)
     // paint + sidewalks stop at each crossing (bare-asphalt intersection box);
     // sidewalks break a touch wider so they clear the corner cleanly.
     const gaps = paintGaps(road)
     const swGaps = paintGaps(road, 5)
+    const dashed = dashGaps(len, gaps)
     const ln: { geo: BufferGeometry; color: string }[] = []
-    const add = (off: number, w: number, color: string) =>
-      ln.push({ geo: ribbonGeo(a.x, a.z, b.x, b.z, off, w, 0.12, gaps), color })
+    const add = (off: number, w: number, color: string, g: [number, number][] = gaps, step = 2.5) =>
+      ln.push({ geo: ribbonGeo(a.x, a.z, b.x, b.z, off, w, 0.12, g, step), color })
     if (arterial) {
       add(-0.38, 0.22, RD_YELLOW) // double-yellow center
       add(0.38, 0.22, RD_YELLOW)
-      add(-W / 4, 0.16, RD_WHITE) // white lane dividers
-      add(W / 4, 0.16, RD_WHITE)
+      add(-W / 4, 0.16, RD_WHITE, dashed, 1.5) // dashed white lane dividers
+      add(W / 4, 0.16, RD_WHITE, dashed, 1.5)
     } else {
       add(0, 0.22, RD_YELLOW) // single yellow center
     }
-    add(-(W / 2 - 0.5), 0.18, RD_WHITE) // white edges
+    add(-(W / 2 - 0.5), 0.18, RD_WHITE) // white edges (solid, per the real standard)
     add(W / 2 - 0.5, 0.18, RD_WHITE)
     const sw = W / 2 + 2 // sidewalks just outside each edge
     return {
       asphalt: ribbonGeo(a.x, a.z, b.x, b.z, 0, W, 0.08), // continuous — paving runs through the box
-      walks: [ribbonGeo(a.x, a.z, b.x, b.z, -sw, 4, 0.14, swGaps), ribbonGeo(a.x, a.z, b.x, b.z, sw, 4, 0.14, swGaps)],
+      // sidewalks ride a touch higher + a light curb strip at the road edge
+      walks: [ribbonGeo(a.x, a.z, b.x, b.z, -sw, 4, 0.2, swGaps), ribbonGeo(a.x, a.z, b.x, b.z, sw, 4, 0.2, swGaps)],
+      curbs: [
+        ribbonGeo(a.x, a.z, b.x, b.z, -(W / 2 - 0.05), 0.7, 0.165, swGaps),
+        ribbonGeo(a.x, a.z, b.x, b.z, W / 2 - 0.05, 0.7, 0.165, swGaps),
+      ],
       lines: ln,
     }
   }, [road, W, arterial])
   return (
     <group>
-      <mesh geometry={asphalt}>
+      <mesh geometry={asphalt} receiveShadow>
         <meshStandardMaterial color={RD_ASPHALT} side={DoubleSide} />
       </mesh>
       {walks.map((g, i) => (
-        <mesh key={`w${i}`} geometry={g}>
-          <meshStandardMaterial color={RD_CURB} side={DoubleSide} />
+        <mesh key={`w${i}`} geometry={g} receiveShadow>
+          <meshStandardMaterial color={RD_WALK} side={DoubleSide} />
+        </mesh>
+      ))}
+      {curbs.map((g, i) => (
+        <mesh key={`c${i}`} geometry={g} receiveShadow>
+          <meshStandardMaterial color={RD_CURBSTONE} side={DoubleSide} />
         </mesh>
       ))}
       {/* lane paint is UNLIT (meshBasic) so it stays bright like real paint */}
@@ -318,16 +435,16 @@ function Bridges() {
         const cz = (b.minZ + b.maxZ) / 2
         return (
           <group key={i}>
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[cx, 0.08, cz]}>
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[cx, 0.08, cz]} receiveShadow>
               <planeGeometry args={[w, d]} />
               <meshStandardMaterial color="#8b9097" />
             </mesh>
             {/* railings down the roadway edges (match the BRIDGE_RAILS colliders) */}
-            <mesh position={[cx - 9.6, 0.95, cz]}>
+            <mesh position={[cx - 9.6, 0.95, cz]} castShadow>
               <boxGeometry args={[0.6, 1.9, d]} />
               <meshStandardMaterial color="#b6bcc2" />
             </mesh>
-            <mesh position={[cx + 9.6, 0.95, cz]}>
+            <mesh position={[cx + 9.6, 0.95, cz]} castShadow>
               <boxGeometry args={[0.6, 1.9, d]} />
               <meshStandardMaterial color="#b6bcc2" />
             </mesh>
@@ -364,7 +481,7 @@ function TrafficLight({ x, z }: { x: number; z: number }) {
   const armY = py + 7
   return (
     <group>
-      <mesh position={[cx, py + 3.5, cz]}>
+      <mesh position={[cx, py + 3.5, cz]} castShadow>
         <cylinderGeometry args={[0.22, 0.28, 7, 8]} />
         <meshStandardMaterial color="#2f3236" />
       </mesh>
@@ -494,7 +611,7 @@ function Alleys() {
     return g
   }, [])
   return (
-    <mesh geometry={geo}>
+    <mesh geometry={geo} receiveShadow>
       <meshStandardMaterial color="#33353a" side={DoubleSide} />
     </mesh>
   )
@@ -607,9 +724,35 @@ function InstancedBoxes({ items }: { items: BoxItem[] }) {
     if (m.instanceColor) m.instanceColor.needsUpdate = true
   }, [items])
   return (
-    <instancedMesh ref={ref} args={[undefined, undefined, items.length]}>
+    <instancedMesh ref={ref} args={[undefined, undefined, items.length]} castShadow receiveShadow>
       <boxGeometry args={[1, 1, 1]} />
       <meshStandardMaterial />
+    </instancedMesh>
+  )
+}
+
+// A dark plinth band hugging each building's base — fake contact shadow +
+// foundation line. This is what visually glues the boxes to the ground beyond
+// the live shadow window (one instanced draw call).
+function BasePlinths() {
+  const ref = useRef<InstancedMesh>(null)
+  useLayoutEffect(() => {
+    const m = ref.current
+    if (!m) return
+    const o = new Object3D()
+    BOX_ITEMS.forEach((b, i) => {
+      const baseY = b.y - b.h / 2 + 1.5 // the building's lowest visible corner
+      o.position.set(b.x, baseY + 0.22, b.z)
+      o.scale.set(b.w + 1.6, 0.44, b.d + 1.6)
+      o.updateMatrix()
+      m.setMatrixAt(i, o.matrix)
+    })
+    m.instanceMatrix.needsUpdate = true
+  }, [])
+  return (
+    <instancedMesh ref={ref} args={[undefined, undefined, BOX_ITEMS.length]}>
+      <boxGeometry args={[1, 1, 1]} />
+      <meshStandardMaterial color="#3a3d41" />
     </instancedMesh>
   )
 }
@@ -633,7 +776,7 @@ function InstancedTrees() {
     if (m.instanceColor) m.instanceColor.needsUpdate = true
   }, [])
   return (
-    <instancedMesh ref={ref} args={[undefined, undefined, TREE_ITEMS.length]}>
+    <instancedMesh ref={ref} args={[undefined, undefined, TREE_ITEMS.length]} castShadow>
       <coneGeometry args={[1, 1, 7]} />
       <meshStandardMaterial />
     </instancedMesh>
@@ -646,11 +789,11 @@ function Palms() {
     <>
       {PALMS.map((p, i) => (
         <group key={i} position={[p.x, terrainHeight(p.x, p.z), p.z]}>
-          <mesh position={[0, p.h / 2, 0]}>
+          <mesh position={[0, p.h / 2, 0]} castShadow>
             <cylinderGeometry args={[0.18, 0.28, p.h, 6]} />
             <meshStandardMaterial color="#8a7150" />
           </mesh>
-          <mesh position={[0, p.h, 0]}>
+          <mesh position={[0, p.h, 0]} castShadow>
             <coneGeometry args={[2, 1.6, 6]} />
             <meshStandardMaterial color="#5f7f43" />
           </mesh>
@@ -684,7 +827,7 @@ function LandmarkMesh({ l }: { l: Landmark }) {
   if (l.kind === 'stadium') {
     return (
       <group>
-        <mesh position={[0, 7, 0]}>
+        <mesh position={[0, 7, 0]} castShadow>
           <cylinderGeometry args={[l.r, l.r, 14, 36, 1, true]} />
           <meshStandardMaterial color="#9aa0a6" side={2} />
         </mesh>
@@ -697,7 +840,7 @@ function LandmarkMesh({ l }: { l: Landmark }) {
   }
   if (l.kind === 'mall') {
     return (
-      <mesh position={[0, 6, 0]}>
+      <mesh position={[0, 6, 0]} castShadow>
         <boxGeometry args={[l.w, 12, l.d]} />
         <meshStandardMaterial color="#b0a89a" />
       </mesh>

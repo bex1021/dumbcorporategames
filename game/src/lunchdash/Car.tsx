@@ -10,9 +10,9 @@
 // "does driving + the follow camera feel good". Bouncy-bumper collision, the
 // salmon bowl, pedestrians and traffic all come in later slices.
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Group } from 'three'
+import { Group, Mesh } from 'three'
 import { useKeyboard } from '../hooks/useKeyboard'
 import { DRIVE, DRIVE_WORLD, AIR } from './driveConfig'
 import { carPosition, carFacing, carTelemetry, carAir } from './carState'
@@ -30,6 +30,13 @@ export function Car() {
   const keys = useKeyboard()
   const [tier, setTier] = useState<DamageTier>('pristine')
   const tierRef = useRef<DamageTier>('pristine')
+
+  // the car casts a real shadow — re-applied when damage swaps the body meshes
+  useEffect(() => {
+    ref.current?.traverse((o) => {
+      if ((o as Mesh).isMesh) o.castShadow = true
+    })
+  }, [tier])
 
   useFrame((_, delta) => {
     const g = ref.current

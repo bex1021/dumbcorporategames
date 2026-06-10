@@ -39,7 +39,7 @@ export function Pedestrians() {
   })
 
   return (
-    <instancedMesh ref={ref} args={[geo, undefined, n]}>
+    <instancedMesh ref={ref} args={[geo, undefined, n]} castShadow>
       <meshStandardMaterial color="#b9b0a0" roughness={0.9} />
     </instancedMesh>
   )

@@ -62,10 +62,10 @@ export function TrafficCars() {
 
   return (
     <>
-      <instancedMesh ref={bodyRef} args={[bodyGeo, undefined, n]}>
+      <instancedMesh ref={bodyRef} args={[bodyGeo, undefined, n]} castShadow>
         <meshStandardMaterial metalness={0.1} roughness={0.6} />
       </instancedMesh>
-      <instancedMesh ref={cabinRef} args={[cabinGeo, undefined, n]}>
+      <instancedMesh ref={cabinRef} args={[cabinGeo, undefined, n]} castShadow>
         <meshStandardMaterial color="#23262c" metalness={0.2} roughness={0.3} />
       </instancedMesh>
     </>
