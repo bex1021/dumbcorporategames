@@ -16,6 +16,7 @@ import { bowl, bowlTier } from './bowlState'
 import { hr } from './pedState'
 import { useLunchStore } from './lunchStore'
 import { Minimap } from './Minimap'
+import { BowlWidget } from './BowlWidget'
 
 const MONO = '"IBM Plex Mono", "SF Mono", ui-monospace, Menlo, monospace'
 const CHIP: React.CSSProperties = {
@@ -349,12 +350,16 @@ export function DriveHud() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 10, letterSpacing: '0.12em', opacity: 0.6 }}>SALMON BOWL</span>
+          <span style={{ fontSize: 10, letterSpacing: '0.12em', opacity: 0.6 }}>EXEC'S SALMON BOWL</span>
           <span ref={bowlLabelRef} style={{ fontSize: 10, letterSpacing: '0.1em', color: '#4ea96b' }}>
             COMPOSED
           </span>
         </div>
-        <div style={{ height: 7, borderRadius: 4, background: 'rgba(217,211,196,0.15)', marginTop: 6, overflow: 'hidden' }}>
+        {/* the live bowl-cam — contents, lid and salmon react to your driving */}
+        <div style={{ marginTop: 4 }}>
+          <BowlWidget />
+        </div>
+        <div style={{ height: 7, borderRadius: 4, background: 'rgba(217,211,196,0.15)', marginTop: 4, overflow: 'hidden' }}>
           <div ref={bowlBarRef} style={{ height: '100%', width: '100%', background: '#4ea96b', transition: 'width 0.15s' }} />
         </div>
       </div>
