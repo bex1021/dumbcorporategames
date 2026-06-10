@@ -6,7 +6,7 @@
 import { useEffect, useRef } from 'react'
 import { carPosition, carFacing } from './carState'
 import { DESTINATIONS } from './destinations'
-import { HQ_BUILDING, WATER, GREEN_AREAS, ROADS, WORLD_HALF, type Rect } from './cityLayout'
+import { HQ_BUILDING, WATER, GREEN_AREAS, ROADS, AVENUE_LINES, WORLD_HALF, type Rect } from './cityLayout'
 import { useLunchStore } from './lunchStore'
 
 const SIZE = 188
@@ -47,6 +47,28 @@ export function Minimap() {
         ctx.moveTo(toX(r.a.x), toY(r.a.z))
         ctx.lineTo(toX(r.b.x), toY(r.b.z))
         ctx.stroke()
+      })
+      // diagonal avenues — thinner
+      AVENUE_LINES.forEach((s) => {
+        ctx.lineWidth = 2.5
+        ctx.beginPath()
+        ctx.moveTo(toX(s.a.x), toY(s.a.z))
+        ctx.lineTo(toX(s.b.x), toY(s.b.z))
+        ctx.stroke()
+      })
+      // street names along the majors
+      ctx.font = 'bold 6px ui-monospace, monospace'
+      ctx.fillStyle = 'rgba(82,84,70,0.9)'
+      ctx.textAlign = 'center'
+      ROADS.forEach((r) => {
+        if (!r.name) return
+        const rlen = Math.hypot(r.b.x - r.a.x, r.b.z - r.a.z)
+        if (rlen < 250) return
+        ctx.save()
+        ctx.translate(toX((r.a.x + r.b.x) / 2), toY((r.a.z + r.b.z) / 2))
+        if (r.a.x === r.b.x) ctx.rotate(-Math.PI / 2)
+        ctx.fillText(r.name, 0, -2)
+        ctx.restore()
       })
 
       // Alignly HQ — navy square marker

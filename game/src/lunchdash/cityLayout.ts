@@ -92,10 +92,13 @@ const BOSTON_COMMON: Rect = { minX: 196, maxX: 244, minZ: -28, maxZ: 14 }
 export const PARKS: Rect[] = [CENTRAL_PARK, BOSTON_COMMON]
 
 // ---------- diagonal avenues ----------
+// Diagonal avenues — each end SNAPS to a real junction now (the old NE avenue
+// literally dead-ended into the river).
 const AVE_SEGMENTS = [
-  { a: { x: 40, z: -20 }, b: { x: 178, z: 120 } },
-  { a: { x: -92, z: -58 }, b: { x: 8, z: 70 } },
+  { a: { x: 40, z: -22 }, b: { x: 168, z: 108 } }, // Alignment Blvd ↔ Riverbank Rd
+  { a: { x: -150, z: -22 }, b: { x: -43, z: 108 } }, // Backlog Ln ↔ Riverbank Rd (clips the park corner — parks have transverse roads)
 ]
+export const AVENUE_LINES = AVE_SEGMENTS
 export const AVENUES: RoadStrip[] = AVE_SEGMENTS.map(({ a, b }) => {
   const dx = b.x - a.x
   const dz = b.z - a.z
@@ -152,35 +155,40 @@ export const GREEN_AREAS: Rect[] = [
 // wide double-yellow spines that each cross the river on a bridge; collectors
 // (single yellow) parallel them and feed the bridges; the leftover building
 // gaps are the unmarked local streets.
-export type Road = { a: { x: number; z: number }; b: { x: number; z: number }; type: 'arterial' | 'collector' }
+export type Road = { a: { x: number; z: number }; b: { x: number; z: number }; type: 'arterial' | 'collector'; name?: string }
 export function roadWidth(type: Road['type']): number {
   return type === 'arterial' ? 18 : 12
 }
 // Every road ends ONLY at the map edge or where it meets another road — never
 // dead-ending mid-map. Arterials span full edge-to-edge; collectors each run
 // BETWEEN two other roads.
+// Every road is NAMED (the minimap labels the majors — and the radio /
+// HR receipts can name-check streets later: "the incident on Sepulveda").
 export const ROADS: Road[] = [
   // N–S arterials — full height: up over the hills and across the bridges
-  { a: { x: -43, z: -295 }, b: { x: -43, z: 295 }, type: 'arterial' }, // Bridge A
-  { a: { x: 111, z: -295 }, b: { x: 111, z: 295 }, type: 'arterial' }, // Bridge B
-  // E–W arterials — full width (downtown + south of the river)
-  { a: { x: -295, z: -22 }, b: { x: 295, z: -22 }, type: 'arterial' },
-  { a: { x: -295, z: 215 }, b: { x: 295, z: 215 }, type: 'arterial' },
-  // riverbank collectors — full width, feeding both bridges
-  { a: { x: -295, z: 108 }, b: { x: 295, z: 108 }, type: 'collector' },
-  { a: { x: -295, z: 186 }, b: { x: 295, z: 186 }, type: 'collector' },
+  { a: { x: -43, z: -295 }, b: { x: -43, z: 295 }, type: 'arterial', name: 'Synergy Ave' }, // Bridge A
+  { a: { x: 111, z: -295 }, b: { x: 111, z: 295 }, type: 'arterial', name: 'Deliverable Dr' }, // Bridge B
+  // E–W arterials
+  { a: { x: -295, z: -22 }, b: { x: 295, z: -22 }, type: 'arterial', name: 'Alignment Blvd' },
+  // south arterial ends at Fairway Ct (the golf course owns the SW corner — no
+  // third bridge over the river, so the south loop closes via the Fairway link)
+  { a: { x: -188, z: 215 }, b: { x: 295, z: 215 }, type: 'arterial', name: 'Sepulveda Blvd' },
+  // riverbank collectors
+  { a: { x: -295, z: 108 }, b: { x: 295, z: 108 }, type: 'collector', name: 'Riverbank Rd' },
+  { a: { x: -188, z: 186 }, b: { x: 295, z: 186 }, type: 'collector', name: 'Esplanade' },
   // connecting collectors (each runs arterial↔arterial or arterial↔riverbank)
-  { a: { x: -43, z: -180 }, b: { x: 111, z: -180 }, type: 'collector' }, // through the hills
-  { a: { x: -43, z: -75 }, b: { x: 111, z: -75 }, type: 'collector' }, // downtown cross-street
-  { a: { x: 30, z: -22 }, b: { x: 30, z: 108 }, type: 'collector' },
-  { a: { x: -150, z: -22 }, b: { x: -150, z: 108 }, type: 'collector' },
-  // perimeter connectors — close the loops so roads don't dead-end at the edge.
-  // Routed only where they clear the river and the SE stadium / SW golf course.
-  { a: { x: -43, z: -295 }, b: { x: 111, z: -295 }, type: 'arterial' }, // north edge: links the two N–S spines
-  { a: { x: -43, z: 295 }, b: { x: 111, z: 295 }, type: 'arterial' }, // south edge
-  { a: { x: -295, z: -22 }, b: { x: -295, z: 108 }, type: 'collector' }, // west: E–W arterial → riverbank collector (north of the river)
-  { a: { x: 295, z: -22 }, b: { x: 295, z: 108 }, type: 'collector' }, // east, north of the river
-  { a: { x: 295, z: 186 }, b: { x: 295, z: 215 }, type: 'collector' }, // east, south of the river
+  { a: { x: -43, z: -180 }, b: { x: 111, z: -180 }, type: 'collector', name: 'Switchback Rd' }, // through the hills
+  { a: { x: -43, z: -75 }, b: { x: 111, z: -75 }, type: 'collector', name: 'Standup St' }, // downtown cross-street
+  { a: { x: 30, z: -22 }, b: { x: 30, z: 108 }, type: 'collector', name: 'KPI Way' },
+  { a: { x: -150, z: -22 }, b: { x: -150, z: 108 }, type: 'collector', name: 'Backlog Ln' },
+  // perimeter connectors — close the loops so roads don't dead-end at the edge
+  { a: { x: -43, z: -295 }, b: { x: 111, z: -295 }, type: 'arterial', name: 'Beltline N' },
+  { a: { x: -43, z: 295 }, b: { x: 111, z: 295 }, type: 'arterial', name: 'Beltline S' },
+  { a: { x: -295, z: -22 }, b: { x: -295, z: 108 }, type: 'collector', name: 'Beltline W' },
+  { a: { x: 295, z: -22 }, b: { x: 295, z: 108 }, type: 'collector', name: 'Beltline E' },
+  { a: { x: 295, z: 186 }, b: { x: 295, z: 215 }, type: 'collector', name: 'Beltline E' },
+  // the SW loop closure: Esplanade ↔ Sepulveda just east of the golf course
+  { a: { x: -188, z: 186 }, b: { x: -188, z: 215 }, type: 'collector', name: 'Fairway Ct' },
 ]
 function pointToSeg(px: number, pz: number, ax: number, az: number, bx: number, bz: number): number {
   const dx = bx - ax
@@ -273,16 +281,42 @@ export const DISTRICT_REGIONS: Rect[] = DISTRICTS.map((d) => d.region)
 // instead of buildings on a field. Unmarked (local streets get no lane paint).
 export type AlleySeg = { a: { x: number; z: number }; b: { x: number; z: number } }
 export const ALLEY_W = 5
-function genAlleys(): AlleySeg[] {
-  const out: AlleySeg[] = []
+function genAlleys(): { segs: AlleySeg[]; fences: Rect[] } {
+  const segs: AlleySeg[] = []
   for (const d of DISTRICTS) {
     const r = d.region
-    for (let x = r.minX + d.step / 2; x < r.maxX - 1; x += d.step) out.push({ a: { x, z: r.minZ }, b: { x, z: r.maxZ } })
-    for (let z = r.minZ + d.step / 2; z < r.maxZ - 1; z += d.step) out.push({ a: { x: r.minX, z }, b: { x: r.maxX, z } })
+    for (let x = r.minX + d.step / 2; x < r.maxX - 1; x += d.step) segs.push({ a: { x, z: r.minZ }, b: { x, z: r.maxZ } })
+    for (let z = r.minZ + d.step / 2; z < r.maxZ - 1; z += d.step) segs.push({ a: { x: r.minX, z }, b: { x: r.maxX, z } })
   }
-  return out
+  // Connect or cap every alley end: if a street is within reach, EXTEND the
+  // alley to meet it (real through-alleys); otherwise CAP it with a back-lot
+  // fence so dead ends end at something instead of petering into grass.
+  const fences: Rect[] = []
+  for (const s of segs) {
+    const vert = s.a.x === s.b.x
+    for (const key of ['a', 'b'] as const) {
+      const e = s[key]
+      const o = key === 'a' ? s.b : s.a
+      const dx = Math.sign(e.x - o.x)
+      const dz = Math.sign(e.z - o.z)
+      if (onRoad(e.x, e.z, 1)) continue // already meets a street
+      let connected = false
+      for (let ext = 3; ext <= 18; ext += 3) {
+        if (onRoad(e.x + dx * ext, e.z + dz * ext, 1)) {
+          e.x += dx * (ext + 2) // overshoot into the roadway so the surfaces merge
+          e.z += dz * (ext + 2)
+          connected = true
+          break
+        }
+      }
+      if (!connected) fences.push(vert ? rect(e.x, e.z, ALLEY_W + 0.8, 0.5) : rect(e.x, e.z, 0.5, ALLEY_W + 0.8))
+    }
+  }
+  return { segs, fences }
 }
-export const ALLEYS: AlleySeg[] = genAlleys()
+const ALLEY_GEN = genAlleys()
+export const ALLEYS: AlleySeg[] = ALLEY_GEN.segs
+export const ALLEY_FENCES: Rect[] = ALLEY_GEN.fences
 function onAlley(x: number, z: number, rad = 0): boolean {
   for (const s of ALLEYS) {
     if (pointToSeg(x, z, s.a.x, s.a.z, s.b.x, s.b.z) < ALLEY_W / 2 + rad + 0.5) return true
@@ -418,6 +452,7 @@ export const TREES: Tree[] = (() => {
       const z = p.minZ + h2(i + pi * 50, 2) * (p.maxZ - p.minZ)
       if (inRect(x, z, POND, 3)) continue
       if (onRoad(x, z, 2)) continue // never drop a tree on a road that crosses the park
+      if (distToAvenues(x, z) < 9) continue // ...or on the diagonal avenue through the park corner
       if (h2(i + pi * 50, 3) < 0.45) continue
       out.push({ x, z, h: 3.5 + h2(i, 4) * 3 })
     }
@@ -475,6 +510,8 @@ const SOLIDS: Rect[] = [
   ...TREES.map((t) => rect(t.x, t.z, 1.4, 1.4)),
   // dumpsters are real obstacles (cans stay knock-through)
   ...ALLEY_PROPS.filter((p) => p.kind === 'dumpster').map((p) => rect(p.x, p.z, 2.2, 1.6)),
+  // back-lot fences capping dead-end alleys
+  ...ALLEY_FENCES,
 ]
 
 function pushOutOfRect(cx: number, cz: number, r: Rect, rad: number): { x: number; z: number; hit: boolean } {

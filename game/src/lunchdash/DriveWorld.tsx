@@ -35,7 +35,7 @@ import {
   COUNTRY_FIELDS,
   COUNTRY_TREES,
   BRIDGES,
-  AVENUES,
+  AVENUE_LINES,
   TUNNEL,
   PARKING,
   LANDMARKS,
@@ -49,6 +49,7 @@ import {
   ALLEYS,
   ALLEY_W,
   ALLEY_PROPS,
+  ALLEY_FENCES,
   SIGNALS,
   type Rect,
   type Landmark,
@@ -187,6 +188,30 @@ ROADS.forEach((r, ri) => {
   }
 })
 
+// Stop signs at every unsignalized road crossing (the 8 majors have lights).
+// Two signs per junction on opposite corners.
+const STOP_SIGNS: { x: number; z: number }[] = []
+{
+  const seen = new Set<string>()
+  for (const v of ROADS) {
+    if (v.a.x !== v.b.x) continue
+    for (const h of ROADS) {
+      if (h.a.z !== h.b.z) continue
+      const cx = v.a.x
+      const cz = h.a.z
+      if (cz < Math.min(v.a.z, v.b.z) || cz > Math.max(v.a.z, v.b.z)) continue
+      if (cx < Math.min(h.a.x, h.b.x) || cx > Math.max(h.a.x, h.b.x)) continue
+      const key = `${cx},${cz}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      if (SIGNALS.some((s) => Math.hypot(s.x - cx, s.z - cz) < 12)) continue
+      const vw = roadWidth(v.type) / 2 + 1.3
+      const hw = roadWidth(h.type) / 2 + 1.3
+      STOP_SIGNS.push({ x: cx + vw, z: cz + hw }, { x: cx - vw, z: cz - hw })
+    }
+  }
+}
+
 // Satire billboards — placed in the cleared bridge-approach / countryside
 // strips so they never clip a building. The ads ARE the world-building.
 const BILLBOARDS: { x: number; z: number; ry: number; top: string; sub: string }[] = [
@@ -213,10 +238,12 @@ export function DriveWorld() {
       <ParkingLots />
       <Avenues />
       <Alleys />
+      <AlleyFences />
       <Roads />
       <SignalMarkings />
       <Bridges />
       <TrafficLights />
+      <StopSigns />
       <Docks />
       <Tunnel />
       <Overpass />
@@ -396,16 +423,88 @@ function ParkingLots() {
   )
 }
 
+// Diagonal avenues — real roads now: terrain-draped asphalt ribbon + a yellow
+// centerline + white edges, with the paint gapped at every crossing (and
+// trimmed at the junction ends) just like the axis-aligned streets.
 function Avenues() {
+  const data = useMemo(
+    () =>
+      AVENUE_LINES.map(({ a, b }) => {
+        const len = Math.hypot(b.x - a.x, b.z - a.z) || 1
+        const gaps: [number, number][] = [
+          [0, 11 / len],
+          [1 - 11 / len, 1],
+        ]
+        for (const r of ROADS) {
+          const vert = r.a.x === r.b.x
+          if (vert) {
+            if ((r.a.x - a.x) * (r.a.x - b.x) >= 0) continue // not strictly between
+            const t = (r.a.x - a.x) / (b.x - a.x)
+            const z = a.z + (b.z - a.z) * t
+            if (z < Math.min(r.a.z, r.b.z) || z > Math.max(r.a.z, r.b.z)) continue
+            const half = (roadWidth(r.type) / 2 + 2.5) / len
+            gaps.push([t - half, t + half])
+          } else {
+            if ((r.a.z - a.z) * (r.a.z - b.z) >= 0) continue
+            const t = (r.a.z - a.z) / (b.z - a.z)
+            const x = a.x + (b.x - a.x) * t
+            if (x < Math.min(r.a.x, r.b.x) || x > Math.max(r.a.x, r.b.x)) continue
+            const half = (roadWidth(r.type) / 2 + 2.5) / len
+            gaps.push([t - half, t + half])
+          }
+        }
+        return {
+          asphalt: ribbonGeo(a.x, a.z, b.x, b.z, 0, 12, 0.07), // under the main roads at crossings
+          center: ribbonGeo(a.x, a.z, b.x, b.z, 0, 0.22, 0.11, gaps),
+          edges: [ribbonGeo(a.x, a.z, b.x, b.z, -5.4, 0.18, 0.11, gaps), ribbonGeo(a.x, a.z, b.x, b.z, 5.4, 0.18, 0.11, gaps)],
+        }
+      }),
+    [],
+  )
   return (
     <>
-      {AVENUES.map((a, i) => (
-        <mesh key={i} rotation={[-Math.PI / 2, 0, a.rotY]} position={[a.x, 0.05, a.z]} receiveShadow>
-          <planeGeometry args={[a.width, a.len]} />
-          <meshStandardMaterial color="#585b60" />
-        </mesh>
+      {data.map((d, i) => (
+        <group key={i}>
+          <mesh geometry={d.asphalt} receiveShadow>
+            <meshStandardMaterial color={RD_ASPHALT} side={DoubleSide} />
+          </mesh>
+          <mesh geometry={d.center}>
+            <meshBasicMaterial color={RD_YELLOW} side={DoubleSide} />
+          </mesh>
+          {d.edges.map((g, j) => (
+            <mesh key={j} geometry={g}>
+              <meshBasicMaterial color={RD_WHITE} side={DoubleSide} />
+            </mesh>
+          ))}
+        </group>
       ))}
     </>
+  )
+}
+
+// Back-lot fences capping the alley stubs that genuinely dead-end — the alley
+// ends AT something (and the fence is solid, matching its collider).
+function AlleyFences() {
+  const ref = useRef<InstancedMesh>(null)
+  useLayoutEffect(() => {
+    const m = ref.current
+    if (!m) return
+    const o = new Object3D()
+    ALLEY_FENCES.forEach((f, i) => {
+      const cx = (f.minX + f.maxX) / 2
+      const cz = (f.minZ + f.maxZ) / 2
+      o.position.set(cx, terrainHeight(cx, cz) + 0.95, cz)
+      o.scale.set(f.maxX - f.minX, 1.9, f.maxZ - f.minZ)
+      o.updateMatrix()
+      m.setMatrixAt(i, o.matrix)
+    })
+    m.instanceMatrix.needsUpdate = true
+  }, [])
+  return (
+    <instancedMesh ref={ref} args={[undefined, undefined, ALLEY_FENCES.length]} castShadow>
+      <boxGeometry args={[1, 1, 1]} />
+      <meshStandardMaterial color="#5a544a" />
+    </instancedMesh>
   )
 }
 
@@ -1014,6 +1113,36 @@ function StreetLights() {
       </instancedMesh>
       <instancedMesh ref={headRef} args={[headGeo, undefined, LAMP_POSTS.length]}>
         <meshStandardMaterial color="#f2e3b8" emissive="#f2e3b8" emissiveIntensity={0.25} />
+      </instancedMesh>
+    </>
+  )
+}
+
+// Stop signs — post + red octagon, instanced, angled so they read from both
+// approaches.
+function StopSigns() {
+  const postRef = useRef<InstancedMesh>(null)
+  const headRef = useRef<InstancedMesh>(null)
+  const postGeo = useMemo(() => new CylinderGeometry(0.05, 0.05, 2.4, 5).translate(0, 1.2, 0), [])
+  const headGeo = useMemo(() => new CylinderGeometry(0.42, 0.42, 0.07, 8).rotateX(Math.PI / 2).translate(0, 2.25, 0), [])
+  useLayoutEffect(() => {
+    const o = new Object3D()
+    STOP_SIGNS.forEach((p, i) => {
+      o.position.set(p.x, terrainHeight(p.x, p.z), p.z)
+      o.rotation.set(0, Math.PI / 4, 0)
+      o.updateMatrix()
+      postRef.current?.setMatrixAt(i, o.matrix)
+      headRef.current?.setMatrixAt(i, o.matrix)
+    })
+    for (const r of [postRef, headRef]) if (r.current) r.current.instanceMatrix.needsUpdate = true
+  }, [])
+  return (
+    <>
+      <instancedMesh ref={postRef} args={[postGeo, undefined, STOP_SIGNS.length]} castShadow>
+        <meshStandardMaterial color="#9aa0a4" />
+      </instancedMesh>
+      <instancedMesh ref={headRef} args={[headGeo, undefined, STOP_SIGNS.length]}>
+        <meshStandardMaterial color="#b5392c" />
       </instancedMesh>
     </>
   )
