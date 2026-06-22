@@ -18,15 +18,14 @@ import { ObjectiveDetector } from './ObjectiveDetector'
 import { GameClock } from './GameClock'
 import { DRIVE_CAMERA } from './driveConfig'
 import { carPosition, carFacing, carTelemetry, carAir } from './carState'
-import { driveClock, START_MIN } from './clockState'
 import { SPAWN, ALLEYS, ALLEY_W, ALLEY_PROPS, BUILDINGS, ROADS } from './cityLayout'
 import { terrainHeight } from './terrain'
-import { boundary } from './boundaryState'
-import { crash } from './crashState'
-import { resetBowl, bowl, bowlTier, sloshBowl } from './bowlState'
-import { resetTraffic, traffic, resolveTrafficCollision } from './trafficState'
-import { resetPeds, peds, hr, updatePeds } from './pedState'
+import { bowl, bowlTier, sloshBowl } from './bowlState'
+import { traffic, resolveTrafficCollision } from './trafficState'
+import { peds, hr, updatePeds } from './pedState'
 import { useLunchStore } from './lunchStore'
+import { resetRun } from './runReset'
+import { Retrospective } from './Retrospective'
 
 export default function LunchDash() {
   // Start rendering immediately — even if this tab happens to load hidden (a
@@ -44,23 +43,7 @@ export default function LunchDash() {
   // Fresh run on every entry: reset the persistent (module-global) car, clock,
   // and objective state so navigating in always starts clean at 11:00.
   useEffect(() => {
-    carPosition.set(SPAWN.x, 0, SPAWN.z)
-    carFacing.y = 0
-    carTelemetry.speed = 0
-    carAir.y = terrainHeight(SPAWN.x, SPAWN.z)
-    carAir.vy = 0
-    carAir.airborne = false
-    carAir.prevGh = carAir.y
-    carAir.climb = 0
-    driveClock.minutes = START_MIN
-    driveClock.running = true
-    boundary.zone = 'in'
-    crash.severity = 0
-    crash.shake = 0
-    resetBowl()
-    resetTraffic()
-    resetPeds()
-    useLunchStore.getState().reset()
+    resetRun()
     // dev-only teleport hook for auditing the city: __lunch.go(x, z, facingRad)
     if (import.meta.env.DEV) {
       ;(window as unknown as { __lunch?: unknown }).__lunch = {
@@ -120,6 +103,7 @@ export default function LunchDash() {
       </Canvas>
 
       <DriveHud />
+      <Retrospective />
     </div>
   )
 }

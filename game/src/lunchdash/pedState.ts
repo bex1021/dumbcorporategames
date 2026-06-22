@@ -9,6 +9,9 @@
 
 import { ROADS, roadWidth, type Road } from './cityLayout'
 import { carPosition } from './carState'
+import { driveClock } from './clockState'
+
+export const HR_TIME_PENALTY = 3 // in-game minutes lost each time you clip someone
 
 export type Ped = {
   road: Road
@@ -100,6 +103,7 @@ export function updatePeds(dt: number) {
       p.down = 4 // knocked down; gets back up after a few seconds
       hr.incidents++
       hr.pulse++
+      driveClock.minutes += HR_TIME_PENALTY // "exchanging info" eats your clock
     }
   }
 }

@@ -66,7 +66,10 @@ export function DriveHud() {
       if (speedRef.current) {
         speedRef.current.textContent = String(Math.round(Math.abs(carTelemetry.speed) * 2.237))
       }
-      if (clockRef.current) clockRef.current.textContent = fmtClock(driveClock.minutes)
+      if (clockRef.current) {
+        clockRef.current.textContent = fmtClock(driveClock.minutes)
+        clockRef.current.style.color = driveClock.minutes > END_MIN ? '#e58a78' : '#d9d3c4'
+      }
       if (barRef.current) {
         const frac = Math.min(Math.max((driveClock.minutes - START_MIN) / (END_MIN - START_MIN), 0), 1)
         barRef.current.style.width = `${frac * 100}%`
@@ -193,25 +196,7 @@ export function DriveHud() {
         }}
       >
         {done ? (
-          (() => {
-            const bt = bowlTier(bowl.integrity)
-            const line =
-              bt === 'composed'
-                ? 'Salmon bowl delivered intact. The exec barely looks up. — Composed'
-                : bt === 'functional'
-                  ? "Bowl's a little sloshed, but presentable. — Functional"
-                  : 'You hand over a salmon crime scene. — Disheveled'
-            return (
-              <>
-                <div style={{ fontSize: 14 }}>{line}</div>
-                <div style={{ fontSize: 11, marginTop: 5, opacity: 0.8 }}>
-                  {hr.incidents === 0
-                    ? 'Driving record: clean — no HR incidents.'
-                    : `Driving record: ${hr.incidents} HR incident${hr.incidents > 1 ? 's' : ''} logged.`}
-                </div>
-              </>
-            )
-          })()
+          <div style={{ fontSize: 13, opacity: 0.8 }}>Run complete — see your receipt.</div>
         ) : (
           <>
             <div style={{ fontSize: 10, letterSpacing: '0.18em', textTransform: 'uppercase', opacity: 0.65 }}>
@@ -286,7 +271,7 @@ export function DriveHud() {
           whiteSpace: 'nowrap',
         }}
       >
-        ⚠ HR INCIDENT LOGGED — that goes in your file
+        ⚠ HR INCIDENT — −3 min, and it goes in your file
       </div>
       <div
         ref={hrChipRef}
