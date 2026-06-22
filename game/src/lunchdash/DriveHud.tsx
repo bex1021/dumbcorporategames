@@ -14,6 +14,7 @@ import { boundary } from './boundaryState'
 import { crash, damageTier } from './crashState'
 import { bowl, bowlTier } from './bowlState'
 import { hr } from './pedState'
+import { pickup } from './pickupState'
 import { useLunchStore } from './lunchStore'
 import { Minimap } from './Minimap'
 import { BowlWidget } from './BowlWidget'
@@ -59,6 +60,9 @@ export function DriveHud() {
   const hrCountRef = useRef<HTMLSpanElement>(null)
   const lastHrPulse = useRef(0)
   const hrToastHideAt = useRef(0)
+  const pickupRef = useRef<HTMLDivElement>(null)
+  const pickupPromptRef = useRef<HTMLSpanElement>(null)
+  const pickupBarRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     let raf = 0
@@ -130,6 +134,13 @@ export function DriveHud() {
       if (hrToastRef.current) hrToastRef.current.style.opacity = performance.now() < hrToastHideAt.current ? '1' : '0'
       if (hrChipRef.current) hrChipRef.current.style.opacity = hr.incidents > 0 ? '1' : '0'
       if (hrCountRef.current) hrCountRef.current.textContent = String(hr.incidents)
+      // pickup prompt — shows when you're in a stop's pull-in zone
+      if (pickupRef.current) pickupRef.current.style.opacity = pickup.inZone ? '1' : '0'
+      if (pickupPromptRef.current) pickupPromptRef.current.textContent = pickup.prompt
+      if (pickupBarRef.current) {
+        pickupBarRef.current.style.width = `${Math.min(pickup.progress / pickup.need, 1) * 100}%`
+        pickupBarRef.current.style.background = pickup.filling ? '#5cbb7a' : '#d4a93a'
+      }
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
@@ -385,6 +396,28 @@ export function DriveHud() {
           0
         </span>
         <span style={{ fontSize: 11, letterSpacing: '0.15em', opacity: 0.7 }}>MPH</span>
+      </div>
+
+      {/* pull-in pickup prompt + progress (bottom-center, above the controls) */}
+      <div
+        ref={pickupRef}
+        style={{
+          ...CHIP,
+          position: 'fixed',
+          bottom: 64,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          padding: '8px 16px',
+          width: 280,
+          textAlign: 'center',
+          opacity: 0,
+          transition: 'opacity 0.18s',
+        }}
+      >
+        <span ref={pickupPromptRef} style={{ fontSize: 13 }} />
+        <div style={{ height: 6, borderRadius: 3, background: 'rgba(217,211,196,0.15)', marginTop: 7, overflow: 'hidden' }}>
+          <div ref={pickupBarRef} style={{ height: '100%', width: '0%', background: '#5cbb7a', transition: 'width 0.08s' }} />
+        </div>
       </div>
 
       {/* bottom-center: controls hint */}

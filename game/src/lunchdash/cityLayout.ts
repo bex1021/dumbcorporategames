@@ -37,6 +37,30 @@ export const DEST_POINTS = {
 
 export const HQ_BUILDING: Building = { x: DEST_POINTS.office.x, z: DEST_POINTS.office.z, w: 16, d: 16, h: 46, color: '#3b4a66' }
 
+// Drive-through storefronts at the pickup stops. The building sits beside the
+// stop's cleared hub; `zx,zz` is the pull-in WINDOW the car stops at (set toward
+// the nearest road so you can actually drive in). The HQ stop reuses HQ_BUILDING
+// and only needs a drop-off zone (see destinations).
+export type Storefront = {
+  id: 'bowlz' | 'lunch'
+  x: number
+  z: number
+  w: number
+  d: number
+  h: number
+  zx: number
+  zz: number
+  color: string
+  sign: string
+}
+export const STOREFRONTS: Storefront[] = [
+  // Corporate Slop Bowlz — Alignment Blvd runs just to the north (z = −22)
+  { id: 'bowlz', x: -22, z: -3, w: 15, d: 8, h: 7, zx: -22, zz: -13, color: '#3f7d4f', sign: 'CORPORATE SLOP BOWLZ' },
+  // Your Lunch — a drive-thru set fully back north of wide Sepulveda (z = 215,
+  // spans z206–224); building clear of the road, window at the curb.
+  { id: 'lunch', x: 40, z: 199, w: 13, d: 8, h: 6, zx: 40, zz: 208, color: '#b5603a', sign: 'GreenWrap — DRIVE THRU' },
+]
+
 function h2(i: number, j: number): number {
   const n = Math.sin(i * 127.1 + j * 311.7) * 43758.5453
   return n - Math.floor(n)
@@ -397,7 +421,7 @@ function clearOf(x: number, z: number, rad = 0): boolean {
   if (onRoad(x, z, rad)) return false
   if (onAlley(x, z, rad)) return false // keep the alley grid clear of buildings
   if (Math.hypot(x - SPAWN.x, z - SPAWN.z) < 18) return false
-  for (const p of Object.values(DEST_POINTS)) if (Math.hypot(x - p.x, z - p.z) < 16) return false
+  for (const p of Object.values(DEST_POINTS)) if (Math.hypot(x - p.x, z - p.z) < 20) return false // room for storefront + lane
   return true
 }
 
@@ -505,6 +529,7 @@ export const BARNS: Building[] = (() => {
 // ---------- collision ----------
 const SOLIDS: Rect[] = [
   ...[...BUILDINGS, HQ_BUILDING, ...BARNS].map((b) => rect(b.x, b.z, b.w, b.d)),
+  ...STOREFRONTS.map((s) => rect(s.x, s.z, s.w, s.d)),
   ...LANDMARK_SOLIDS,
   ...BRIDGE_RAILS,
   ...TREES.map((t) => rect(t.x, t.z, 1.4, 1.4)),

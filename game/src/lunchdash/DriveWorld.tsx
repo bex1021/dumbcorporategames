@@ -28,6 +28,8 @@ import { DESTINATIONS, type Destination } from './destinations'
 import {
   BUILDINGS,
   HQ_BUILDING,
+  STOREFRONTS,
+  DEST_POINTS,
   BARNS,
   WATER,
   TREES,
@@ -256,6 +258,8 @@ export function DriveWorld() {
       <Billboards />
       <Palms />
       <AlleyProps />
+      <Storefronts />
+      <OfficeDropoff />
       <Landmarks />
       <TrafficCars />
       <Pedestrians />
@@ -1324,6 +1328,112 @@ function LandmarkMesh({ l }: { l: Landmark }) {
           <meshStandardMaterial color="#c4c8c2" />
         </mesh>
       ))}
+    </group>
+  )
+}
+
+// --- drive-through storefronts ---
+function Storefronts() {
+  return (
+    <>
+      {STOREFRONTS.map((s) => {
+        const gy = terrainHeight(s.x, s.z)
+        // unit vector from the building toward its pull-in window = the "front"
+        const fx = s.zx - s.x
+        const fz = s.zz - s.z
+        const fl = Math.hypot(fx, fz) || 1
+        const nx = fx / fl
+        const nz = fz / fl
+        const yaw = Math.atan2(nx, nz)
+        return (
+          <group key={s.id}>
+            {/* main building */}
+            <mesh position={[s.x, gy + s.h / 2, s.z]} castShadow receiveShadow>
+              <boxGeometry args={[s.w, s.h, s.d]} />
+              <meshStandardMaterial color={s.color} />
+            </mesh>
+            {/* window strip on the front face */}
+            <mesh position={[s.x + nx * (s.d / 2 + 0.06), gy + 1.7, s.z + nz * (s.d / 2 + 0.06)]} rotation={[0, yaw, 0]}>
+              <boxGeometry args={[s.w * 0.55, 1.6, 0.12]} />
+              <meshStandardMaterial color="#23262b" metalness={0.2} roughness={0.3} />
+            </mesh>
+            {/* sign band above the front */}
+            <group position={[s.x + nx * (s.d / 2 + 0.12), gy + s.h + 1.5, s.z + nz * (s.d / 2 + 0.12)]} rotation={[0, yaw, 0]}>
+              <mesh castShadow>
+                <boxGeometry args={[s.w * 0.92, 2.5, 0.35]} />
+                <meshStandardMaterial color="#f2efe6" />
+              </mesh>
+              <Suspense fallback={null}>
+                <Text position={[0, 0, 0.22]} fontSize={0.92} maxWidth={s.w * 0.86} color={s.color} anchorX="center" anchorY="middle" textAlign="center">
+                  {s.sign}
+                </Text>
+              </Suspense>
+            </group>
+            {/* drive-thru canopy over the window + 4 posts */}
+            <mesh position={[s.zx, gy + 3.5, s.zz]} castShadow>
+              <boxGeometry args={[7, 0.35, 7]} />
+              <meshStandardMaterial color={s.color} />
+            </mesh>
+            {[
+              [-3, -3],
+              [3, -3],
+              [-3, 3],
+              [3, 3],
+            ].map(([ox, oz], i) => (
+              <mesh key={i} position={[s.zx + ox, gy + 1.7, s.zz + oz]} castShadow>
+                <cylinderGeometry args={[0.15, 0.15, 3.4, 6]} />
+                <meshStandardMaterial color="#54585d" />
+              </mesh>
+            ))}
+            {/* lane pad under the window */}
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[s.zx, gy + 0.05, s.zz]} receiveShadow>
+              <planeGeometry args={[10, 8]} />
+              <meshStandardMaterial color="#34363a" />
+            </mesh>
+            {/* menu board beside the lane */}
+            <mesh position={[s.zx - nz * 4, gy + 1.2, s.zz + nx * 4]} rotation={[0, yaw + 0.4, 0]} castShadow>
+              <boxGeometry args={[1.4, 1.8, 0.18]} />
+              <meshStandardMaterial color="#22251f" />
+            </mesh>
+          </group>
+        )
+      })}
+    </>
+  )
+}
+
+// Alignly HQ drop-off — a sign + entrance canopy on the tower's south face and
+// a parking pad at the return zone (the bug fix: a reachable arrival outside the
+// building, where the beacon also now sits).
+function OfficeDropoff() {
+  const ox = DEST_POINTS.office.x
+  const oz = DEST_POINTS.office.z
+  const gy = terrainHeight(ox, oz + 12)
+  return (
+    <group>
+      <Suspense fallback={null}>
+        <Billboard position={[ox, 34, oz + 8.3]}>
+          <Text fontSize={3.4} color="#cfd8ea" anchorX="center" anchorY="middle">
+            ALIGNLY
+          </Text>
+        </Billboard>
+      </Suspense>
+      {/* entrance canopy on the south face */}
+      <mesh position={[ox, gy + 4, oz + 9]} castShadow>
+        <boxGeometry args={[11, 0.4, 4]} />
+        <meshStandardMaterial color="#2f3b57" />
+      </mesh>
+      {[-4.5, 4.5].map((sx) => (
+        <mesh key={sx} position={[ox + sx, gy + 2, oz + 10.6]} castShadow>
+          <cylinderGeometry args={[0.16, 0.16, 4, 6]} />
+          <meshStandardMaterial color="#54585d" />
+        </mesh>
+      ))}
+      {/* drop-off pad at the return zone */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[ox, gy + 0.05, oz + 12]} receiveShadow>
+        <planeGeometry args={[13, 9]} />
+        <meshStandardMaterial color="#3a3d41" />
+      </mesh>
     </group>
   )
 }
