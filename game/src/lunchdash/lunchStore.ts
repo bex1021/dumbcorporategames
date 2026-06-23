@@ -4,13 +4,14 @@ import { driveClock, START_MIN, END_MIN } from './clockState'
 import { bowl, bowlTier, type BowlTier } from './bowlState'
 import { crash, damageTier, type DamageTier } from './crashState'
 import { hr } from './pedState'
+import { scoreTier, type ReturnTier } from './scoring'
 
 // Objective progress + the RUN OUTCOME for the Lunch Dash drive. The active
 // destination advances as the car reaches each stop; reaching the last stop
 // (Alignly HQ) ENDS the run and writes `final` — the receipt the retrospective
 // screen reads (and, later, Phase 4). A 12:30 no-show also ends the run.
 
-export type ReturnTier = 'composed' | 'functional' | 'disheveled'
+export type { ReturnTier }
 
 // The Phase 3 receipt — a snapshot captured the instant the run ends.
 export type RunFinal = {
@@ -25,15 +26,6 @@ export type RunFinal = {
   damage: DamageTier
   stopsCompleted: number
   returnTier: ReturnTier
-}
-
-// Composed / Functional / Disheveled — the blueprint's tier truth table.
-function scoreTier(f: Omit<RunFinal, 'returnTier'>): ReturnTier {
-  if (!f.delivered) return 'disheveled' // never made it back = the worst receipt
-  const bowlOk = f.bowlState !== 'disheveled'
-  if (!f.wasLate && f.pedestrianHits === 0 && f.bowlState === 'composed') return 'composed'
-  if (bowlOk && ((!f.wasLate && f.pedestrianHits <= 2) || (f.latenessMin <= 5 && f.pedestrianHits <= 1))) return 'functional'
-  return 'disheveled'
 }
 
 function capture(delivered: boolean, stopsCompleted: number): RunFinal {
