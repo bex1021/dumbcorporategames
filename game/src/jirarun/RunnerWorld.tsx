@@ -11,7 +11,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useGLTF, useAnimations, RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 import type { AnimationClip } from 'three'
-import { LANES, TOKEN_Y, PAL, LEVEL_DISTANCE, runwayForLevel, isMovingOverhang, bannerSweepX, type Obstacle, type ObstacleKind, type Token } from './runnerConfig'
+import { LANES, TOKEN_Y, PAL, LEVEL_DISTANCE, SLIDE_DUR, runwayForLevel, isMovingOverhang, bannerSweepX, type Obstacle, type ObstacleKind, type Token } from './runnerConfig'
 import { Sim, multForCombo, type DeathCause } from './simulation'
 
 const LEONARD_URL = '/models/Player_Idle.glb' // hosts the mesh we render
@@ -1202,8 +1202,14 @@ function LeonardModel() {
     const prev = actions[state.current]
     const next = actions[desired]
     state.current = desired
-    next?.reset().fadeIn(0.12).play()
+    next?.reset().fadeIn(0.1).play()
     if (desired === 'Run' && next) next.timeScale = RUN_TIMESCALE
+    // The Mixamo running-slide clip is ~1.5s, but the slide only LASTS SLIDE_DUR
+    // (0.62s) before we crossfade back to Run. At normal speed you'd only ever
+    // see the first ~40% — the crouch-down wind-up — so Leonard never visibly
+    // gets low and a clean slide reads like a near-miss. Compress the whole clip
+    // into the slide window so the full drop→glide plays out while he's sliding.
+    if (desired === 'Slide' && next) next.timeScale = next.getClip().duration / SLIDE_DUR
     prev?.fadeOut(0.12)
   })
 
