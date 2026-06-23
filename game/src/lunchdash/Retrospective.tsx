@@ -17,7 +17,7 @@ const TIER = {
 } as const
 
 function headline(f: RunFinal): { title: string; line: string } {
-  if (!f.delivered) return { title: 'You missed the Architecture Sync.', line: 'The meeting started without you. Diane (HR) is already typing.' }
+  if (!f.delivered) return { title: "Out of time — you didn't make it back by noon.", line: 'The Architecture Sync started without you. Diane (HR) is already typing.' }
   if (f.returnTier === 'composed')
     return { title: 'Composed.', line: 'Back in one piece, bowl intact, not a soul harmed. The exec barely looks up — "Let’s get into it."' }
   if (f.returnTier === 'functional')
@@ -35,6 +35,8 @@ export function Retrospective() {
   if (!done || !final) return null
 
   const tier = TIER[final.returnTier]
+  const isTimeout = final.outcome === 'timeout'
+  const resColor = isTimeout ? '#d76a5a' : tier.color
   const h = headline(final)
   const row = (k: string, v: string, vColor?: string) => (
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -84,9 +86,9 @@ export function Retrospective() {
           <div style={{ fontSize: 19, marginTop: 3, marginBottom: 2 }}>Pre-Sync Nourishment Acquisition</div>
 
           {/* resolution headline */}
-          <div style={{ marginTop: 12, padding: '12px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: `1px solid ${tier.color}55` }}>
-            <div style={{ fontSize: 10, letterSpacing: '0.18em', opacity: 0.55 }}>RESOLUTION</div>
-            <div style={{ fontSize: 24, fontWeight: 600, color: tier.color, marginTop: 1 }}>{tier.label}</div>
+          <div style={{ marginTop: 12, padding: '12px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: `1px solid ${resColor}55` }}>
+            <div style={{ fontSize: 10, letterSpacing: '0.18em', opacity: 0.55 }}>{isTimeout ? 'OUTCOME' : 'RESOLUTION'}</div>
+            <div style={{ fontSize: 24, fontWeight: 600, color: resColor, marginTop: 1 }}>{isTimeout ? '⏱ Out of Time' : tier.label}</div>
             <div style={{ fontSize: 13, marginTop: 6, opacity: 0.92 }}>{h.title}</div>
             <div style={{ fontSize: 12, marginTop: 4, opacity: 0.62, fontStyle: 'italic' }}>{h.line}</div>
           </div>

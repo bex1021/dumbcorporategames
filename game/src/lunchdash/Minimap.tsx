@@ -7,7 +7,7 @@ import { useEffect, useRef } from 'react'
 import { carPosition, carFacing } from './carState'
 import { DESTINATIONS } from './destinations'
 import { HQ_BUILDING, WATER, GREEN_AREAS, ROADS, AVENUE_LINES, PARADE, WORLD_HALF, type Rect } from './cityLayout'
-import { useLunchStore } from './lunchStore'
+import { useLunchStore, stopStateFor } from './lunchStore'
 
 const SIZE = 188
 const S = SIZE / (WORLD_HALF * 2)
@@ -30,7 +30,7 @@ export function Minimap() {
     let raf = 0
 
     const draw = () => {
-      const { stepIndex, done } = useLunchStore.getState()
+      const { stepIndex, mustRebowl, done } = useLunchStore.getState()
 
       // land base, then greens, then water
       ctx.fillStyle = '#a8b487'
@@ -90,12 +90,14 @@ export function Minimap() {
       ctx.fill()
       ctx.stroke()
 
-      // destination pins (white-outlined; active one ringed)
+      // destination pins (white-outlined; active one ringed). The active pin
+      // honours the salmon-overboard detour back to Corporate Slop Bowlz.
       DESTINATIONS.forEach((d, i) => {
         const x = clamp(toX(d.x))
         const y = clamp(toY(d.z))
-        const isActive = !done && i === stepIndex
-        const isDone = done || i < stepIndex
+        const st = stopStateFor(i, stepIndex, mustRebowl, done)
+        const isActive = st === 'active'
+        const isDone = st === 'done'
         ctx.beginPath()
         ctx.arc(x, y, isActive ? 6 : 5, 0, Math.PI * 2)
         ctx.fillStyle = isDone ? '#9a9a9a' : d.color

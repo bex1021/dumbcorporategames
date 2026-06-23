@@ -71,7 +71,7 @@ console.log('══════════════════════�
 console.log(`\nROUTE (road-following, Manhattan + bridge constraint):`)
 console.log(`  spawn→Bowlz ${LEGS[0].dist}m · Bowlz→Lunch ${LEGS[1].dist}m · Lunch→HQ ${LEGS[2].dist}m`)
 console.log(`  total ≈ ${ROUTE_DIST}m, ${LEGS.reduce((s, l) => s + l.corners, 0)} corners`)
-console.log(`  in-game budget: 60 min over the hour; clock = 11:00→12:00 noon, 12:30 hard fail`)
+console.log(`  in-game budget: 60 min over the hour; clock = 11:00→12:00 noon = HARD deadline (late = loss)`)
 
 console.log(`\n─── (1) AT THE CURRENT CLOCK (REAL_SECONDS_PER_HOUR=${CUR_BUDGET}, ${(3600 / CUR_BUDGET).toFixed(0)}:1) ───`)
 console.log('  bot       on-time   late   no-show   avg finish   avg used   avg hits   tier dist (C/F/D)')

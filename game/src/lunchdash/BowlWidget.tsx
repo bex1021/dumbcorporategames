@@ -50,8 +50,9 @@ export function BowlWidget() {
     let prevAir = false
     let prevShake = 0
     let lidGone = false
-    let salmonGone = false
+    let salmonEjected = false
     let wasCarrying = false
+    let lastSerial = bowl.serial
     let parts: Particle[] = []
     let last = performance.now()
     let raf = 0
@@ -83,7 +84,7 @@ export function BowlWidget() {
           o = 0
           v = 0
           lidGone = false
-          salmonGone = false
+          salmonEjected = false
           parts = []
         }
         wasCarrying = false
@@ -91,9 +92,15 @@ export function BowlWidget() {
         prevSp = carTelemetry.speed
         return // hidden by the parent chip anyway
       }
-      if (!wasCarrying) {
-        // pickup pop-in
+      // fresh bowl — first pickup OR a re-bowl after an overboard (serial bumps)
+      if (!wasCarrying || bowl.serial !== lastSerial) {
         wasCarrying = true
+        lastSerial = bowl.serial
+        o = 0
+        v = 0
+        lidGone = false
+        salmonEjected = false
+        parts = []
         cv.style.transition = 'none'
         cv.style.transform = 'scale(0.2)'
         requestAnimationFrame(() => {
@@ -147,8 +154,8 @@ export function BowlWidget() {
         })
         spawnLeaves(4, 1)
       }
-      if (!salmonGone && lidGone && bowl.integrity <= 5) {
-        salmonGone = true
+      if (!salmonEjected && bowl.salmonGone) {
+        salmonEjected = true
         parts.push({
           x: 72 + o * 0.6,
           y: 46,
@@ -189,18 +196,18 @@ export function BowlWidget() {
       ctx.fill()
 
       // contents — greens mound + salmon, sliding with the spring
-      if (!salmonGone || bowl.integrity > 5) {
+      if (!salmonEjected) {
         const greens = ['#6f9a55', '#5f8a49', '#7da75f', '#558044']
         for (let i = 0; i < 4; i++) {
           const gx = cx + o * (0.55 + i * 0.12) + (i - 1.5) * 13
-          const gy = rimY - 4 - (i % 2) * 3 - (salmonGone ? 3 : 0)
+          const gy = rimY - 4 - (i % 2) * 3 - (salmonEjected ? 3 : 0)
           ctx.fillStyle = greens[i]
           ctx.beginPath()
           ctx.ellipse(gx, gy, 11, 7.5, o * 0.012, 0, Math.PI * 2)
           ctx.fill()
         }
       }
-      if (!salmonGone) {
+      if (!salmonEjected) {
         // the salmon slab — rides the mound, hops when jostled
         const hop = Math.min(Math.abs(v) * 0.045, 7)
         const sx = cx + o * 0.85
@@ -290,7 +297,7 @@ export function BowlWidget() {
 
       // caption
       if (captionRef.current) {
-        const cap = salmonGone
+        const cap = salmonEjected
           ? 'salmon overboard.'
           : !lidGone
             ? bowl.integrity >= 85
@@ -300,7 +307,7 @@ export function BowlWidget() {
               ? 'open-air salad'
               : 'CRITICAL — salmon sliding'
         captionRef.current.textContent = cap
-        captionRef.current.style.color = salmonGone || bowl.integrity <= 30 ? '#d96a5a' : lidGone ? '#d4a93a' : '#9fb39a'
+        captionRef.current.style.color = salmonEjected || bowl.integrity <= 30 ? '#d96a5a' : lidGone ? '#d4a93a' : '#9fb39a'
       }
     }
 

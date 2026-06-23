@@ -15,7 +15,7 @@ import { crash, damageTier } from './crashState'
 import { bowl, bowlTier } from './bowlState'
 import { hr } from './pedState'
 import { pickup } from './pickupState'
-import { useLunchStore } from './lunchStore'
+import { useLunchStore, activeStop, stopStateFor } from './lunchStore'
 import { Minimap } from './Minimap'
 import { BowlWidget } from './BowlWidget'
 
@@ -39,6 +39,7 @@ function fmtClock(min: number): string {
 
 export function DriveHud() {
   const stepIndex = useLunchStore((s) => s.stepIndex)
+  const mustRebowl = useLunchStore((s) => s.mustRebowl)
   const done = useLunchStore((s) => s.done)
 
   const speedRef = useRef<HTMLSpanElement>(null)
@@ -63,6 +64,9 @@ export function DriveHud() {
   const pickupRef = useRef<HTMLDivElement>(null)
   const pickupPromptRef = useRef<HTMLSpanElement>(null)
   const pickupBarRef = useRef<HTMLDivElement>(null)
+  const spillTipRef = useRef<HTMLDivElement>(null)
+  const spillTipHideAt = useRef(0)
+  const prevBowlSerial = useRef(0)
 
   useEffect(() => {
     let raf = 0
@@ -84,7 +88,7 @@ export function DriveHud() {
         if (st.done) {
           distRef.current.textContent = ''
         } else {
-          const d = DESTINATIONS[st.stepIndex]
+          const d = DESTINATIONS[activeStop(st.stepIndex, st.mustRebowl)]
           const m = Math.round(Math.hypot(carPosition.x - d.x, carPosition.z - d.z))
           distRef.current.textContent = `${m} m`
         }
@@ -134,6 +138,11 @@ export function DriveHud() {
       if (hrToastRef.current) hrToastRef.current.style.opacity = performance.now() < hrToastHideAt.current ? '1' : '0'
       if (hrChipRef.current) hrChipRef.current.style.opacity = hr.incidents > 0 ? '1' : '0'
       if (hrCountRef.current) hrCountRef.current.textContent = String(hr.incidents)
+      // one-time spill-cause tip — fires the first time a bowl rides shotgun
+      // (serial hits 1), so the player knows WHAT spills it before it happens
+      if (bowl.serial === 1 && prevBowlSerial.current === 0) spillTipHideAt.current = performance.now() + 7000
+      prevBowlSerial.current = bowl.serial
+      if (spillTipRef.current) spillTipRef.current.style.opacity = performance.now() < spillTipHideAt.current ? '1' : '0'
       // pickup prompt — shows when you're in a stop's pull-in zone
       if (pickupRef.current) pickupRef.current.style.opacity = pickup.inZone ? '1' : '0'
       if (pickupPromptRef.current) pickupPromptRef.current.textContent = pickup.prompt
@@ -147,8 +156,8 @@ export function DriveHud() {
     return () => cancelAnimationFrame(raf)
   }, [])
 
-  const dest = DESTINATIONS[stepIndex]
-  const stopsDone = done ? DESTINATIONS.length : stepIndex
+  const dest = DESTINATIONS[activeStop(stepIndex, mustRebowl)]
+  const stopsDone = DESTINATIONS.filter((_, i) => stopStateFor(i, stepIndex, mustRebowl, done) === 'done').length
 
   return (
     <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 20 }}>
@@ -177,18 +186,21 @@ export function DriveHud() {
             {stopsDone} / {DESTINATIONS.length}
           </span>
           <span style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
-            {DESTINATIONS.map((d, i) => (
-              <span
-                key={d.id}
-                style={{
-                  width: 10,
-                  height: 10,
-                  borderRadius: '50%',
-                  background: i < stopsDone ? d.color : 'rgba(217,211,196,0.2)',
-                  border: !done && i === stepIndex ? '1px solid #fff' : '1px solid transparent',
-                }}
-              />
-            ))}
+            {DESTINATIONS.map((d, i) => {
+              const st = stopStateFor(i, stepIndex, mustRebowl, done)
+              return (
+                <span
+                  key={d.id}
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: '50%',
+                    background: st === 'done' ? d.color : 'rgba(217,211,196,0.2)',
+                    border: st === 'active' ? '1px solid #fff' : '1px solid transparent',
+                  }}
+                />
+              )
+            })}
           </span>
         </div>
       </div>
@@ -208,6 +220,17 @@ export function DriveHud() {
       >
         {done ? (
           <div style={{ fontSize: 13, opacity: 0.8 }}>Run complete — see your receipt.</div>
+        ) : mustRebowl ? (
+          <>
+            <div style={{ fontSize: 10, letterSpacing: '0.18em', textTransform: 'uppercase', color: '#e58a78' }}>
+              ⚠ Salmon overboard · recover
+            </div>
+            <div style={{ fontSize: 15, marginTop: 2 }}>
+              <span style={{ color: dest.color }}>●</span> Get another salmon bowl —{' '}
+              <span style={{ opacity: 0.85 }}>{dest.short}</span>{' '}
+              <span ref={distRef} style={{ opacity: 0.7, fontVariantNumeric: 'tabular-nums' }} />
+            </div>
+          </>
         ) : (
           <>
             <div style={{ fontSize: 10, letterSpacing: '0.18em', textTransform: 'uppercase', opacity: 0.65 }}>
@@ -417,6 +440,33 @@ export function DriveHud() {
         <span ref={pickupPromptRef} style={{ fontSize: 13 }} />
         <div style={{ height: 6, borderRadius: 3, background: 'rgba(217,211,196,0.15)', marginTop: 7, overflow: 'hidden' }}>
           <div ref={pickupBarRef} style={{ height: '100%', width: '0%', background: '#5cbb7a', transition: 'width 0.08s' }} />
+        </div>
+      </div>
+
+      {/* one-time spill-cause tip — appears the moment the exec's bowl is in
+          the car so the player knows WHAT spills it (the #1 unclear thing) */}
+      <div
+        ref={spillTipRef}
+        style={{
+          ...CHIP,
+          position: 'fixed',
+          top: 104,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          padding: '9px 16px',
+          maxWidth: 430,
+          textAlign: 'center',
+          background: 'rgba(26,44,32,0.9)',
+          border: '1px solid rgba(120,200,150,0.45)',
+          opacity: 0,
+          transition: 'opacity 0.3s',
+        }}
+      >
+        <div style={{ fontSize: 11, letterSpacing: '0.14em', color: '#9fe0b3', textTransform: 'uppercase' }}>🥗 Exec's salmon bowl secured</div>
+        <div style={{ fontSize: 12.5, marginTop: 3, opacity: 0.92, lineHeight: 1.5 }}>
+          It spills from <b>sharp turns at speed</b> and <b>crashes</b> — brake for corners and drive clean.
+          <br />
+          <span style={{ opacity: 0.6 }}>(Hitting people costs you time, not the bowl. Trash it completely and you'll have to fetch another.)</span>
         </div>
       </div>
 

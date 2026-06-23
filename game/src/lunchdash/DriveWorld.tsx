@@ -58,7 +58,7 @@ import {
   type Landmark,
   type Road,
 } from './cityLayout'
-import { useLunchStore } from './lunchStore'
+import { useLunchStore, stopStateFor } from './lunchStore'
 import { TrafficCars } from './Traffic'
 import { Pedestrians } from './Pedestrians'
 import { Parade } from './Parade'
@@ -1444,11 +1444,12 @@ function OfficeDropoff() {
 // --- destination beacons ---
 function Beacons() {
   const stepIndex = useLunchStore((s) => s.stepIndex)
+  const mustRebowl = useLunchStore((s) => s.mustRebowl)
   const done = useLunchStore((s) => s.done)
   return (
     <>
       {DESTINATIONS.map((d, i) => {
-        const state: BeaconState = done || i < stepIndex ? 'done' : i === stepIndex ? 'active' : 'future'
+        const state: BeaconState = stopStateFor(i, stepIndex, mustRebowl, done)
         return <Beacon key={d.id} d={d} state={state} />
       })}
     </>

@@ -31,8 +31,10 @@ const BLIMPS = [
 function Blimp({ z, motto, color, i }: { z: number; motto: string; color: string; i: number }) {
   const ref = useRef<Group>(null)
   // float a fixed height above whatever ground is beneath it, so a blimp over
-  // the high north end isn't visibly lower than one over the low south end
-  const baseY = terrainHeight(PARADE.x, z) + 38 + (i % 2) * 5
+  // the high north end isn't visibly lower than one over the low south end.
+  // Kept low (≈22m) so you can actually read the logos from street level —
+  // still well clear of the floats and the car.
+  const baseY = terrainHeight(PARADE.x, z) + 22 + (i % 2) * 4
   useFrame(() => {
     if (ref.current) {
       ref.current.position.y = baseY + Math.sin(performance.now() * 0.0006 + i * 1.3) * 1.5
@@ -62,16 +64,16 @@ function Blimp({ z, motto, color, i }: { z: number; motto: string; color: string
       </mesh>
       {/* hanging motto banner — billboarded so it always reads */}
       <Suspense fallback={null}>
-        <Billboard position={[0, -6.5, 0]}>
+        <Billboard position={[0, -6, 0]}>
           <mesh>
-            <planeGeometry args={[10, 3.6]} />
+            <planeGeometry args={[12.4, 4.5]} />
             <meshBasicMaterial color="#f3efe4" />
           </mesh>
           <mesh position={[0, 0, -0.02]}>
-            <planeGeometry args={[10.5, 4.1]} />
+            <planeGeometry args={[13, 5.1]} />
             <meshBasicMaterial color={color} />
           </mesh>
-          <Text position={[0, 0, 0.05]} fontSize={0.82} maxWidth={9.2} lineHeight={1.15} color="#23262b" anchorX="center" anchorY="middle" textAlign="center">
+          <Text position={[0, 0, 0.05]} fontSize={0.98} maxWidth={11.4} lineHeight={1.15} color="#23262b" anchorX="center" anchorY="middle" textAlign="center">
             {motto}
           </Text>
         </Billboard>

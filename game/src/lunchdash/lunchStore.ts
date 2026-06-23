@@ -8,18 +8,22 @@ import { scoreTier, type ReturnTier } from './scoring'
 
 // Objective progress + the RUN OUTCOME for the Lunch Dash drive. The active
 // destination advances as the car reaches each stop; reaching the last stop
-// (Alignly HQ) ENDS the run and writes `final` — the receipt the retrospective
-// screen reads (and, later, Phase 4). A 12:30 no-show also ends the run.
+// (Alignly HQ) WITH both items ENDS the run as a win and writes `final` — the
+// receipt the retrospective reads. Two ways to lose: the noon deadline passes
+// (timeOut), or you can't deliver because the salmon went overboard and you ran
+// out of time fetching another.
 
 export type { ReturnTier }
+export type RunOutcome = 'win' | 'timeout'
 
 // The Phase 3 receipt — a snapshot captured the instant the run ends.
 export type RunFinal = {
-  delivered: boolean // made it back to HQ with everything
+  delivered: boolean // made it back to HQ with everything before noon
+  outcome: RunOutcome
   arrivedMin: number // in-game clock at the end
   minutesUsed: number // of the 60
-  wasLate: boolean // past 12:00
-  latenessMin: number // minutes past 12:00 (0 if on time)
+  wasLate: boolean // past 12:00 (only meaningful pre-deadline; noon is now a hard fail)
+  latenessMin: number
   pedestrianHits: number
   bowlIntegrity: number
   bowlState: BowlTier
@@ -28,10 +32,11 @@ export type RunFinal = {
   returnTier: ReturnTier
 }
 
-function capture(delivered: boolean, stopsCompleted: number): RunFinal {
+function capture(delivered: boolean, outcome: RunOutcome, stopsCompleted: number): RunFinal {
   const arrivedMin = driveClock.minutes
   const base = {
     delivered,
+    outcome,
     arrivedMin,
     minutesUsed: Math.round(arrivedMin - START_MIN),
     wasLate: arrivedMin > END_MIN,
@@ -45,31 +50,58 @@ function capture(delivered: boolean, stopsCompleted: number): RunFinal {
   return { ...base, returnTier: scoreTier(base) }
 }
 
+// The single source of truth for "which stop is the player actually heading to"
+// — used by the HUD, minimap, beacons AND the detector so they never disagree.
+// A salmon-overboard sends you back to stop 0 (Corporate Slop Bowlz) for a fresh
+// bowl, whatever step you'd reached.
+export function activeStop(stepIndex: number, mustRebowl: boolean): number {
+  return mustRebowl ? 0 : stepIndex
+}
+
+export type StopState = 'active' | 'done' | 'future'
+export function stopStateFor(i: number, stepIndex: number, mustRebowl: boolean, done: boolean): StopState {
+  const activeIdx = activeStop(stepIndex, mustRebowl)
+  if (!done && i === activeIdx) return 'active'
+  if (i < stepIndex && i !== activeIdx) return 'done'
+  return 'future'
+}
+
 type LunchState = {
   stepIndex: number
-  done: boolean // the run is over (won or failed) — the retrospective is up
+  mustRebowl: boolean // salmon overboard — must re-acquire a bowl before HQ counts
+  done: boolean // the run is over (won or lost) — the retrospective is up
+  outcome: RunOutcome | null
   final: RunFinal | null
-  advance: () => void // reach a stop; reaching the last one ends + scores the run
-  finishLate: () => void // 12:30 no-show — auto-fail
+  advance: () => void // complete the active normal stop; the last one wins the run
+  flagRebowl: () => void // the salmon went overboard mid-run
+  clearRebowl: () => void // picked up a fresh bowl
+  timeOut: () => void // noon passed without delivering — lose
   reset: () => void
 }
 
 export const useLunchStore = create<LunchState>()((set, get) => ({
   stepIndex: 0,
+  mustRebowl: false,
   done: false,
+  outcome: null,
   final: null,
   advance: () => {
     if (get().done) return
     const next = get().stepIndex + 1
     if (next >= DESTINATIONS.length) {
-      set({ stepIndex: next, done: true, final: capture(true, DESTINATIONS.length) })
+      set({ stepIndex: next, done: true, outcome: 'win', final: capture(true, 'win', DESTINATIONS.length) })
     } else {
       set({ stepIndex: next })
     }
   },
-  finishLate: () => {
-    if (get().done) return
-    set({ done: true, final: capture(false, get().stepIndex) })
+  flagRebowl: () => {
+    if (get().done || get().mustRebowl) return
+    set({ mustRebowl: true })
   },
-  reset: () => set({ stepIndex: 0, done: false, final: null }),
+  clearRebowl: () => set({ mustRebowl: false }),
+  timeOut: () => {
+    if (get().done) return
+    set({ done: true, outcome: 'timeout', final: capture(false, 'timeout', get().stepIndex) })
+  },
+  reset: () => set({ stepIndex: 0, mustRebowl: false, done: false, outcome: null, final: null }),
 }))
