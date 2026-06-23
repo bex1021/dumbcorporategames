@@ -11,7 +11,7 @@
 //   - parked cars are just cars with `parked: true`: they never move and always
 //     act as solid obstacles.
 
-import { ROADS, paintGaps, roadWidth, SIGNALS, type Road } from './cityLayout'
+import { ROADS, paintGaps, roadWidth, SIGNALS, PARADE, type Road } from './cityLayout'
 import { carPosition } from './carState'
 import { honk } from './honk'
 import { tickSignals, signalState } from './signalState'
@@ -81,6 +81,9 @@ export function initTraffic() {
           heading: 0,
         }
         placeMoving(c)
+        // don't spawn a moving car inside the closed parade segment — it'd be
+        // trapped among the floats. Cars approaching it queue (see updateTraffic).
+        if (r.a.x === r.b.x && Math.abs(r.a.x - PARADE.x) < 1.5 && c.z > PARADE.z0 - 6 && c.z < PARADE.z1 + 6) continue
         cars.push(c)
         ci++
       }
@@ -189,6 +192,20 @@ export function updateTraffic(dt: number) {
         const crossHalf = (carNS ? (s.z === -22 || s.z === 215 ? 18 : 12) : 18) / 2
         const stopDist = fwdSig - crossHalf - 3.5 // pull up at the stop bar, not in the box
         if (stopDist > 0.2 && stopDist < gap) gap = stopDist
+      }
+    }
+    // the parade CLOSES this stretch of Synergy Ave — cars queue at the
+    // barricade instead of driving through it. The player is walled out by the
+    // solid PARADE_BARRIERS, so the traffic has to respect the closure too
+    // (otherwise cars sail through a "closed" road the player can't).
+    if (carNS && Math.abs(c.road!.a.x - PARADE.x) < 1.5) {
+      const buf = 5
+      if (c.z > PARADE.z0 - buf && c.z < PARADE.z1 + buf) {
+        gap = 0 // somehow inside the closure — hold position
+      } else {
+        const stopZ = fz < 0 ? PARADE.z1 + buf : PARADE.z0 - buf
+        const d = (stopZ - c.z) * fz // distance ahead to the near barricade line
+        if (d > 0.2 && d < gap) gap = d
       }
     }
     let v = c.speed

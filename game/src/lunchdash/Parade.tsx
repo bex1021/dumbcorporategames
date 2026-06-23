@@ -1,9 +1,14 @@
 // The Corporate Parade — a Macy's-grade civic event that walls off a downtown
 // stretch of Synergy Ave. Giant branded blimps drift overhead trailing
-// dark-corporate mottos, a couple of floats and a faceless beige crowd fill the
+// dark-corporate mottos, balloon floats and a faceless beige crowd fill the
 // street, and barricades (solid — see cityLayout PARADE_BARRIERS) force a
 // reroute. The set-piece + the detour cost = the blueprint's "you cannot go
 // straight through here."
+//
+// IMPORTANT: this stretch of Synergy Ave is NOT flat — it rides the long tail
+// of the northern hill (terrain ~11m at the north barricade down to ~1.5m at
+// the south). So every ground piece samples terrainHeight at ITS OWN x,z; a
+// single shared height would bury the uphill end and levitate the downhill end.
 
 import { useRef, useMemo, useLayoutEffect, Suspense } from 'react'
 import { useFrame } from '@react-three/fiber'
@@ -12,20 +17,22 @@ import { Group, InstancedMesh, Object3D, CapsuleGeometry, Color } from 'three'
 import { PARADE, PARADE_BARRIERS } from './cityLayout'
 import { terrainHeight } from './terrain'
 
-const GY = terrainHeight(PARADE.x, (PARADE.z0 + PARADE.z1) / 2) // downtown is flat
-
-// The blimps + their mottos. Peak corporate.
+// The blimps + their mottos. Peak corporate. The first is the branded green
+// SLOP BOWLZ blimp (so the destination has a recognisable airship overhead, not
+// a mystery green box); the rest are generic alignment-speak.
 const BLIMPS = [
-  { z: -42, motto: 'CHANGE THE WORLD\nTHROUGH ALIGNMENT', color: '#3b4a66' },
-  { z: -24, motto: 'SYNERGY IS A JOURNEY,\nNOT A DESTINATION', color: '#6e5040' },
-  { z: -6, motto: 'WE ARE A FAMILY™\n(results may vary)', color: '#586575' },
-  { z: 11, motto: 'DISRUPT YOURSELF\nBEFORE WE DO', color: '#7a5a44' },
-  { z: 24, motto: 'MAXIMIZING HUMAN\nCAPITAL POTENTIAL', color: '#4f5a52' },
+  { z: -40, motto: 'CORPORATE SLOP BOWLZ\nyou deserve this™', color: '#3f7d4f' },
+  { z: -22, motto: 'CHANGE THE WORLD\nTHROUGH ALIGNMENT', color: '#3b4a66' },
+  { z: -4, motto: 'SYNERGY IS A JOURNEY,\nNOT A DESTINATION', color: '#6e5040' },
+  { z: 13, motto: 'WE ARE A FAMILY™\n(results may vary)', color: '#586575' },
+  { z: 26, motto: 'DISRUPT YOURSELF\nBEFORE WE DO', color: '#7a5a44' },
 ]
 
 function Blimp({ z, motto, color, i }: { z: number; motto: string; color: string; i: number }) {
   const ref = useRef<Group>(null)
-  const baseY = GY + 36 + (i % 2) * 5
+  // float a fixed height above whatever ground is beneath it, so a blimp over
+  // the high north end isn't visibly lower than one over the low south end
+  const baseY = terrainHeight(PARADE.x, z) + 38 + (i % 2) * 5
   useFrame(() => {
     if (ref.current) {
       ref.current.position.y = baseY + Math.sin(performance.now() * 0.0006 + i * 1.3) * 1.5
@@ -73,20 +80,33 @@ function Blimp({ z, motto, color, i }: { z: number; motto: string; color: string
   )
 }
 
-// A parade float — a flatbed with a giant branded cube + a slogan placard.
+// A parade float — a flatbed carrying a giant tethered BALLOON (not a box) +
+// a slogan placard. Sits on the local grade.
 function Float({ z, color, word }: { z: number; color: string; word: string }) {
+  const gy = terrainHeight(PARADE.x, z)
   return (
-    <group position={[PARADE.x, GY, z]}>
+    <group position={[PARADE.x, gy, z]}>
+      {/* flatbed */}
       <mesh position={[0, 0.5, 0]} castShadow>
         <boxGeometry args={[8, 1, 5]} />
         <meshStandardMaterial color="#3a3d42" />
       </mesh>
-      <mesh position={[0, 3, 0]} rotation={[0, 0.6, 0.1]} castShadow>
-        <boxGeometry args={[3.4, 3.4, 3.4]} />
-        <meshStandardMaterial color={color} />
+      {/* tether lines */}
+      <mesh position={[-1.4, 2.6, 0]} rotation={[0, 0, 0.18]}>
+        <cylinderGeometry args={[0.03, 0.03, 3.4, 4]} />
+        <meshStandardMaterial color="#5a5d62" />
+      </mesh>
+      <mesh position={[1.4, 2.6, 0]} rotation={[0, 0, -0.18]}>
+        <cylinderGeometry args={[0.03, 0.03, 3.4, 4]} />
+        <meshStandardMaterial color="#5a5d62" />
+      </mesh>
+      {/* the balloon — a fat blimp-shaped envelope */}
+      <mesh position={[0, 4.7, 0]} scale={[2.3, 2.7, 3.2]} castShadow>
+        <sphereGeometry args={[1, 16, 12]} />
+        <meshStandardMaterial color={color} roughness={0.7} />
       </mesh>
       <Suspense fallback={null}>
-        <Billboard position={[0, 6, 0]}>
+        <Billboard position={[0, 8.4, 0]}>
           <Text fontSize={1.1} color="#f3efe4" anchorX="center" anchorY="middle" outlineWidth={0.04} outlineColor="#23262b">
             {word}
           </Text>
@@ -115,7 +135,7 @@ function Crowd() {
     const o = new Object3D()
     const c = new Color()
     CROWD.forEach((p, i) => {
-      o.position.set(p.x, GY, p.z)
+      o.position.set(p.x, terrainHeight(p.x, p.z), p.z) // stand each person on the local grade
       o.updateMatrix()
       m.setMatrixAt(i, o.matrix)
       m.setColorAt(i, c.set(shirts[i % shirts.length]))
@@ -136,11 +156,12 @@ export function Parade() {
       {BLIMPS.map((b, i) => (
         <Blimp key={i} z={b.z} motto={b.motto} color={b.color} i={i} />
       ))}
-      <Float z={-30} color="#b5603a" word="ALIGNLY" />
-      <Float z={10} color="#3f7d4f" word="SLOP BOWLZ" />
+      <Float z={-30} color="#3b4a66" word="ALIGNLY" />
+      <Float z={12} color="#3f7d4f" word="SLOP BOWLZ" />
       <Crowd />
       {/* barricades — a ROW of waist-high A-frame sawhorses across each blocked
-          line (reads as "road closed", not a random orange wall) */}
+          line (reads as "road closed", not a random orange wall). Each sawhorse
+          stands on the local grade so the row follows the slope. */}
       {PARADE_BARRIERS.flatMap((r, bi) => {
         const cz = (r.minZ + r.maxZ) / 2
         const w = r.maxX - r.minX
@@ -148,7 +169,7 @@ export function Parade() {
         return Array.from({ length: n }, (_, i) => {
           const x = r.minX + (w / n) * (i + 0.5)
           return (
-            <group key={`${bi}-${i}`} position={[x, GY, cz]}>
+            <group key={`${bi}-${i}`} position={[x, terrainHeight(x, cz), cz]}>
               <mesh position={[-0.85, 0.42, 0]} rotation={[0, 0, 0.22]} castShadow>
                 <boxGeometry args={[0.1, 1, 0.1]} />
                 <meshStandardMaterial color="#9aa0a4" />
