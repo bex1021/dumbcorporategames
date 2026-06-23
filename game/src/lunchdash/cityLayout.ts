@@ -91,7 +91,10 @@ function rect(x: number, z: number, w: number, d: number): Rect {
 
 // ---------- water, bridges, approaches ----------
 const RIVER: Rect = { minX: -WORLD_HALF, maxX: WORLD_HALF, minZ: 120, maxZ: 176 }
-const POND: Rect = { minX: -206, maxX: -150, minZ: 14, maxZ: 56 }
+// east edge pulled to -158 so it clears Backlog Ln's west asphalt edge (x-156);
+// otherwise the road's west half ran through the water = an invisible wall where
+// the car gets shoved off the pond mid-lane.
+const POND: Rect = { minX: -206, maxX: -158, minZ: 14, maxZ: 56 }
 export const WATER: Rect[] = [RIVER, POND]
 export const BRIDGES: Rect[] = [
   { minX: -58, maxX: -28, minZ: 112, maxZ: 184 },
