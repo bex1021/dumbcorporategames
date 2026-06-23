@@ -16,6 +16,7 @@ import { DriveCamera } from './DriveCamera'
 import { DriveHud } from './DriveHud'
 import { ObjectiveDetector } from './ObjectiveDetector'
 import { GameClock } from './GameClock'
+import { CinematicEffects } from './CinematicEffects'
 import { DRIVE_CAMERA } from './driveConfig'
 import { carPosition, carFacing, carTelemetry, carAir } from './carState'
 import { SPAWN, ALLEYS, ALLEY_W, ALLEY_PROPS, BUILDINGS, ROADS } from './cityLayout'
@@ -100,6 +101,7 @@ export default function LunchDash() {
         <DriveCamera />
         <ObjectiveDetector />
         <GameClock />
+        <CinematicEffects />
       </Canvas>
 
       <DriveHud />
