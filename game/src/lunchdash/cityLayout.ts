@@ -33,8 +33,8 @@ export const SPAWN = { x: 24, z: 100 }
 // clustered route is why noon had no teeth — see the balance harness): exec's
 // bowl in the far-NW downtown, your lunch in the far-SE sprawl, HQ in the middle.
 export const DEST_POINTS = {
-  bowlz: { x: -57, z: -88 }, // far-NW Manhattan core, on Synergy Ave
-  lunch: { x: 200, z: 230 }, // far-SE LA sprawl, off Sepulveda
+  bowlz: { x: -61, z: -88 }, // far-NW Manhattan core, set back from Synergy Ave
+  lunch: { x: 200, z: 234 }, // far-SE LA sprawl, set back from Sepulveda
   office: { x: 0, z: 90 }, // Alignly HQ
 } as const
 
@@ -57,11 +57,12 @@ export type Storefront = {
   sign: string
 }
 export const STOREFRONTS: Storefront[] = [
-  // Corporate Slop Bowlz — far-NW downtown, window at the Synergy Ave curb (x=-43)
-  { id: 'bowlz', x: -62, z: -88, w: 15, d: 8, h: 7, zx: -52, zz: -88, color: '#3f7d4f', sign: 'CORPORATE SLOP BOWLZ' },
-  // Your Lunch — far-SE sprawl, set back north of wide Sepulveda (z=215, spans
-  // z206–224); building clear of the road, window at the curb.
-  { id: 'lunch', x: 200, z: 232, w: 13, d: 8, h: 6, zx: 200, zz: 224, color: '#b5603a', sign: 'GreenWrap — DRIVE THRU' },
+  // Corporate Slop Bowlz — far-NW downtown. Building + window pulled WEST off
+  // Synergy Ave (x=-43, west edge x=-52) so the canopy lot clears the road.
+  { id: 'bowlz', x: -66, z: -88, w: 15, d: 8, h: 7, zx: -58, zz: -88, color: '#3f7d4f', sign: 'CORPORATE SLOP BOWLZ' },
+  // Your Lunch — far-SE sprawl, pulled SOUTH off wide Sepulveda (z=215, south
+  // edge z=224) so the drive-thru lot clears the road.
+  { id: 'lunch', x: 200, z: 240, w: 13, d: 8, h: 6, zx: 200, zz: 230, color: '#b5603a', sign: 'GreenWrap — DRIVE THRU' },
 ]
 
 // The corporate parade — a Macy's-grade civic event that walls off a downtown
@@ -235,7 +236,7 @@ function pointToSeg(px: number, pz: number, ax: number, az: number, bx: number, 
   t = Math.max(0, Math.min(1, t))
   return Math.hypot(px - (ax + t * dx), pz - (az + t * dz))
 }
-function onRoad(x: number, z: number, rad = 0): boolean {
+export function onRoad(x: number, z: number, rad = 0): boolean {
   for (const r of ROADS) {
     if (pointToSeg(x, z, r.a.x, r.a.z, r.b.x, r.b.z) < roadWidth(r.type) / 2 + rad + 1.5) return true
   }

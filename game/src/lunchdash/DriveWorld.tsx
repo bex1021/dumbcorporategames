@@ -45,6 +45,7 @@ import {
   OVERPASS,
   ROADS,
   roadWidth,
+  onRoad,
   paintGaps,
   GREEN_AREAS,
   DISTRICT_REGIONS,
@@ -178,15 +179,15 @@ ROADS.forEach((r, ri) => {
   const W = roadWidth(r.type)
   for (let d = 22; d < len - 22; d += 38) {
     const side = Math.floor(d / 38) % 2 === 0 ? 1 : -1
-    const x = r.a.x + ux * d + px * (W / 2 + 1.1) * side
-    const z = r.a.z + uz * d + pz * (W / 2 + 1.1) * side
+    const x = r.a.x + ux * d + px * (W / 2 + 1.6) * side
+    const z = r.a.z + uz * d + pz * (W / 2 + 1.6) * side
     if (SIGNALS.some((s) => Math.hypot(s.x - x, s.z - z) < 16)) continue
+    if (onRoad(x, z, -1)) continue // never plant a lamp on a crossing road's asphalt
     LAMP_POSTS.push({ x, z, rot: Math.atan2(-px * side, -pz * side) }) // arm faces the road
     if (d + 12 < len - 16 && bh(ri, Math.round(d)) < 0.3) {
-      HYDRANTS.push({
-        x: r.a.x + ux * (d + 12) + px * (W / 2 + 1.7) * -side,
-        z: r.a.z + uz * (d + 12) + pz * (W / 2 + 1.7) * -side,
-      })
+      const hx = r.a.x + ux * (d + 12) + px * (W / 2 + 2.1) * -side
+      const hz = r.a.z + uz * (d + 12) + pz * (W / 2 + 2.1) * -side
+      if (!onRoad(hx, hz, -1)) HYDRANTS.push({ x: hx, z: hz })
     }
   }
 })

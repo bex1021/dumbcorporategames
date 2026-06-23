@@ -96,12 +96,12 @@ function Float({ z, color, word }: { z: number; color: string; word: string }) {
   )
 }
 
-// The crowd: faceless beige blobs packed onto both sidewalks + a band in the
-// street, one instanced draw.
+// The crowd: faceless beige blobs lining both sidewalks (two loose rows each) +
+// a thin marching column in the street. One instanced draw.
 const CROWD = (() => {
   const out: { x: number; z: number }[] = []
-  for (const sx of [-55, -31]) for (let z = PARADE.z0 - 2; z <= PARADE.z1 + 2; z += 1.9) for (const r of [0, 1]) out.push({ x: sx - (sx < -43 ? r : -r) * 1.4, z: z + r * 0.9 })
-  for (let z = PARADE.z0 + 4; z <= PARADE.z1 - 4; z += 4) for (const dx of [-3, 0, 3]) out.push({ x: PARADE.x + dx, z }) // the marching band
+  for (const sx of [-55, -31]) for (let z = PARADE.z0; z <= PARADE.z1; z += 3.4) for (const r of [0, 1]) out.push({ x: sx + (sx < -43 ? -1 : 1) * r * 1.3, z: z + r * 1.1 })
+  for (let z = PARADE.z0 + 8; z <= PARADE.z1 - 8; z += 7) for (const dx of [-2.2, 2.2]) out.push({ x: PARADE.x + dx, z }) // marching column
   return out
 })()
 
@@ -139,22 +139,35 @@ export function Parade() {
       <Float z={-30} color="#b5603a" word="ALIGNLY" />
       <Float z={10} color="#3f7d4f" word="SLOP BOWLZ" />
       <Crowd />
-      {/* barricades (match the solid PARADE_BARRIERS) — striped sawhorses */}
-      {PARADE_BARRIERS.map((r, i) => {
-        const cx = (r.minX + r.maxX) / 2
+      {/* barricades — a ROW of waist-high A-frame sawhorses across each blocked
+          line (reads as "road closed", not a random orange wall) */}
+      {PARADE_BARRIERS.flatMap((r, bi) => {
         const cz = (r.minZ + r.maxZ) / 2
-        return (
-          <group key={i} position={[cx, GY, cz]}>
-            <mesh position={[0, 0.7, 0]} castShadow>
-              <boxGeometry args={[r.maxX - r.minX, 1.2, r.maxZ - r.minZ]} />
-              <meshStandardMaterial color="#c8742e" />
-            </mesh>
-            <mesh position={[0, 1.1, 0]}>
-              <boxGeometry args={[r.maxX - r.minX, 0.28, (r.maxZ - r.minZ) + 0.05]} />
-              <meshStandardMaterial color="#23262b" />
-            </mesh>
-          </group>
-        )
+        const w = r.maxX - r.minX
+        const n = Math.max(2, Math.round(w / 2.6))
+        return Array.from({ length: n }, (_, i) => {
+          const x = r.minX + (w / n) * (i + 0.5)
+          return (
+            <group key={`${bi}-${i}`} position={[x, GY, cz]}>
+              <mesh position={[-0.85, 0.42, 0]} rotation={[0, 0, 0.22]} castShadow>
+                <boxGeometry args={[0.1, 1, 0.1]} />
+                <meshStandardMaterial color="#9aa0a4" />
+              </mesh>
+              <mesh position={[0.85, 0.42, 0]} rotation={[0, 0, -0.22]} castShadow>
+                <boxGeometry args={[0.1, 1, 0.1]} />
+                <meshStandardMaterial color="#9aa0a4" />
+              </mesh>
+              <mesh position={[0, 0.82, 0]} castShadow>
+                <boxGeometry args={[2.4, 0.42, 0.12]} />
+                <meshStandardMaterial color="#e0762e" />
+              </mesh>
+              <mesh position={[0, 0.82, 0.07]}>
+                <boxGeometry args={[2.42, 0.16, 0.04]} />
+                <meshStandardMaterial color="#f0ede4" />
+              </mesh>
+            </group>
+          )
+        })
       })}
     </group>
   )
