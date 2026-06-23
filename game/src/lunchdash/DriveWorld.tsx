@@ -60,6 +60,7 @@ import {
 import { useLunchStore } from './lunchStore'
 import { TrafficCars } from './Traffic'
 import { Pedestrians } from './Pedestrians'
+import { Parade } from './Parade'
 
 // Sink each building so its flat base doesn't float on a slope: sample terrain
 // at the footprint corners, set the bottom below the lowest corner and the top
@@ -260,6 +261,7 @@ export function DriveWorld() {
       <AlleyProps />
       <Storefronts />
       <OfficeDropoff />
+      <Parade />
       <Landmarks />
       <TrafficCars />
       <Pedestrians />

@@ -6,7 +6,7 @@
 import { useEffect, useRef } from 'react'
 import { carPosition, carFacing } from './carState'
 import { DESTINATIONS } from './destinations'
-import { HQ_BUILDING, WATER, GREEN_AREAS, ROADS, AVENUE_LINES, WORLD_HALF, type Rect } from './cityLayout'
+import { HQ_BUILDING, WATER, GREEN_AREAS, ROADS, AVENUE_LINES, PARADE, WORLD_HALF, type Rect } from './cityLayout'
 import { useLunchStore } from './lunchStore'
 
 const SIZE = 188
@@ -70,6 +70,14 @@ export function Minimap() {
         ctx.fillText(r.name, 0, -2)
         ctx.restore()
       })
+
+      // parade — a red "blocked" band across Synergy Ave
+      ctx.strokeStyle = '#d24a3a'
+      ctx.lineWidth = 4
+      ctx.beginPath()
+      ctx.moveTo(toX(PARADE.x), toY(PARADE.z0))
+      ctx.lineTo(toX(PARADE.x), toY(PARADE.z1))
+      ctx.stroke()
 
       // Alignly HQ — navy square marker
       const hx = clamp(toX(HQ_BUILDING.x))

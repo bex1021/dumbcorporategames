@@ -40,6 +40,10 @@ const ROUTE: Pt[] = [
   { x: DESTINATIONS[2].x, z: DESTINATIONS[2].z },
 ]
 export const LEGS = [leg(ROUTE[0], ROUTE[1]), leg(ROUTE[1], ROUTE[2]), leg(ROUTE[2], ROUTE[3])]
+// the corporate parade walls off downtown Synergy Ave on the way to Bowlz —
+// routing around it adds distance + a couple of turns (the time-sink)
+const PARADE_DETOUR_M = 170
+LEGS[0] = { dist: LEGS[0].dist + PARADE_DETOUR_M, corners: LEGS[0].corners + 2 }
 export const ROUTE_DIST = LEGS.reduce((s, l) => s + l.dist, 0)
 export { START_MIN, END_MIN, HARDCAP_MIN }
 

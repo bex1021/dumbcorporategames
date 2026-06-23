@@ -62,7 +62,7 @@ function runBot(bot: Bot, minPerSec: number, n = N) {
   }
 }
 
-const CUR_BUDGET = 240 // REAL_SECONDS_PER_HOUR currently in clockState.ts
+const CUR_BUDGET = 150 // REAL_SECONDS_PER_HOUR currently in clockState.ts
 const minPerSecFor = (budget: number) => (END_MIN - START_MIN) / budget
 
 console.log('═══════════════════════════════════════════════════════════════════')

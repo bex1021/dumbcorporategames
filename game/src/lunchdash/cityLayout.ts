@@ -29,9 +29,12 @@ export type Landmark =
 export const WORLD_HALF = 300
 export const SPAWN = { x: 24, z: 100 }
 
+// Stops sit at OPPOSITE corners so the route crosses most of the city (a short,
+// clustered route is why noon had no teeth — see the balance harness): exec's
+// bowl in the far-NW downtown, your lunch in the far-SE sprawl, HQ in the middle.
 export const DEST_POINTS = {
-  bowlz: { x: -22, z: -10 }, // Manhattan core
-  lunch: { x: 40, z: 215 }, // across the river (Austin side)
+  bowlz: { x: -57, z: -88 }, // far-NW Manhattan core, on Synergy Ave
+  lunch: { x: 200, z: 230 }, // far-SE LA sprawl, off Sepulveda
   office: { x: 0, z: 90 }, // Alignly HQ
 } as const
 
@@ -54,11 +57,21 @@ export type Storefront = {
   sign: string
 }
 export const STOREFRONTS: Storefront[] = [
-  // Corporate Slop Bowlz — Alignment Blvd runs just to the north (z = −22)
-  { id: 'bowlz', x: -22, z: -3, w: 15, d: 8, h: 7, zx: -22, zz: -13, color: '#3f7d4f', sign: 'CORPORATE SLOP BOWLZ' },
-  // Your Lunch — a drive-thru set fully back north of wide Sepulveda (z = 215,
-  // spans z206–224); building clear of the road, window at the curb.
-  { id: 'lunch', x: 40, z: 199, w: 13, d: 8, h: 6, zx: 40, zz: 208, color: '#b5603a', sign: 'GreenWrap — DRIVE THRU' },
+  // Corporate Slop Bowlz — far-NW downtown, window at the Synergy Ave curb (x=-43)
+  { id: 'bowlz', x: -62, z: -88, w: 15, d: 8, h: 7, zx: -52, zz: -88, color: '#3f7d4f', sign: 'CORPORATE SLOP BOWLZ' },
+  // Your Lunch — far-SE sprawl, set back north of wide Sepulveda (z=215, spans
+  // z206–224); building clear of the road, window at the curb.
+  { id: 'lunch', x: 200, z: 232, w: 13, d: 8, h: 6, zx: 200, zz: 224, color: '#b5603a', sign: 'GreenWrap — DRIVE THRU' },
+]
+
+// The corporate parade — a Macy's-grade civic event that walls off a downtown
+// segment of Synergy Ave (x=-43), forcing a reroute. Cross-road barricades are
+// solid; the blimps + floats + crowd are set-dressing (see Parade.tsx).
+export const PARADE = { x: -43, z0: -45, z1: 25 }
+export const PARADE_BARRIERS: Rect[] = [
+  rect(-43, -45, 22, 2.4),
+  rect(-43, -10, 22, 2.4),
+  rect(-43, 25, 22, 2.4),
 ]
 
 function h2(i: number, j: number): number {
@@ -530,6 +543,7 @@ export const BARNS: Building[] = (() => {
 const SOLIDS: Rect[] = [
   ...[...BUILDINGS, HQ_BUILDING, ...BARNS].map((b) => rect(b.x, b.z, b.w, b.d)),
   ...STOREFRONTS.map((s) => rect(s.x, s.z, s.w, s.d)),
+  ...PARADE_BARRIERS,
   ...LANDMARK_SOLIDS,
   ...BRIDGE_RAILS,
   ...TREES.map((t) => rect(t.x, t.z, 1.4, 1.4)),
