@@ -26,10 +26,11 @@ export default function Landing() {
         badge={<>● 3 GAMES · ALL LIVE</>}
       />
       <Hero />
+      {/* "3 games live" already appears in the nav badge AND the index strip
+          visible in the same viewport — a third repetition is noise. */}
       <Ticker
         accent
         items={[
-          '3 GAMES LIVE',
           'A FULL MORNING · 9 AM TO NOON',
           'PLAY IN YOUR BROWSER',
           'NO INSTALL · NO ACCOUNT',
@@ -76,6 +77,9 @@ const NAV_LINKS: NavLink[] = [
 // ─── Hero ─────────────────────────────────────────────────────────────────
 function Hero() {
   const isMobile = useIsMobile()
+  // The KEEP SCROLLING hint needs a full row of spare width; between 760 and
+  // ~1080px it wrapped into an awkward orphan line under the CTAs.
+  const cramped = useIsMobile(1080)
   return (
     <section style={{ borderBottom: `4px solid ${BR.ink}` }}>
       <div style={{
@@ -153,13 +157,15 @@ function Hero() {
         }}>▶ PLAY — FREE</Link>
         <a href="#games" style={ctaSecondary}>▼ SEE OUR GAMES</a>
         <a href="#mission" style={ctaSecondary}>READ THE MISSION</a>
-        <div style={{
-          marginLeft: 'auto', alignSelf: 'center', padding: '0 20px',
-          fontFamily: brMono, fontSize: 11,
-          textTransform: 'uppercase', color: BR.muted, letterSpacing: '0.08em',
-        }}>
-          <span style={{ color: BR.accent, fontWeight: 700 }}>▼ KEEP SCROLLING</span> · ALL FREE · BROWSER · NO INSTALL
-        </div>
+        {!cramped && (
+          <div style={{
+            marginLeft: 'auto', alignSelf: 'center', padding: '0 20px',
+            fontFamily: brMono, fontSize: 11,
+            textTransform: 'uppercase', color: BR.muted, letterSpacing: '0.08em',
+          }}>
+            <span style={{ color: BR.accent, fontWeight: 700 }}>▼ KEEP SCROLLING</span> · ALL FREE · BROWSER · NO INSTALL
+          </div>
+        )}
       </div>
     </section>
   )
@@ -209,8 +215,9 @@ function StudioOps() {
         fontWeight: 700, letterSpacing: '0.14em',
       }}>
         <span><span style={{ color: BR.accent }}>●</span> STUDIO OPS · LIVE</span>
+        {/* nowrap: at tablet widths this used to line-break inside "UTC-5" */}
         <span style={{
-          color: '#aaa', display: 'flex', gap: 8, alignItems: 'center',
+          color: '#aaa', display: 'flex', gap: 8, alignItems: 'center', whiteSpace: 'nowrap',
         }}>
           <span>{tz}</span>
           <span style={{ color: BR.accent, fontVariantNumeric: 'tabular-nums' }}>{time}</span>
@@ -272,7 +279,9 @@ const GAMES: Game[] = [
   {
     n: '01',
     title: 'BLOCKED',
-    sub: 'PRE-STANDUP ALIGNMENT',
+    // Parallel with cards 02/03: PHASE · TIME · IMPERATIVE. Card 01 used to
+    // break the pattern, which also hid that the three games are one morning.
+    sub: 'PHASE 1 · 9:00 AM · GET ALIGNED',
     blurb:
       'An earnest PM at the fictional company ALIGNLY has 75 minutes to extract alignment from five blocked coworkers before the 10:15 standup. The exec wants the Customer Happiness Portal Refresh GREEN by EOD. The coworkers all say "no blockers." They are lying.',
     tags: ['CORPORATE SATIRE', '5–10 MIN', 'WASD + E', 'BROWSER', 'FREE'],

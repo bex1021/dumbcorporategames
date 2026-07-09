@@ -15,6 +15,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import type { ReactNode, CSSProperties } from 'react'
+import { Link } from 'react-router-dom'
 
 // ─── Palette + fonts ──────────────────────────────────────────────────────
 export const BR = {
@@ -63,14 +64,43 @@ export function useIsMobile(breakpoint = 760) {
   return isMobile
 }
 
+// ─── Accessibility floor for the marketing pages ─────────────────────────
+// Inline styles can't express :focus-visible or media queries, so PageScroll
+// injects one small global sheet:
+//   · a visible safety-orange focus ring on every interactive element
+//     (the Signup input previously set outline:none with no replacement —
+//     keyboard users had NO focus indicator anywhere on the site)
+//   · marquees (.br-marquee) freeze under prefers-reduced-motion; they are
+//     decorative repetition, so a static first frame loses nothing
+let a11yInjected = false
+function useBrutalistA11y() {
+  useEffect(() => {
+    if (a11yInjected) return
+    const s = document.createElement('style')
+    s.textContent = `
+      .br-page :is(a, button, input, [tabindex]):focus-visible {
+        outline: 3px solid ${BR.accent};
+        outline-offset: 2px;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .br-marquee { animation: none !important; }
+      }
+    `
+    document.head.appendChild(s)
+    a11yInjected = true
+  }, [])
+}
+
 // ─── Page scroll wrapper ──────────────────────────────────────────────────
 // The app's index.css sets `overflow: hidden` on html/body/#root so the 3D
 // game stays anchored. The marketing routes need to scroll — wrap them in
 // this and they get their own scroll context inside the locked root.
 export function PageScroll({ children }: { children: ReactNode }) {
   useBrutalistFonts()
+  useBrutalistA11y()
   return (
     <div
+      className="br-page"
       style={{
         position: 'fixed',
         inset: 0,
@@ -175,7 +205,7 @@ export function Ticker({
         @keyframes br-ticker-left  { from{transform:translateX(0)}      to{transform:translateX(-50%)} }
         @keyframes br-ticker-right { from{transform:translateX(-50%)}   to{transform:translateX(0)}    }
       `}</style>
-      <div style={{
+      <div className="br-marquee" style={{
         display: 'inline-flex', gap: 28,
         animation: `${anim} ${speed}s linear infinite`,
         willChange: 'transform',
@@ -228,11 +258,22 @@ export function Nav({ links, badge }: { links: NavLink[]; badge?: ReactNode }) {
         display: 'flex', gap: isMobile ? 16 : 22, flexWrap: 'wrap',
         fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700,
       }}>
-        {links.map((l) => (
-          <a key={l.label} href={l.href || l.to || '#'} style={{
+        {links.map((l) => {
+          // Padding + negative margin: grows the tap target to ~40px without
+          // moving the rendered text — the 18px-tall bare links failed the
+          // mobile touch-target floor.
+          const linkStyle: CSSProperties = {
             color: l.active ? BR.accent : BR.ink, textDecoration: 'none', cursor: 'pointer',
-          }}>{l.label}</a>
-        ))}
+            padding: '12px 6px', margin: '-12px -6px',
+          }
+          // Router destinations get <Link> — the old plain <a href> forced a
+          // full page reload on every internal nav.
+          return l.to ? (
+            <Link key={l.label} to={l.to} style={linkStyle}>{l.label}</Link>
+          ) : (
+            <a key={l.label} href={l.href || '#'} style={linkStyle}>{l.label}</a>
+          )
+        })}
       </nav>
       {badge && (
         <div style={{
@@ -320,7 +361,7 @@ export function AboutTheStudio() {
       <div style={{
         padding: isMobile ? '24px 20px 18px' : '32px 32px 24px',
         borderBottom: `1px solid #333`,
-        display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr auto', gap: isMobile ? 14 : 32, alignItems: 'end',
+        display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) auto', gap: isMobile ? 14 : 32, alignItems: 'end',
       }}>
         <div>
           <div style={{
@@ -344,7 +385,7 @@ export function AboutTheStudio() {
 
       <div style={{
         padding: isMobile ? '22px 20px 28px' : '28px 32px 36px',
-        display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : '1.4fr 1fr', gap: isMobile ? 22 : 36, alignItems: 'flex-start',
+        display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: isMobile ? 22 : 36, alignItems: 'flex-start',
       }}>
         <p style={{
           margin: 0, fontFamily: brFont, fontSize: 22, lineHeight: 1.4,
@@ -360,24 +401,36 @@ export function AboutTheStudio() {
           </a>.
         </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 0, minWidth: 0 }}>
+          {/* Only EMAIL is a real destination. The other rows are jokes —
+              they used to be href="#" links, which promised interactivity
+              and delivered a scroll-jump to the top. Deadpan works better
+              when the dead thing genuinely does nothing. */}
           {[
             { l: 'EMAIL → HELLO@DUMBCORPORATEGAMES.COM', href: 'mailto:hello@dumbcorporategames.com' },
-            { l: 'LINKEDIN → ACCOUNT PENDING DELETION',  href: '#' },
-            { l: 'GITHUB → COMMITS UNDER PSEUDONYM',     href: '#' },
-            { l: 'DM → PLEASE DO NOT',                   href: '#' },
-          ].map((a, i) => (
-            <a key={a.l} href={a.href} style={{
+            { l: 'LINKEDIN → ACCOUNT PENDING DELETION' },
+            { l: 'GITHUB → COMMITS UNDER PSEUDONYM' },
+            { l: 'DM → PLEASE DO NOT' },
+          ].map((a, i) => {
+            const rowStyle: CSSProperties = {
               color: BR.bg, border: `1px solid ${BR.bg}`, padding: '14px 18px',
               fontFamily: brMono, fontWeight: 700, fontSize: 12, letterSpacing: '0.12em',
               textTransform: 'uppercase', textDecoration: 'none',
               borderTop: i ? 'none' : `1px solid ${BR.bg}`,
               display: 'flex', justifyContent: 'space-between', gap: 12,
               minWidth: 0,
-            }}>
-              <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{a.l}</span>
-              <span style={{ color: BR.accent, flexShrink: 0 }}>·0{i + 1}</span>
-            </a>
-          ))}
+            }
+            const inner = (
+              <>
+                <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{a.l}</span>
+                <span style={{ color: BR.accent, flexShrink: 0 }}>·0{i + 1}</span>
+              </>
+            )
+            return a.href ? (
+              <a key={a.l} href={a.href} style={rowStyle}>{inner}</a>
+            ) : (
+              <div key={a.l} style={rowStyle}>{inner}</div>
+            )
+          })}
         </div>
       </div>
     </section>
@@ -425,9 +478,13 @@ export function Signup() {
     <section id="signup" style={{
       borderBottom: `4px solid ${BR.ink}`, background: BR.accent, color: '#000',
     }}>
+      {/* minmax(0, ·) on BOTH tracks: without it the giant H2's min-content
+          width squeezed the form column below the SUBSCRIBE button's width
+          and pushed it past the viewport — 12px of horizontal scroll at
+          tablet widths (caught at 768px). */}
       <div style={{
         padding: isMobile ? '28px 20px 28px' : '40px 32px 32px',
-        display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : '1.4fr 1fr', gap: isMobile ? 24 : 36, alignItems: 'center',
+        display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: isMobile ? 24 : 36, alignItems: 'center',
       }}>
         <div>
           <div style={{
@@ -456,6 +513,8 @@ export function Signup() {
             WORK EMAIL (PREFERRED)
           </label>
           <div style={{ display: 'flex', border: `3px solid #000`, background: '#fff' }}>
+            {/* No outline:none here — the .br-page focus-visible ring is the
+                only focus indicator this input gets. */}
             <input
               type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
               placeholder="you@bigco.example"
@@ -463,7 +522,7 @@ export function Signup() {
               style={{
                 flex: 1, minWidth: 0, border: 'none', padding: '18px 18px',
                 fontFamily: brMono, fontSize: 16,
-                background: 'transparent', outline: 'none',
+                background: 'transparent',
               }}
             />
             <button type="submit" disabled={state.kind === 'submitting'} style={{
@@ -519,7 +578,7 @@ export function Closer() {
         fontSize: 'clamp(64px, 17vw, 184px)', lineHeight: 0.9, letterSpacing: '-0.05em',
         textTransform: 'uppercase',
       }}>
-        <div style={{ display: 'inline-flex', gap: 36, animation: 'br-closer 60s linear infinite' }}>
+        <div className="br-marquee" style={{ display: 'inline-flex', gap: 36, animation: 'br-closer 60s linear infinite' }}>
           {Array.from({ length: 2 }).flatMap((_, i) => [
             <span key={`a${i}`}>BUILT BY ONE PERSON</span>,
             <span key={`b${i}`} style={{ color: BR.accent }}>★</span>,
@@ -546,9 +605,11 @@ export function Footer() {
       }}>
         <div>© {year} DUMB CORPORATE GAMES · ALL ARTIFACTS PRODUCED IN PURSUIT OF ALIGNMENT.</div>
         <div style={{ display: 'flex', gap: 16 }}>
-          <a href="mailto:press@dumbcorporategames.com" style={{ color: BR.muted }}>PRESS</a>
-          <a href="mailto:hello@dumbcorporategames.com" style={{ color: BR.muted }}>CONTACT</a>
-          <a href="#" style={{ color: BR.muted }}>CIRCLE BACK</a>
+          {/* padding+negative margin = 40px tap targets, same visual */}
+          <a href="mailto:press@dumbcorporategames.com" style={{ color: BR.muted, padding: '12px 6px', margin: '-12px -6px' }}>PRESS</a>
+          <a href="mailto:hello@dumbcorporategames.com" style={{ color: BR.muted, padding: '12px 6px', margin: '-12px -6px' }}>CONTACT</a>
+          {/* joke row, not a link — was href="#", a false affordance */}
+          <span style={{ color: BR.muted }}>CIRCLE BACK</span>
         </div>
       </div>
     </footer>

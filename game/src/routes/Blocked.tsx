@@ -136,9 +136,14 @@ function Hero() {
           fontFamily: brFont, fontSize: 22, lineHeight: 1.32, fontWeight: 500,
           maxWidth: 760, color: BR.ink,
         }}>
-          WE MAKE BROWSER GAMES ABOUT YOUR JOB. EACH RUNS APPROXIMATELY THE LENGTH OF A
-          STATUS MEETING AND IS, PER INTERNAL BENCHMARKS WE WILL NOT BE DISCLOSING,{' '}
-          <u style={{ background: BR.accent, padding: '0 2px' }}>TWICE AS PRODUCTIVE</u>.
+          {/* Product pitch, not the studio pitch — the old paragraph here was
+              the landing hero's copy verbatim, telling a visitor who already
+              clicked into BLOCKED what the studio is instead of what the
+              game is. */}
+          YOU ARE LEONARD, AN EARNEST PM AT ALIGNLY. FIVE COWORKERS, 75 MINUTES,
+          ONE STANDUP. EVERYONE SAYS{' '}
+          <u style={{ background: BR.accent, padding: '0 2px' }}>"NO BLOCKERS."</u>{' '}
+          EVERYONE IS LYING.
         </p>
 
         <div style={{
@@ -147,7 +152,7 @@ function Hero() {
           fontFamily: brMono, fontSize: 11, lineHeight: 1.7,
           color: BR.ink, textTransform: 'uppercase', letterSpacing: '0.06em',
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: BR.muted }}>PORTFOLIO</span><b>1 OF 1</b></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: BR.muted }}>PORTFOLIO</span><b>1 OF 3</b></div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: BR.muted }}>HEADCOUNT</span><b>1</b></div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: BR.muted }}>FUNDING</span><b>FEELINGS</b></div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: BR.muted }}>PRICE</span><b style={{ color: BR.accent }}>$0.00</b></div>

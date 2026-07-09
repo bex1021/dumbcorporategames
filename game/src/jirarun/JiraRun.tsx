@@ -444,7 +444,9 @@ function JiraRunNav() {
       <div className="hidden md:flex items-center gap-4 text-[13px] text-[#42526e]">
         <span>Your work</span><span>Projects</span><span>Filters</span><span>Dashboards</span>
       </div>
-      <div className="ml-auto w-7 h-7 rounded-full bg-[#0052cc] text-white flex items-center justify-center text-[11px] font-bold">LC</div>
+      {/* LP = Leonard P. — the assignee name on his own tickets. (Was "LC",
+          while /play said "LB": three initials for one Leonard.) */}
+      <div className="ml-auto w-7 h-7 rounded-full bg-[#0052cc] text-white flex items-center justify-center text-[11px] font-bold">LP</div>
     </div>
   )
 }

@@ -53,7 +53,8 @@ export default function Play() {
         </div>
         <div className="flex items-center gap-3 text-[#5e6c84]">
           <span className="text-[12px] hidden sm:inline">Probity · Verve · Wit</span>
-          <span className="w-7 h-7 rounded-full grid place-items-center text-white text-[11px] font-bold" style={{ background: '#2a2f33' }}>LB</span>
+          {/* LP = Leonard P. (canonical initials — matches his Jira assignee name) */}
+          <span className="w-7 h-7 rounded-full grid place-items-center text-white text-[11px] font-bold" style={{ background: '#2a2f33' }}>LP</span>
         </div>
       </nav>
 
@@ -106,7 +107,7 @@ export default function Play() {
             </div>
           </div>
 
-          <p className="mt-7 text-[11px] text-[#8993a4]">
+          <p className="mt-7 text-[11px] text-[#5e6c84]">
             Progress saves to this browser · no account · clearing cookies resets the path.
           </p>
         </div>
@@ -147,7 +148,7 @@ function PhaseNode({ phase, tone, beaten }: { phase: CampaignPhase; tone: Tone; 
       </div>
 
       <div className={`mt-3 text-[15px] font-semibold leading-snug ${dim ? 'text-[#5e6c84]' : ''}`}>{title}</div>
-      <div className="text-[10px] uppercase tracking-wider text-[#8993a4] mt-0.5">{phase.label}</div>
+      <div className="text-[10px] uppercase tracking-wider text-[#5e6c84] mt-0.5">{phase.label}</div>
 
       {/* action */}
       <div className="mt-3 w-full">
@@ -162,9 +163,9 @@ function PhaseNode({ phase, tone, beaten }: { phase: CampaignPhase; tone: Tone; 
           </span>
         )}
         {tone === 'locked' && (
-          <span className="block text-[11px] text-[#8993a4]">Beat {phase.requires ? phaseLabel(phase.requires) : ''} to unlock</span>
+          <span className="block text-[11px] text-[#5e6c84]">Beat {phase.requires ? phaseLabel(phase.requires) : ''} to unlock</span>
         )}
-        {tone === 'soon' && <span className="block text-[11px] text-[#8993a4]">Coming soon</span>}
+        {tone === 'soon' && <span className="block text-[11px] text-[#5e6c84]">Coming soon</span>}
       </div>
     </div>
   )
@@ -211,7 +212,7 @@ function AchvGroup({ label, items }: { label: string; items: AchvItem[] }) {
     <div>
       <div className="flex items-center gap-2 mb-2">
         <span className="text-[12px] font-semibold uppercase tracking-wider text-[#5e6c84]">{label}</span>
-        <span className="text-[11px] text-[#8993a4]">{earned}/{items.length}</span>
+        <span className="text-[11px] text-[#5e6c84]">{earned}/{items.length}</span>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
         {items.map((a) => (
@@ -228,7 +229,7 @@ function AchvGroup({ label, items }: { label: string; items: AchvItem[] }) {
             <span className="text-[22px]" style={{ filter: a.earned ? 'none' : 'grayscale(1)', opacity: a.earned ? 1 : 0.45 }}>
               {a.emoji}
             </span>
-            <span className={`mt-1 text-[10px] leading-tight font-medium ${a.earned ? 'text-[#172b4d]' : 'text-[#8993a4]'}`}>
+            <span className={`mt-1 text-[10px] leading-tight font-medium ${a.earned ? 'text-[#172b4d]' : 'text-[#5e6c84]'}`}>
               {a.earned ? a.title : 'Locked'}
             </span>
           </div>
