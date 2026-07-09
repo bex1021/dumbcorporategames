@@ -14,6 +14,7 @@ import Landing from './routes/Landing'
 import Blocked from './routes/Blocked'
 import Play from './routes/Play'
 import MusicLab from './routes/MusicLab'
+import { KeyboardGate } from './ui/KeyboardGate'
 
 const Game = lazy(() => import('./routes/Game'))
 // Phase 2 — Jira Run (8-bit endless runner). Lazy so its R3F chunk only
@@ -31,28 +32,38 @@ export default function App() {
         <Route path="/play"        element={<Play />} />
         <Route path="/play/music"  element={<MusicLab />} />
         <Route path="/blocked"     element={<Blocked />} />
+        {/* All three games are keyboard-only; KeyboardGate shows touch-only
+            devices a deadpan IT notice (with an escape hatch) instead of an
+            unplayable canvas. It also short-circuits the multi-MB GLB fetch
+            those visitors would otherwise pay for. */}
         <Route
           path="/play/blocked"
           element={
-            <Suspense fallback={<RouteSplash />}>
-              <Game />
-            </Suspense>
+            <KeyboardGate>
+              <Suspense fallback={<RouteSplash />}>
+                <Game />
+              </Suspense>
+            </KeyboardGate>
           }
         />
         <Route
           path="/play/jira-run"
           element={
-            <Suspense fallback={<RouteSplash />}>
-              <JiraRun />
-            </Suspense>
+            <KeyboardGate>
+              <Suspense fallback={<RouteSplash />}>
+                <JiraRun />
+              </Suspense>
+            </KeyboardGate>
           }
         />
         <Route
           path="/play/lunch-dash"
           element={
-            <Suspense fallback={<RouteSplash />}>
-              <LunchDash />
-            </Suspense>
+            <KeyboardGate>
+              <Suspense fallback={<RouteSplash />}>
+                <LunchDash />
+              </Suspense>
+            </KeyboardGate>
           }
         />
         {/* Catch-all: send unknown paths back to landing */}
