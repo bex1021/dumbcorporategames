@@ -42,7 +42,7 @@ export default function Landing() {
       />
       <Portfolio />
       <CareerStats />
-      <WhatsNext />
+      <MorningArc />
       <Ticker
         items={[
           'DO WHATEVER IT TAKES',
@@ -460,30 +460,37 @@ function GameCard({ g, i }: { g: Game; i: number }) {
   )
 }
 
-// ─── WhatsNext — phase roadmap (Phase 1 live · 2 building · 3 brewing) ──
-function WhatsNext() {
-  type Phase = {
-    phase: string; state: string; tone: 'live' | 'wip' | 'idea'
-    title: string; blurb: string
-  }
-  const PHASES: Phase[] = [
+// ─── MorningArc — the campaign as one continuous morning ─────────────────
+// Replaced the old "WHAT'S NEXT" roadmap. That section repeated the same
+// three games Portfolio had just finished selling (same titles, near-same
+// blurbs) under a header that promised futures while every card said
+// "already shipped" — and painted all three cards accent-orange, so the
+// page's one highlight color highlighted nothing. This section now carries
+// the ONE fact Portfolio doesn't: the games are a single morning at Alignly,
+// played in order, one save file. Orange is spent only on the timeline rail
+// and the single CTA.
+function MorningArc() {
+  type Stop = { time: string; title: string; hook: string }
+  const STOPS: Stop[] = [
     {
-      phase: 'PHASE 1', state: 'LIVE', tone: 'live',
+      time: '9:00 AM',
       title: 'BLOCKED',
-      blurb:
-        'PRE-STANDUP ALIGNMENT. A PM HAS 75 MINUTES TO EXTRACT THE TRUTH FROM FIVE LIARS. SHIPPED. PLAYABLE NOW.',
+      hook: 'EXTRACT ALIGNMENT FROM FIVE LIARS BEFORE THE 10:15 STANDUP.',
     },
     {
-      phase: 'PHASE 2', state: 'LIVE', tone: 'live',
+      time: '10:45 AM',
       title: 'JIRA RUN',
-      blurb:
-        'STANDUP IS OVER. LEONARD OPENS THE JIRA BOARD. THE BACKLOG STARES BACK. 4 UPDATES, 4 KANBAN GATES, DO NOT FALL BEHIND.',
+      hook: 'STANDUP SURVIVED. LOG FOUR UPDATES BEFORE THE BACKLOG NOTICES YOU.',
     },
     {
-      phase: 'PHASE 3', state: 'LIVE', tone: 'live',
+      time: '11:00 AM',
       title: 'LUNCH DASH',
-      blurb:
-        'OFFICE → CAR → ACROSS TOWN → THE EXEC\'S SALMON BOWL → BACK BY NOON. THE BOWL IS JUDGING.',
+      hook: 'ACROSS TOWN AND BACK WITH THE EXEC’S SALMON BOWL. NOON IS A DEADLINE.',
+    },
+    {
+      time: '12:00 PM',
+      title: 'LUNCH',
+      hook: 'YOU ARE BACK. NOTHING WAS ACCOMPLISHED. STATUS: GREEN.',
     },
   ]
   const isMobile = useIsMobile()
@@ -492,7 +499,7 @@ function WhatsNext() {
       <div style={{
         padding: isMobile ? '24px 20px 18px' : '32px 32px 24px',
         borderBottom: `1px solid #333`,
-        display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr auto', gap: isMobile ? 14 : 32, alignItems: 'end',
+        display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) auto', gap: isMobile ? 14 : 32, alignItems: 'end',
       }}>
         <div>
           <div style={{
@@ -500,67 +507,84 @@ function WhatsNext() {
             textTransform: 'uppercase', letterSpacing: '0.16em', marginBottom: 10,
           }}>
             <span style={{ color: BR.accent, marginRight: 8 }}>●</span>
-            ROADMAP · PHASES 1 → 3 · LEAKED INTERNALLY
+            THE CAMPAIGN · ONE CONTINUOUS MORNING · ONE SAVE FILE
           </div>
           <h2 style={{
             margin: 0, fontFamily: brFont, fontWeight: 900,
             fontSize: 'clamp(40px, 6vw, 80px)',
             lineHeight: 0.95, letterSpacing: '-0.03em', textTransform: 'uppercase',
           }}>
-            WHAT'S NEXT<span style={{ color: BR.accent }}>.</span>
+            THE FULL MORNING<span style={{ color: BR.accent }}>.</span>
           </h2>
         </div>
         <div style={{
           fontFamily: brMono, fontSize: 11, color: '#aaa',
-          textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: 'right',
+          textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: isMobile ? 'left' : 'right',
           maxWidth: 280, lineHeight: 1.55,
         }}>
-          THREE PHASES · ALL LIVE · 9 AM TO NOON · BACK BY LUNCH
+          PLAYED IN ORDER · CLEAR A PHASE TO UNLOCK THE NEXT
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)' }}>
-        {PHASES.map((p, i) => {
-          const live = p.tone === 'live'
-          const wip = p.tone === 'wip'
+      {/* Timeline. Desktop: 4 stops left→right on a shared rail. Mobile: a
+          vertical rail down the left edge. The 12:00 terminus is dimmer —
+          it's the punchline, not a fourth product. */}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, minmax(0, 1fr))' }}>
+        {STOPS.map((s, i) => {
+          const terminus = i === STOPS.length - 1
           return (
-            <div key={p.phase} style={{
-              padding: '24px 24px 28px',
-              borderLeft: isMobile ? 'none' : (i ? `1px solid #333` : 'none'),
-              borderTop: isMobile && i ? `1px solid #333` : 'none',
-              background: live ? BR.accent : BR.ink,
-              color: live ? '#000' : BR.bg,
-              minHeight: isMobile ? 'auto' : 280,
-              display: 'flex', flexDirection: 'column',
+            <div key={s.time} style={{
+              padding: isMobile ? '18px 20px 22px 24px' : '22px 24px 30px',
+              borderLeft: isMobile ? `2px solid ${BR.accent}` : 'none',
+              marginLeft: isMobile ? 20 : 0,
+              borderTop: isMobile ? 'none' : `2px solid ${BR.accent}`,
+              position: 'relative',
             }}>
+              {/* rail node */}
+              <span style={{
+                position: 'absolute',
+                width: 10, height: 10, background: terminus ? BR.ink : BR.accent,
+                border: `2px solid ${BR.accent}`,
+                top: isMobile ? 24 : -7,
+                left: isMobile ? -7 : 24,
+              }} />
               <div style={{
-                fontFamily: brMono, fontSize: 11, fontWeight: 700,
+                fontFamily: brMono, fontSize: 12, fontWeight: 700,
                 textTransform: 'uppercase', letterSpacing: '0.16em',
-                color: live ? '#000' : (wip ? BR.accent : '#aaa'),
-              }}>{p.phase}</div>
+                color: BR.accent, marginTop: isMobile ? 0 : 10,
+                fontVariantNumeric: 'tabular-nums',
+              }}>{s.time}</div>
               <div style={{
-                marginTop: 10, fontFamily: brFont, fontWeight: 900,
-                fontSize: live ? 40 : 32, lineHeight: 0.95, letterSpacing: '-0.02em',
+                marginTop: 8, fontFamily: brFont, fontWeight: 900,
+                fontSize: 30, lineHeight: 0.95, letterSpacing: '-0.02em',
                 textTransform: 'uppercase',
-                color: live ? '#000' : (wip ? BR.bg : '#888'),
-              }}>{p.title}</div>
+                color: terminus ? '#888' : BR.bg,
+              }}>{s.title}</div>
               <div style={{
-                marginTop: 14, fontFamily: brFont, fontSize: 14, lineHeight: 1.5,
-                color: live ? '#000' : (wip ? '#ddd' : '#777'),
-                flex: 1,
-              }}>{p.blurb}</div>
-              <div style={{
-                marginTop: 18,
-                fontFamily: brMono, fontSize: 11, fontWeight: 700,
-                textTransform: 'uppercase', letterSpacing: '0.14em',
-                color: live ? '#000' : (wip ? BR.accent : '#aaa'),
-              }}>
-                ● {p.state}
-              </div>
+                marginTop: 10, fontFamily: brFont, fontSize: 14, lineHeight: 1.5,
+                color: terminus ? '#777' : '#ccc',
+                maxWidth: 320,
+              }}>{s.hook}</div>
             </div>
           )
         })}
       </div>
+
+      {/* One CTA. The old section had three orange slabs and no action. */}
+      <Link to="/play" style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        gap: 16, flexWrap: 'wrap',
+        borderTop: `1px solid #333`,
+        background: BR.accent, color: '#000',
+        padding: '20px 26px', textDecoration: 'none',
+        fontFamily: brFont, fontWeight: 900, fontSize: 18,
+        textTransform: 'uppercase', letterSpacing: '0.04em',
+      }}>
+        <span>▶ CLOCK IN AT 9:00 AM — PLAY THE MORNING</span>
+        <span style={{
+          fontFamily: brMono, fontSize: 11, fontWeight: 700, letterSpacing: '0.14em',
+        }}>FREE · BROWSER · BACK BY LUNCH</span>
+      </Link>
     </section>
   )
 }
