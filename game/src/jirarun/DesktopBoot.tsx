@@ -13,6 +13,7 @@
 
 import { useState, useRef, useEffect, useLayoutEffect, type CSSProperties, type ReactNode, type PointerEvent as ReactPointerEvent } from 'react'
 import { STARTER_PINGS, AMBIENT_POOL, type SlackTemplate } from '../content/slack'
+import { audio } from '../audio/AudioManager'
 
 type AppId = 'slack' | 'chrome' | 'spotify'
 
@@ -123,7 +124,10 @@ export function DesktopBoot({ onEnter, skipBoot = false }: { onEnter: () => void
       const i = pressureIdx.current
       if (i >= PRESSURE.length) { window.clearInterval(id); return }
       pressureIdx.current = i + 1
-      setPing(PRESSURE[i]); setUnread((u) => u + 1); deskSfx.knock()
+      // The Slack ping is the day's leitmotif — use the SAME knock sample as
+      // the office (Phase 1) and every phase segue, not a phase-local synth,
+      // so a Slack ping sounds identical across all four games.
+      setPing(PRESSURE[i]); setUnread((u) => u + 1); audio.notify('slack')
     }, 4500)
     return () => window.clearInterval(id)
   }, [booted, entering])

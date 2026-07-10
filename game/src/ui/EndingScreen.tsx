@@ -328,6 +328,14 @@ export function EndingScreen() {
                 </span>
                 <span>{ticketSummary}</span>
               </div>
+              {/* The franchise punchline — the same immovable line that closes
+                  every Jira Run and Lunch Dash retrospective. Phase 1 was the
+                  only ending missing it; now all four games end on the same
+                  thesis, win or lose. */}
+              <div className="mt-2 pt-2 border-t border-dashed border-[#dfe1e6] flex justify-between text-[12px]">
+                <span className="text-[#5e6c84]">Actual Business Value Generated</span>
+                <span className="font-semibold font-mono text-[#172b4d]">$0.00</span>
+              </div>
             </div>
 
             {/* Performance review — color-tier chip */}
