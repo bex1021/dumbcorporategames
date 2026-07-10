@@ -15,6 +15,7 @@ import { useState, useRef, useEffect, useLayoutEffect, type CSSProperties, type 
 import { STARTER_PINGS, AMBIENT_POOL, type SlackTemplate } from '../content/slack'
 import { audio } from '../audio/AudioManager'
 import { CarriedMeters } from '../ui/CarriedMeters'
+import { buildPressurePings } from './callbackPings'
 
 type AppId = 'slack' | 'chrome' | 'spotify'
 
@@ -45,14 +46,8 @@ const deskSfx = (() => {
 // Escalating "are the tickets updated yet?" pings that arrive while you idle on
 // the desktop — so resisting the distractions and locking in actually means
 // something (the noise builds; you choose to silence it by getting to work).
-const PRESSURE: { from: string; text: string; color: string }[] = [
-  { from: 'Diane', text: 'hey — are your tickets up to date? 👀', color: '#a89876' },
-  { from: 'Brent', text: "is the board current? can't tell what's actually in progress", color: '#6b7a8f' },
-  { from: 'Exec', text: "looking at the board now… doesn't look updated?", color: '#b08a3a' },
-  { from: 'Diane', text: "another nudge — board's still looking a little stale on my end 💚", color: '#a89876' },
-  { from: 'Chad', text: "client's going to pull up the board in standup. is it updated?", color: '#3a4f7a' },
-  { from: 'Exec', text: "circling back — board still isn't updated. can you refresh it today?", color: '#b08a3a' },
-]
+// The list is now built per-run from your Phase 1 choices (see callbackPings):
+// each ticket-owner quotes what you actually told them at standup.
 
 // A believable "prior session" Slack feed: the morning's starter pings plus a
 // handful of ambient ones, oldest → newest, with fake "Xm ago" timestamps.
@@ -117,18 +112,20 @@ export function DesktopBoot({ onEnter, skipBoot = false }: { onEnter: () => void
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [booted, focused, chromeTab, entering])
 
-  // Escalating pings while you dawdle on the desktop.
+  // Escalating pings while you dawdle on the desktop — built once per run from
+  // the player's Phase 1 choices (falls back to generic if no standup on record).
+  const pressure = useRef(buildPressurePings()).current
   const pressureIdx = useRef(0)
   useEffect(() => {
     if (!booted || entering) return
     const id = window.setInterval(() => {
       const i = pressureIdx.current
-      if (i >= PRESSURE.length) { window.clearInterval(id); return }
+      if (i >= pressure.length) { window.clearInterval(id); return }
       pressureIdx.current = i + 1
       // The Slack ping is the day's leitmotif — use the SAME knock sample as
       // the office (Phase 1) and every phase segue, not a phase-local synth,
       // so a Slack ping sounds identical across all four games.
-      setPing(PRESSURE[i]); setUnread((u) => u + 1); audio.notify('slack')
+      setPing(pressure[i]); setUnread((u) => u + 1); audio.notify('slack')
     }, 4500)
     return () => window.clearInterval(id)
   }, [booted, entering])
