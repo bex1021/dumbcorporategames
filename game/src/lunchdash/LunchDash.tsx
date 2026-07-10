@@ -27,6 +27,7 @@ import { peds, hr, updatePeds } from './pedState'
 import { useLunchStore } from './lunchStore'
 import { resetRun } from './runReset'
 import { Retrospective } from './Retrospective'
+import { DriveIntro } from './DriveIntro'
 
 export default function LunchDash() {
   // Start rendering immediately — even if this tab happens to load hidden (a
@@ -40,6 +41,10 @@ export default function LunchDash() {
     document.addEventListener('visibilitychange', onVis)
     return () => document.removeEventListener('visibilitychange', onVis)
   }, [])
+
+  // The intro card holds the clock at 11:00 (GameClock only mounts once the
+  // player starts the car) so reading the brief doesn't cost them the run.
+  const [started, setStarted] = useState(false)
 
   // Fresh run on every entry: reset the persistent (module-global) car, clock,
   // and objective state so navigating in always starts clean at 11:00.
@@ -92,19 +97,20 @@ export default function LunchDash() {
         }}
         gl={{ antialias: true }}
       >
-        <color attach="background" args={['#cfd8dd']} />
-        <fog attach="fog" args={['#d4dadc', 180, 540]} />
+        <color attach="background" args={['#e9cfa4']} />
+        <fog attach="fog" args={['#f0d3a2', 180, 540]} />
         <Suspense fallback={null}>
           <DriveWorld />
           <Car />
         </Suspense>
         <DriveCamera />
         <ObjectiveDetector />
-        <GameClock />
+        {started && <GameClock />}
         <CinematicEffects />
       </Canvas>
 
       <DriveHud />
+      {!started && <DriveIntro onStart={() => setStarted(true)} />}
       <Retrospective />
     </div>
   )
