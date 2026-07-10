@@ -16,13 +16,14 @@ import { Group, Mesh } from 'three'
 import { useKeyboard } from '../hooks/useKeyboard'
 import { DRIVE, DRIVE_WORLD, AIR } from './driveConfig'
 import { carPosition, carFacing, carTelemetry, carAir } from './carState'
-import { resolveCarCollision, SPAWN } from './cityLayout'
+import { resolveCarCollision, SPAWN, PARADE } from './cityLayout'
 import { boundary } from './boundaryState'
 import { crash, damageTier, type DamageTier } from './crashState'
 import { bowl, sloshBowl } from './bowlState'
 import { resolveTrafficCollision } from './trafficState'
 import { useLunchStore } from './lunchStore'
 import { terrainHeight } from './terrain'
+import { updateEngine, engineOff, screech, setParadeMix, playerHonk, toggleRadio } from './driveAudio'
 
 export function Car() {
   const ref = useRef<Group>(null)
@@ -36,6 +37,21 @@ export function Car() {
   const [tier, setTier] = useState<DamageTier>('pristine')
   const tierRef = useRef<DamageTier>('pristine')
 
+  // H = honk, R = toggle the car radio. Separate from the drive keys (which are
+  // held) since these are taps. Engine winds down when the car unmounts.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.repeat) return
+      if (e.key === 'h' || e.key === 'H') playerHonk()
+      else if (e.key === 'r' || e.key === 'R') toggleRadio()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      engineOff()
+    }
+  }, [])
+
   // the car casts a real shadow — re-applied when damage swaps the body meshes
   useEffect(() => {
     ref.current?.traverse((o) => {
@@ -46,7 +62,11 @@ export function Car() {
   useFrame((_, delta) => {
     const g = ref.current
     if (!g) return
-    const dt = Math.min(delta, 0.05) // clamp big frames (tab refocus) so we don't lurch
+    // Floor dt at a tiny positive value: R3F's delta can be 0 on the first frame,
+    // and a 0 would make `accel = (speed-before)/dt` compute 0/0 = NaN, which
+    // poisons the suspension spring and renders the car body at "nowhere"
+    // (invisible) forever. (This was the "where's my car" bug.)
+    const dt = Math.max(1e-4, Math.min(delta, 0.05)) // clamp big frames (tab refocus) + never 0
     const k = keys.current
 
     // --- longitudinal speed ---
@@ -263,6 +283,8 @@ export function Car() {
       if (!carAir.airborne) sp.v += Math.max(-8, Math.min(8, accel)) * 0.003 // squat/dive
       sp.y += sp.v * dt
       sp.y = Math.max(-0.3, Math.min(0.12, sp.y))
+      // hard guard: a stray NaN here would hide the whole car body. Never let it.
+      if (!Number.isFinite(sp.y)) { sp.y = 0; sp.v = 0 }
       body.position.y = sp.y
 
       if (carAir.airborne) {
@@ -283,6 +305,18 @@ export function Car() {
         sh.scale.setScalar(Math.max(0.5, 1 - lift * 0.06))
       }
     }
+
+    // ── audio: engine tracks throttle + speed; tires screech under hard
+    //    cornering load or braking at speed; the parade bed swells nearby ──
+    updateEngine(carTelemetry.speed, keys.current.forward)
+    const yawRateAudio = steer * DRIVE.turnRate * ramp * taper
+    const latAudio = Math.abs(carTelemetry.speed * yawRateAudio)
+    if (latAudio > 14 || (keys.current.back && Math.abs(carTelemetry.speed) > 8)) {
+      screech(Math.min(1, latAudio / 28))
+    }
+    const paradeCZ = (PARADE.z0 + PARADE.z1) / 2
+    const paradeDist = Math.hypot(carPosition.x - PARADE.x, carPosition.z - paradeCZ)
+    setParadeMix(Math.max(0, 1 - paradeDist / 70))
   })
 
   return (

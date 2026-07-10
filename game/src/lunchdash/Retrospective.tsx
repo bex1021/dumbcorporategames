@@ -2,14 +2,19 @@
 // run. Same deadpan format as the Phase 2 Jira-board retro: status, resolution
 // tier, subtask checklist, the stats the player didn't know were tracked, and
 // the franchise punchline — Actual Business Value Generated: $0.00. Shows the
-// instant the run ends (delivered, or a 12:30 no-show).
+// instant the run ends (delivered, or a 1:30 no-show).
+//
+// Laid out as ONE page (no scroll): the ticket on the left, and — on a
+// delivered run — the Exec's follow-up rendered as an iPhone with Slack open to
+// the conversation, on the right. Same cohesion thread as every phase's Exec
+// segue (one more calendar drop, the 4:30 tease), just staged as a phone.
 
 import { Link } from 'react-router-dom'
 import { useLunchStore, type RunFinal } from './lunchStore'
 import { resetRun } from './runReset'
-import { ExecSegue } from '../ui/ExecSegue'
 
 const MONO = '"IBM Plex Mono", "SF Mono", ui-monospace, Menlo, monospace'
+const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, sans-serif'
 
 const TIER = {
   composed: { label: 'Composed', color: '#5cbb7a' },
@@ -18,7 +23,7 @@ const TIER = {
 } as const
 
 function headline(f: RunFinal): { title: string; line: string } {
-  if (!f.delivered) return { title: "Out of time — you didn't make it back by noon.", line: 'The Architecture Sync started without you. Diane (HR) is already typing.' }
+  if (!f.delivered) return { title: "Out of time — you didn't make it back for the sync.", line: 'The Architecture Sync started without you. Diane (HR) is already typing.' }
   if (f.returnTier === 'composed')
     return { title: 'Composed.', line: 'Back in one piece, bowl intact, not a soul harmed. The exec barely looks up — "Let’s get into it."' }
   if (f.returnTier === 'functional')
@@ -40,7 +45,7 @@ export function Retrospective() {
   const resColor = isTimeout ? '#d76a5a' : tier.color
   const h = headline(final)
   const row = (k: string, v: string, vColor?: string) => (
-    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
       <span style={{ opacity: 0.55 }}>{k}</span>
       <span style={{ color: vColor ?? '#d9d3c4', textAlign: 'right' }}>{v}</span>
     </div>
@@ -63,119 +68,211 @@ export function Retrospective() {
         padding: 16,
       }}
     >
-      <div
-        style={{
-          width: 'min(560px, 94vw)',
-          maxHeight: '92vh',
-          overflowY: 'auto',
-          background: '#16181c',
-          border: '1px solid rgba(217,211,196,0.18)',
-          borderRadius: 10,
-          boxShadow: '0 24px 80px rgba(0,0,0,0.6)',
-        }}
-      >
-        {/* breadcrumb header */}
-        <div style={{ padding: '9px 16px', fontSize: 10.5, letterSpacing: '0.04em', opacity: 0.5, borderBottom: '1px solid rgba(255,255,255,0.07)', background: '#1b1e23' }}>
-          Projects › Personal › Lunch Dash › Retrospective
+      {/* one row: ticket + (on a win) the phone. Wraps only if truly too narrow. */}
+      <div style={{ display: 'flex', gap: 18, alignItems: 'stretch', maxHeight: '94vh', flexWrap: 'wrap', justifyContent: 'center' }}>
+        {/* ─── left: the Jira retro ticket ─── */}
+        <div
+          style={{
+            width: 'min(500px, 94vw)',
+            maxHeight: '94vh',
+            display: 'flex',
+            flexDirection: 'column',
+            background: '#16181c',
+            border: '1px solid rgba(217,211,196,0.18)',
+            borderRadius: 10,
+            boxShadow: '0 24px 80px rgba(0,0,0,0.6)',
+            overflow: 'hidden',
+          }}
+        >
+          <div style={{ padding: '8px 16px', fontSize: 10.5, letterSpacing: '0.04em', opacity: 0.5, borderBottom: '1px solid rgba(255,255,255,0.07)', background: '#1b1e23' }}>
+            Projects › Personal › Lunch Dash › Retrospective
+          </div>
+
+          <div style={{ padding: '14px 18px', overflowY: 'auto' }}>
+            <div style={{ fontSize: 11, letterSpacing: '0.14em', color: tier.color, opacity: 0.95 }}>
+              LUNCH-471 · {final.delivered ? '✓ DONE' : '✗ FAILED'}
+            </div>
+            <div style={{ fontSize: 18, marginTop: 3, marginBottom: 2 }}>Pre-Sync Nourishment Acquisition</div>
+
+            <div style={{ marginTop: 10, padding: '10px 13px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: `1px solid ${resColor}55` }}>
+              <div style={{ fontSize: 10, letterSpacing: '0.18em', opacity: 0.55 }}>{isTimeout ? 'OUTCOME' : 'RESOLUTION'}</div>
+              <div style={{ fontSize: 22, fontWeight: 600, color: resColor, marginTop: 1 }}>{isTimeout ? '⏱ Out of Time' : tier.label}</div>
+              <div style={{ fontSize: 12.5, marginTop: 5, opacity: 0.92 }}>{h.title}</div>
+              <div style={{ fontSize: 11.5, marginTop: 3, opacity: 0.62, fontStyle: 'italic' }}>{h.line}</div>
+            </div>
+
+            <div style={{ marginTop: 12, fontSize: 10, letterSpacing: '0.16em', opacity: 0.5 }}>SUBTASKS</div>
+            <div style={{ marginTop: 5, fontSize: 12.5 }}>
+              {SUBTASKS.map((s, i) => {
+                const ok = i < final.stopsCompleted
+                return (
+                  <div key={i} style={{ display: 'flex', gap: 9, padding: '2px 0', opacity: ok ? 1 : 0.5 }}>
+                    <span style={{ color: ok ? tier.color : '#777' }}>{ok ? '✓' : '☐'}</span>
+                    <span style={{ opacity: 0.5 }}>LUNCH-471.{i + 1}</span>
+                    <span>{s}</span>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div style={{ marginTop: 12, fontSize: 10, letterSpacing: '0.16em', opacity: 0.5 }}>COMMENTS</div>
+            <div style={{ marginTop: 3, fontSize: 12 }}>
+              {row('Time used', `${final.minutesUsed} of 60 min`, final.wasLate ? '#d76a5a' : undefined)}
+              {final.wasLate && row('', `— late by ${final.latenessMin} min`, '#d76a5a')}
+              {row('Pedestrians injured', String(final.pedestrianHits), final.pedestrianHits ? '#d99a5a' : undefined)}
+              {row('Vehicle damage', final.damage[0].toUpperCase() + final.damage.slice(1))}
+              {row('Bowl status at delivery', final.delivered ? `${TIER[final.bowlState].label} (${final.bowlIntegrity}%)` : 'Undelivered', TIER[final.bowlState].color)}
+              {row('Vehicle', 'Personal')}
+            </div>
+
+            <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px dashed rgba(255,255,255,0.14)', display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+              <span style={{ opacity: 0.7 }}>Actual Business Value Generated</span>
+              <span style={{ fontWeight: 600 }}>$0.00</span>
+            </div>
+
+            <div style={{ marginTop: 16, display: 'flex', gap: 10, alignItems: 'center' }}>
+              <button
+                onClick={() => resetRun()}
+                style={{
+                  flex: 1,
+                  padding: '10px 14px',
+                  borderRadius: 7,
+                  border: '1px solid rgba(217,211,196,0.3)',
+                  background: tier.color,
+                  color: '#15171a',
+                  fontFamily: MONO,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  letterSpacing: '0.04em',
+                  cursor: 'pointer',
+                }}
+              >
+                ↻ Drive again
+              </button>
+              <Link
+                to="/play"
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: 7,
+                  border: '1px solid rgba(217,211,196,0.3)',
+                  background: 'rgba(255,255,255,0.04)',
+                  color: '#d9d3c4',
+                  fontFamily: MONO,
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                  letterSpacing: '0.04em',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                ← Back to levels
+              </Link>
+            </div>
+          </div>
         </div>
 
-        <div style={{ padding: '16px 20px' }}>
-          {/* ticket id + title */}
-          <div style={{ fontSize: 11, letterSpacing: '0.14em', color: tier.color, opacity: 0.95 }}>
-            LUNCH-471 · {final.delivered ? '✓ DONE' : '✗ FAILED'}
-          </div>
-          <div style={{ fontSize: 19, marginTop: 3, marginBottom: 2 }}>Pre-Sync Nourishment Acquisition</div>
+        {/* ─── right: the Exec's follow-up, as an iPhone with Slack open ─── */}
+        {final.delivered && <ExecPhone />}
+      </div>
+    </div>
+  )
+}
 
-          {/* resolution headline */}
-          <div style={{ marginTop: 12, padding: '12px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: `1px solid ${resColor}55` }}>
-            <div style={{ fontSize: 10, letterSpacing: '0.18em', opacity: 0.55 }}>{isTimeout ? 'OUTCOME' : 'RESOLUTION'}</div>
-            <div style={{ fontSize: 24, fontWeight: 600, color: resColor, marginTop: 1 }}>{isTimeout ? '⏱ Out of Time' : tier.label}</div>
-            <div style={{ fontSize: 13, marginTop: 6, opacity: 0.92 }}>{h.title}</div>
-            <div style={{ fontSize: 12, marginTop: 4, opacity: 0.62, fontStyle: 'italic' }}>{h.line}</div>
-          </div>
+// An iPhone showing Slack open to the DM with the Exec — the day's closing beat.
+// Same thread as the other phases' Exec segue: a thank-you + one more "quick
+// sync" dropped on your calendar, with the 4:30 Executive Review teased.
+function ExecPhone() {
+  return (
+    <div
+      style={{
+        width: 250,
+        maxHeight: '94vh',
+        alignSelf: 'center',
+        borderRadius: 44,
+        background: '#0a0a0c',
+        padding: 9,
+        boxShadow: '0 24px 60px rgba(0,0,0,0.6), inset 0 0 0 2px #2b2b30',
+        flexShrink: 0,
+      }}
+    >
+      <div
+        style={{
+          position: 'relative',
+          width: '100%',
+          height: 512,
+          borderRadius: 36,
+          overflow: 'hidden',
+          background: '#ffffff',
+          fontFamily: SANS,
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        {/* dynamic island */}
+        <div style={{ position: 'absolute', top: 9, left: '50%', transform: 'translateX(-50%)', width: 78, height: 21, background: '#000', borderRadius: 12, zIndex: 5 }} />
 
-          {/* subtasks */}
-          <div style={{ marginTop: 16, fontSize: 10, letterSpacing: '0.16em', opacity: 0.5 }}>SUBTASKS</div>
-          <div style={{ marginTop: 6, fontSize: 13 }}>
-            {SUBTASKS.map((s, i) => {
-              const ok = i < final.stopsCompleted
-              return (
-                <div key={i} style={{ display: 'flex', gap: 9, padding: '3px 0', opacity: ok ? 1 : 0.5 }}>
-                  <span style={{ color: ok ? tier.color : '#777' }}>{ok ? '✓' : '☐'}</span>
-                  <span style={{ opacity: 0.5 }}>LUNCH-471.{i + 1}</span>
-                  <span style={{ textDecoration: ok ? 'none' : 'none' }}>{s}</span>
-                </div>
-              )
-            })}
-          </div>
+        {/* status bar */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 20px 3px', fontSize: 12, fontWeight: 600, color: '#000' }}>
+          <span>12:01</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            {/* signal bars */}
+            <span style={{ display: 'flex', alignItems: 'flex-end', gap: 1.5, height: 10 }}>
+              {[4, 6, 8, 10].map((hbar) => (
+                <span key={hbar} style={{ width: 3, height: hbar, background: '#000', borderRadius: 1 }} />
+              ))}
+            </span>
+            {/* battery */}
+            <span style={{ width: 22, height: 11, border: '1.4px solid #000', borderRadius: 3, position: 'relative', display: 'inline-block' }}>
+              <span style={{ position: 'absolute', inset: 1.4, right: 5, background: '#000', borderRadius: 1 }} />
+              <span style={{ position: 'absolute', right: -3, top: 3.2, width: 2, height: 4, background: '#000', borderRadius: 1 }} />
+            </span>
+          </span>
+        </div>
 
-          {/* comments / stats */}
-          <div style={{ marginTop: 16, fontSize: 10, letterSpacing: '0.16em', opacity: 0.5 }}>COMMENTS</div>
-          <div style={{ marginTop: 4, fontSize: 12.5 }}>
-            {row('Time used', `${final.minutesUsed} of 60 min`, final.wasLate ? '#d76a5a' : undefined)}
-            {final.wasLate && row('', `— late by ${final.latenessMin} min`, '#d76a5a')}
-            {row('Pedestrians injured', String(final.pedestrianHits), final.pedestrianHits ? '#d99a5a' : undefined)}
-            {row('Vehicle damage', final.damage[0].toUpperCase() + final.damage.slice(1))}
-            {row('Bowl status at delivery', final.delivered ? `${TIER[final.bowlState].label} (${final.bowlIntegrity}%)` : 'Undelivered', TIER[final.bowlState].color)}
-            {row('Vehicle', 'Personal')}
-          </div>
-
-          {/* the punchline */}
-          <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px dashed rgba(255,255,255,0.14)', display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-            <span style={{ opacity: 0.7 }}>Actual Business Value Generated</span>
-            <span style={{ fontWeight: 600 }}>$0.00</span>
-          </div>
-
-          {/* actions */}
-          <div style={{ marginTop: 18, display: 'flex', gap: 10, alignItems: 'center' }}>
-            <button
-              onClick={() => resetRun()}
-              style={{
-                flex: 1,
-                padding: '10px 14px',
-                borderRadius: 7,
-                border: '1px solid rgba(217,211,196,0.3)',
-                background: tier.color,
-                color: '#15171a',
-                fontFamily: MONO,
-                fontSize: 13,
-                fontWeight: 600,
-                letterSpacing: '0.04em',
-                cursor: 'pointer',
-              }}
-            >
-              ↻ Drive again
-            </button>
-            <Link
-              to="/play"
-              style={{
-                padding: '10px 14px',
-                borderRadius: 7,
-                border: '1px solid rgba(217,211,196,0.22)',
-                color: '#d9d3c4',
-                fontFamily: MONO,
-                fontSize: 12,
-                textDecoration: 'none',
-                letterSpacing: '0.04em',
-              }}
-            >
-              ✕ Exit
-            </Link>
-          </div>
-          {/* On a delivered run, the Exec closes the day the same way he
-              opened every phase — one more calendar drop, same card, same
-              knock. Phase 4 (the fight) isn't built yet, so the CTA is a
-              tease; the visual thread holds regardless. */}
-          {final.delivered && (
-            <div style={{ marginTop: 18 }}>
-              <ExecSegue
-                kind="calendar"
-                time="12:01 PM"
-                message={<>Bowl received, thank you 🙂 Last thing today — let's do a quick sync on the portal refresh. Popped 30 min on your calendar. Shouldn't take long.</>}
-                comingSoonLabel="4:30 PM · Executive Review · coming soon"
-              />
+        {/* Slack conversation header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px 8px', borderBottom: '1px solid #e9e9e9' }}>
+          <span style={{ color: '#1264a3', fontSize: 22, lineHeight: 1, marginTop: -2 }}>‹</span>
+          <div style={{ width: 30, height: 30, borderRadius: 8, background: '#b08a3a', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 15 }}>E</div>
+          <div style={{ lineHeight: 1.15 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, color: '#1d1c1d', display: 'flex', alignItems: 'center', gap: 5 }}>
+              Exec <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#2eb67d', display: 'inline-block' }} />
             </div>
-          )}
+            <div style={{ fontSize: 11, color: '#616061' }}>Alignly</div>
+          </div>
+        </div>
+
+        {/* chat body */}
+        <div style={{ flex: 1, padding: '10px 12px 0', display: 'flex', flexDirection: 'column', gap: 4, overflow: 'hidden' }}>
+          <div style={{ textAlign: 'center', fontSize: 10.5, color: '#9a9a9a', fontWeight: 600, margin: '2px 0 8px' }}>Today</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: '#b08a3a', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 15, flexShrink: 0 }}>E</div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                <span style={{ fontWeight: 700, fontSize: 13.5, color: '#1d1c1d' }}>Exec</span>
+                <span style={{ fontSize: 10.5, color: '#8d8d8d' }}>12:01 PM</span>
+              </div>
+              <div style={{ fontSize: 13.5, lineHeight: 1.42, color: '#1d1c1d', marginTop: 2 }}>
+                food received, thank you 🙂 last thing today — let's do a quick sync on the status of the portal refresh. popped 30 min on your calendar later today.
+              </div>
+              {/* calendar event unfurl — the 4:30 tease */}
+              <div style={{ marginTop: 8, border: '1px solid #e2e2e2', borderLeft: '3px solid #616061', borderRadius: 6, padding: '7px 9px', background: '#fafafa' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: '#1d1c1d' }}>
+                  <span>📅</span> Executive Review
+                </div>
+                <div style={{ fontSize: 11, color: '#616061', marginTop: 2 }}>Today · 4:30 PM · coming soon</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Slack message input (inert) + home indicator */}
+        <div style={{ padding: '7px 12px 4px', borderTop: '1px solid #ececec' }}>
+          <div style={{ border: '1px solid #d9d9d9', borderRadius: 20, padding: '7px 12px', fontSize: 12.5, color: '#9a9a9a' }}>
+            Message Exec
+          </div>
+        </div>
+        <div style={{ padding: '5px 0 8px', display: 'flex', justifyContent: 'center' }}>
+          <div style={{ width: 108, height: 4, borderRadius: 2, background: '#111' }} />
         </div>
       </div>
     </div>

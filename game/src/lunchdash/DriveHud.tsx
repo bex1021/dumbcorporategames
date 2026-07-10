@@ -18,6 +18,7 @@ import { pickup } from './pickupState'
 import { useLunchStore, activeStop, stopStateFor } from './lunchStore'
 import { Minimap } from './Minimap'
 import { BowlWidget } from './BowlWidget'
+import { RadioDial } from './RadioDial'
 
 const MONO = '"IBM Plex Mono", "SF Mono", ui-monospace, Menlo, monospace'
 const CHIP: React.CSSProperties = {
@@ -349,6 +350,9 @@ export function DriveHud() {
         ✕ Exit
       </Link>
 
+      {/* top-right: car-radio dial (under Exit) */}
+      <RadioDial />
+
       {/* bottom-left: minimap */}
       <div style={{ ...CHIP, position: 'fixed', bottom: 16, left: 16, padding: 6, lineHeight: 0 }}>
         <Minimap />
@@ -483,7 +487,7 @@ export function DriveHud() {
           letterSpacing: '0.06em',
         }}
       >
-        W / ↑ accelerate · S / ↓ brake + reverse · A D / ← → steer
+        W / ↑ accelerate · S / ↓ brake + reverse · A D / ← → steer · H honk · R radio
       </div>
     </div>
   )

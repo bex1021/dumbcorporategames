@@ -246,6 +246,20 @@ export function onRoad(x: number, z: number, rad = 0): boolean {
   return false
 }
 
+// Any DRIVABLE / paved surface — roads, the diagonal avenues, bridge decks,
+// alleys, and parking lots. Used to keep scenery (trees, palms) off pavement:
+// onRoad alone misses avenues, bridges, and lots, which is how trees ended up
+// standing in the middle of the road. (Hoisted; only called after cityLayout's
+// consts finish initialising.)
+export function onPaved(x: number, z: number, rad = 0): boolean {
+  if (onRoad(x, z, rad)) return true
+  if (onAlley(x, z, rad)) return true
+  if (distToAvenues(x, z) < 6 + rad) return true
+  for (const p of PARKING) if (inRect(x, z, p, rad)) return true
+  for (const b of BRIDGES) if (inRect(x, z, b, rad)) return true
+  return false
+}
+
 // Lane-PAINT clipping: real lane lines stop at the intersection — they don't run
 // through the box. Every road here is axis-aligned, so a crossing happens where
 // a perpendicular road's centerline passes through this one. Returns the spans

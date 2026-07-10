@@ -1,0 +1,139 @@
+{
+  "station": "KPI 101.1",
+  "voiceHint": "Anchor = deadpan British business-radio DJ (Daniel). Exec soundbites = Samantha, filtered like a conference-call clip.",
+  "note": "Canonical radio talk script. Lines with an 'exec' field are two-voice: 'text' is read by the anchor, then 'exec' is the CEO/founder soundbite in a different voice. Edit here, then run: node scripts/render-radio.mjs \"Daniel\" \"Samantha\" to regenerate audio in public/sounds/radio/. Keep text TTS-friendly: 'K P I', 'A I', 'C E O', spell out numbers, no symbols. Playback = array order, looped; songs (radioSongs.md) interleave automatically.",
+  "lines": [
+    {
+      "id": "sting-open",
+      "segment": "sting",
+      "text": "K P I. One oh one point one. All metrics, all the time."
+    },
+    {
+      "id": "market-layoffs",
+      "segment": "market",
+      "text": "On Wall Street, stocks closed higher on news of mass layoffs across the tech sector. Investors called the cuts encouraging. The market, as always, loves nothing more than fewer of you."
+    },
+    {
+      "id": "company-hyperscale-asset",
+      "segment": "company",
+      "text": "HyperScale posted record profits this quarter, after cutting fifteen percent of its workforce. Here's the C E O, on the earnings call.",
+      "exec": "Our people have always been our greatest asset. That's exactly why we made the difficult decision to have fewer of them."
+    },
+    {
+      "id": "traffic-email-meeting",
+      "segment": "traffic",
+      "text": "Traffic on the ones. The expressway is backed up because someone scheduled a meeting that could have been an email. Expect delays of, roughly, your whole afternoon."
+    },
+    {
+      "id": "tech-delve-funding",
+      "segment": "tech",
+      "text": "Delve raised another eight hundred million dollars today, at a forty billion dollar valuation. The company has no product, no revenue, and, in the words of one investor, no clear idea what it does. But sources say the momentum is incredible."
+    },
+    {
+      "id": "commercial-slopbowlz",
+      "segment": "commercial",
+      "text": "This hour is brought to you by Corporate Slop Bowlz. When the return to office mandate has taken your evenings, your mornings, and most of the feeling in your hands, the salmon bowl is still fourteen dollars. Corporate Slop Bowlz. You're already here."
+    },
+    {
+      "id": "market-indexes-mixed",
+      "segment": "market",
+      "text": "The major indexes finished mixed. The Dow off forty points, the Nasdaq up a quarter percent, as traders waited on Friday's jobs report. And, quietly, on each other."
+    },
+    {
+      "id": "weather-scopecreep",
+      "segment": "weather",
+      "text": "Your forecast. A cool morning of optimism, followed by a ninety percent chance of scope creep after three."
+    },
+    {
+      "id": "company-shipmart-rto",
+      "segment": "company",
+      "text": "ShipMart is ending remote work, ordering all staff back to the office five days a week. The C E O explained the decision.",
+      "exec": "This was never about control. It's about collaboration, culture, and the fifteen year lease we signed on an eleven story building."
+    },
+    {
+      "id": "sting-lobby",
+      "segment": "sting",
+      "text": "You're listening to K P I. The only station your building is contractually required to play in the lobby."
+    },
+    {
+      "id": "tech-hyperscale-ai",
+      "segment": "tech",
+      "text": "HyperScale unveiled an A I that manages your other A Is. Shares jumped nine percent. Then fell six, when an analyst asked what it does."
+    },
+    {
+      "id": "traffic-finance-lunch",
+      "segment": "traffic",
+      "text": "Heavy downtown congestion as the entire finance team leaves for lunch at exactly noon. Together. As they do."
+    },
+    {
+      "id": "market-fed",
+      "segment": "market",
+      "text": "The Federal Reserve held rates steady again, citing inflation, uncertainty, and what the chair described only as a bad feeling."
+    },
+    {
+      "id": "commercial-unwind",
+      "segment": "commercial",
+      "text": "Struggling to disconnect after work? Try Unwind. The app that reminds you to relax, from the same company that emails you at eleven p.m. Unwind. Because balance is a personal responsibility."
+    },
+    {
+      "id": "company-delve-support",
+      "segment": "company",
+      "text": "Delve says it will replace its entire customer support team with A I by the end of the year. Here's the C E O.",
+      "exec": "We're not eliminating jobs. We're freeing our people from the burden of having them."
+    },
+    {
+      "id": "time-noon",
+      "segment": "time",
+      "text": "Coming up on the noon hour. If you're not already driving to lunch, you are, statistically, already late."
+    },
+    {
+      "id": "tech-promptly",
+      "segment": "tech",
+      "text": "Promptly released an A I that attends your meetings for you. Early users report attending more meetings than ever. Now to discuss what the A I said in the other meetings."
+    },
+    {
+      "id": "weather-reorg",
+      "segment": "weather",
+      "text": "Sunny today, with a late afternoon chance of reorg. Bundle up. There will be a slide that says, we are a family."
+    },
+    {
+      "id": "market-confidence",
+      "segment": "market",
+      "text": "Consumer confidence fell for a third straight month. Americans remain worried about prices, layoffs, and a growing sense that the economy is a group project, and they're the only one working on it."
+    },
+    {
+      "id": "tech-alignly",
+      "segment": "tech",
+      "text": "Startup Alignly launched alignment as a service this week. Here's the founder.",
+      "exec": "For too long, being aligned meant agreeing. That's outdated. With Alignly, you can be fully aligned while agreeing on nothing. Indefinitely, and for a monthly fee."
+    },
+    {
+      "id": "commercial-shipmart-intern",
+      "segment": "commercial",
+      "text": "Are you a self starter? A go getter? A team player who thrives in a fast paced environment? Then ShipMart has an unpaid opportunity that could, someday, become a paid one. Probably not. But someday."
+    },
+    {
+      "id": "traffic-return-office",
+      "segment": "traffic",
+      "text": "Delays on the loop, as commuters return to an office they were told, for three years, they would never have to see again."
+    },
+    {
+      "id": "time-just-past-noon",
+      "segment": "time",
+      "text": "Just past noon. Somewhere, an executive is deciding your fourth quarter future. You have time for lunch. Live a little."
+    },
+    {
+      "id": "sting-circleback",
+      "segment": "sting",
+      "text": "K P I business radio. We circle back, so you don't have to."
+    }
+  ],
+  "songs": [
+    {
+      "id": "rise-and-grind",
+      "title": "Rise & Grind",
+      "artist": "Synergy",
+      "intro": "And now, topping this week's Corporate Slave Top Fifty. This is Rise and Grind, by Synergy. A song about living the dream. Someone's dream."
+    }
+  ]
+}

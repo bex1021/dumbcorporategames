@@ -47,6 +47,7 @@ import {
   ROADS,
   roadWidth,
   onRoad,
+  onPaved,
   paintGaps,
   GREEN_AREAS,
   DISTRICT_REGIONS,
@@ -83,7 +84,9 @@ const BOX_ITEMS = [...BUILDINGS, HQ_BUILDING, ...BARNS].map((b) => {
   const bottom = minH - 1.5 // bury the base below the lowest corner
   return { x: b.x, y: (top + bottom) / 2, z: b.z, w: b.w, h: top - bottom, d: b.d, color: b.color }
 })
-const TREE_ITEMS = [...TREES, ...COUNTRY_TREES]
+// Belt-and-suspenders: drop any tree that landed on pavement (roads/avenues/
+// bridges/lots) so none end up standing in the middle of the road.
+const TREE_ITEMS = [...TREES, ...COUNTRY_TREES].filter((t) => !onPaved(t.x, t.z, 2.5))
 
 // ---- building detail (Phase B) — all derived once, rendered in ONE instanced draw ----
 function shade(hex: string, f: number): string {
@@ -319,8 +322,8 @@ function DriveLights() {
   // Lower fill so the sun's shadows actually read; the sun carries the scene.
   return (
     <>
-      <ambientLight intensity={0.44} color="#ecdcc2" />
-      <hemisphereLight args={['#cddcf0', '#b6987a', 0.36]} />
+      <ambientLight intensity={0.5} color="#eef1f4" />
+      <hemisphereLight args={['#e2ebf2', '#9aa08c', 0.4]} />
       <SunLight />
     </>
   )
@@ -341,9 +344,9 @@ function SunLight() {
     if (!l) return
     const ax = Math.round(carPosition.x / 8) * 8
     const az = Math.round(carPosition.z / 8) * 8
-    // Golden hour: sun dropped low (was y=170) and pushed out, so it rakes
-    // across the city at ~25° and throws long, dramatic shadows.
-    l.position.set(ax + 132, 74, az + 92)
+    // High noon: sun nearly overhead (slightly angled so buildings still cast a
+    // readable shadow), for flat midday light — it's 12:00, not golden hour.
+    l.position.set(ax + 46, 195, az + 34)
     target.position.set(ax, 0, az)
     target.updateMatrixWorld()
   })
@@ -352,8 +355,8 @@ function SunLight() {
       <directionalLight
         ref={ref}
         castShadow
-        intensity={1.35}
-        color="#ffdca6"
+        intensity={1.2}
+        color="#fff6ea"
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
         shadow-camera-left={-95}
@@ -377,9 +380,9 @@ function SkyDome() {
   const geo = useMemo(() => {
     const g = new SphereGeometry(880, 24, 12)
     const pos = g.attributes.position
-    const zen = new Color('#5c83b6') // deeper blue overhead
-    const hor = new Color('#ffc888') // warm golden-hour horizon band
-    const low = new Color('#eac697') // gold haze below the horizon
+    const zen = new Color('#79a6d6') // midday blue overhead
+    const hor = new Color('#cdd9e2') // pale haze at the horizon
+    const low = new Color('#dde5ea') // light ground haze below
     const c = new Color()
     const colors = new Float32Array(pos.count * 3)
     for (let i = 0; i < pos.count; i++) {
@@ -1020,10 +1023,10 @@ function InstancedBoxes({ items, glass = false }: { items: BoxItem[]; glass?: bo
   return (
     <instancedMesh ref={ref} args={[geo, undefined, items.length]} castShadow receiveShadow>
       {glass ? (
-        // Window glass: smooth + metallic so it mirrors the sky/gold from the
-        // <Environment>. A faint warm emissive reads as interior lights left on,
-        // so windows glow on the shadow side instead of going black at dusk.
-        <meshStandardMaterial metalness={0.88} roughness={0.16} envMapIntensity={1.15} emissive="#ffcf87" emissiveIntensity={0.16} />
+        // Window glass: smooth + metallic so it mirrors the midday sky from the
+        // <Environment>. A whisper of cool emissive keeps the deepest shadow-side
+        // panes from going fully black, without reading as "lights on" at noon.
+        <meshStandardMaterial metalness={0.88} roughness={0.18} envMapIntensity={1.2} emissive="#c9d6e2" emissiveIntensity={0.05} />
       ) : (
         // Matte structure: keep reflections almost off so masonry stays masonry.
         <meshStandardMaterial roughness={0.85} metalness={0.0} envMapIntensity={0.18} />
@@ -1033,20 +1036,21 @@ function InstancedBoxes({ items, glass = false }: { items: BoxItem[]; glass?: bo
 }
 
 // The reflected environment the window glass samples. Built entirely in-engine
-// from a few glowing panels (no HDR download), evoking a warm golden-hour sky:
-// a bright gold band low on the sun side, cool blue up high. `frames={1}` bakes
-// it once — it's static scenery, so this costs nothing per frame.
+// from a few bright panels (no HDR download), evoking a clear MIDDAY sky: a
+// strong white light overhead and pale blue on the horizon, so glass mirrors a
+// noon sky rather than a sunset. `frames={1}` bakes it once — static scenery,
+// so it costs nothing per frame.
 function CityEnv() {
   return (
     <Environment resolution={128} frames={1}>
-      {/* warm horizon / sun side */}
-      <Lightformer form="rect" intensity={2.2} color="#ffd9a0" scale={[60, 18, 1]} position={[40, 12, -60]} rotation={[0, 0, 0]} />
-      <Lightformer form="rect" intensity={1.1} color="#ffb877" scale={[50, 10, 1]} position={[60, 5, 20]} rotation={[0, -Math.PI / 2, 0]} />
-      {/* cool sky overhead + opposite side */}
-      <Lightformer form="rect" intensity={1.0} color="#bcd4ea" scale={[80, 80, 1]} position={[0, 60, 0]} rotation={[Math.PI / 2, 0, 0]} />
-      <Lightformer form="rect" intensity={0.6} color="#8fb0d0" scale={[60, 20, 1]} position={[-50, 14, 40]} rotation={[0, Math.PI / 2, 0]} />
+      {/* bright overhead sun/sky — the dominant midday reflection */}
+      <Lightformer form="rect" intensity={2.4} color="#ffffff" scale={[90, 90, 1]} position={[10, 70, 0]} rotation={[Math.PI / 2, 0, 0]} />
+      {/* pale blue horizon band on all sides */}
+      <Lightformer form="rect" intensity={1.0} color="#c4d6e8" scale={[70, 16, 1]} position={[0, 14, -60]} rotation={[0, 0, 0]} />
+      <Lightformer form="rect" intensity={0.9} color="#bcd0e6" scale={[70, 16, 1]} position={[0, 14, 60]} rotation={[0, Math.PI, 0]} />
+      <Lightformer form="rect" intensity={0.9} color="#c0d3e6" scale={[60, 16, 1]} position={[-60, 14, 0]} rotation={[0, Math.PI / 2, 0]} />
       {/* dim ground bounce so glass isn't black underneath */}
-      <Lightformer form="rect" intensity={0.35} color="#6b6357" scale={[100, 100, 1]} position={[0, -30, 0]} rotation={[-Math.PI / 2, 0, 0]} />
+      <Lightformer form="rect" intensity={0.35} color="#7d7d78" scale={[100, 100, 1]} position={[0, -30, 0]} rotation={[-Math.PI / 2, 0, 0]} />
     </Environment>
   )
 }
@@ -1344,10 +1348,11 @@ function RooftopAds() {
 }
 
 // LA palms — thin tall trunk + a small green crown
+const PALM_ITEMS = PALMS.filter((p) => !onPaved(p.x, p.z, 2.5)) // keep palms off pavement too
 function Palms() {
   return (
     <>
-      {PALMS.map((p, i) => (
+      {PALM_ITEMS.map((p, i) => (
         <group key={i} position={[p.x, terrainHeight(p.x, p.z), p.z]}>
           <mesh position={[0, p.h / 2, 0]} castShadow>
             <cylinderGeometry args={[0.18, 0.28, p.h, 6]} />
@@ -1471,7 +1476,21 @@ function Storefronts() {
   return (
     <>
       {STOREFRONTS.map((s) => {
-        const gy = terrainHeight(s.x, s.z)
+        const hw = s.w / 2
+        const hd = s.d / 2
+        // Sink the building into the slope like the city towers: base below the
+        // lowest footprint corner, top s.h above the highest — so it sits flush
+        // on a hill instead of floating/tilting (fixes the crooked Slop Bowlz).
+        const corners = [
+          terrainHeight(s.x - hw, s.z - hd), terrainHeight(s.x + hw, s.z - hd),
+          terrainHeight(s.x - hw, s.z + hd), terrainHeight(s.x + hw, s.z + hd),
+        ]
+        const minH = Math.min(...corners)
+        const maxH = Math.max(...corners)
+        const baseY = minH - 1.2
+        const topY = maxH + s.h
+        const midY = (baseY + topY) / 2
+        const boxH = topY - baseY
         // unit vector from the building toward its pull-in window = the "front"
         const fx = s.zx - s.x
         const fz = s.zz - s.z
@@ -1479,20 +1498,24 @@ function Storefronts() {
         const nx = fx / fl
         const nz = fz / fl
         const yaw = Math.atan2(nx, nz)
+        // ground the front-face detail + the drive-thru at THEIR own terrain
+        // heights (the window sits out on the flatter road), not the center's.
+        const frontGY = terrainHeight(s.x + nx * hd, s.z + nz * hd)
+        const winGY = terrainHeight(s.zx, s.zz)
         return (
           <group key={s.id}>
-            {/* main building */}
-            <mesh position={[s.x, gy + s.h / 2, s.z]} castShadow receiveShadow>
-              <boxGeometry args={[s.w, s.h, s.d]} />
+            {/* main building — sunk to span the footprint's slope */}
+            <mesh position={[s.x, midY, s.z]} castShadow receiveShadow>
+              <boxGeometry args={[s.w, boxH, s.d]} />
               <meshStandardMaterial color={s.color} />
             </mesh>
             {/* window strip on the front face */}
-            <mesh position={[s.x + nx * (s.d / 2 + 0.06), gy + 1.7, s.z + nz * (s.d / 2 + 0.06)]} rotation={[0, yaw, 0]}>
+            <mesh position={[s.x + nx * (hd + 0.06), frontGY + 1.7, s.z + nz * (hd + 0.06)]} rotation={[0, yaw, 0]}>
               <boxGeometry args={[s.w * 0.55, 1.6, 0.12]} />
               <meshStandardMaterial color="#23262b" metalness={0.2} roughness={0.3} />
             </mesh>
-            {/* sign band above the front */}
-            <group position={[s.x + nx * (s.d / 2 + 0.12), gy + s.h + 1.5, s.z + nz * (s.d / 2 + 0.12)]} rotation={[0, yaw, 0]}>
+            {/* sign band above the visible top */}
+            <group position={[s.x + nx * (hd + 0.12), topY + 0.9, s.z + nz * (hd + 0.12)]} rotation={[0, yaw, 0]}>
               <mesh castShadow>
                 <boxGeometry args={[s.w * 0.92, 2.5, 0.35]} />
                 <meshStandardMaterial color="#f2efe6" />
@@ -1503,8 +1526,8 @@ function Storefronts() {
                 </Text>
               </Suspense>
             </group>
-            {/* drive-thru canopy over the window + 4 posts */}
-            <mesh position={[s.zx, gy + 3.5, s.zz]} castShadow>
+            {/* drive-thru canopy over the window + 4 posts — grounded at the window */}
+            <mesh position={[s.zx, winGY + 3.5, s.zz]} castShadow>
               <boxGeometry args={[7, 0.35, 7]} />
               <meshStandardMaterial color={s.color} />
             </mesh>
@@ -1514,18 +1537,18 @@ function Storefronts() {
               [-3, 3],
               [3, 3],
             ].map(([ox, oz], i) => (
-              <mesh key={i} position={[s.zx + ox, gy + 1.7, s.zz + oz]} castShadow>
+              <mesh key={i} position={[s.zx + ox, winGY + 1.7, s.zz + oz]} castShadow>
                 <cylinderGeometry args={[0.15, 0.15, 3.4, 6]} />
                 <meshStandardMaterial color="#54585d" />
               </mesh>
             ))}
             {/* lane pad under the window */}
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[s.zx, gy + 0.05, s.zz]} receiveShadow>
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[s.zx, winGY + 0.05, s.zz]} receiveShadow>
               <planeGeometry args={[10, 8]} />
               <meshStandardMaterial color="#34363a" />
             </mesh>
             {/* menu board beside the lane */}
-            <mesh position={[s.zx - nz * 4, gy + 1.2, s.zz + nx * 4]} rotation={[0, yaw + 0.4, 0]} castShadow>
+            <mesh position={[s.zx - nz * 4, winGY + 1.2, s.zz + nx * 4]} rotation={[0, yaw + 0.4, 0]} castShadow>
               <boxGeometry args={[1.4, 1.8, 0.18]} />
               <meshStandardMaterial color="#22251f" />
             </mesh>

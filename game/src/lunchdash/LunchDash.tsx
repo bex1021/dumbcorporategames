@@ -28,6 +28,7 @@ import { useLunchStore } from './lunchStore'
 import { resetRun } from './runReset'
 import { Retrospective } from './Retrospective'
 import { DriveIntro } from './DriveIntro'
+import { startRadio, stopAll } from './driveAudio'
 
 export default function LunchDash() {
   // Start rendering immediately — even if this tab happens to load hidden (a
@@ -45,6 +46,10 @@ export default function LunchDash() {
   // The intro card holds the clock at 11:00 (GameClock only mounts once the
   // player starts the car) so reading the brief doesn't cost them the run.
   const [started, setStarted] = useState(false)
+
+  // Tune the car radio to the market-news bed for the whole session; tear all
+  // audio down when we leave Lunch Dash.
+  useEffect(() => stopAll, [])
 
   // Fresh run on every entry: reset the persistent (module-global) car, clock,
   // and objective state so navigating in always starts clean at 11:00.
@@ -64,6 +69,11 @@ export default function LunchDash() {
           carAir.prevGh = gy
           carAir.climb = 0
         },
+        // live car state (read-only inspection)
+        carPosition,
+        carAir,
+        carFacing,
+        terrainHeight,
         // bowl-mechanic inspection / tuning hooks
         bowl,
         bowlTier,
@@ -97,8 +107,8 @@ export default function LunchDash() {
         }}
         gl={{ antialias: true }}
       >
-        <color attach="background" args={['#e9cfa4']} />
-        <fog attach="fog" args={['#f0d3a2', 180, 540]} />
+        <color attach="background" args={['#cfd8dd']} />
+        <fog attach="fog" args={['#d6dde1', 180, 540]} />
         <Suspense fallback={null}>
           <DriveWorld />
           <Car />
@@ -110,8 +120,9 @@ export default function LunchDash() {
       </Canvas>
 
       <DriveHud />
-      {!started && <DriveIntro onStart={() => setStarted(true)} />}
+      {!started && <DriveIntro onStart={() => { setStarted(true); startRadio() }} />}
       <Retrospective />
     </div>
   )
 }
+

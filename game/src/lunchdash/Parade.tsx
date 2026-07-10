@@ -13,9 +13,12 @@
 import { useRef, useMemo, useLayoutEffect, Suspense } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Text, Billboard } from '@react-three/drei'
-import { Group, InstancedMesh, Object3D, CapsuleGeometry, Color } from 'three'
+import { Group, InstancedMesh, Object3D, CapsuleGeometry, SphereGeometry, BoxGeometry, Color } from 'three'
 import { PARADE, PARADE_BARRIERS } from './cityLayout'
 import { terrainHeight } from './terrain'
+import { carPosition } from './carState'
+import { hr, HR_TIME_PENALTY } from './pedState'
+import { driveClock } from './clockState'
 
 // The blimps + their mottos. Peak corporate. The first is the branded green
 // SLOP BOWLZ blimp (so the destination has a recognisable airship overhead, not
@@ -127,28 +130,109 @@ const CROWD = (() => {
   return out
 })()
 
+// Same faceless-office-worker silhouette as the roaming Pedestrians (legs box +
+// torso capsule + head sphere), so the parade crowd matches the blobs walking
+// the rest of the city instead of being lone pills. Same palettes, too.
+const CROWD_SHIRTS = ['#b9b0a0', '#9aa3ad', '#a8b29e', '#b5a98f', '#8f9aa8', '#b0a4ad']
+const CROWD_SLACKS = ['#5b5e63', '#6a6457', '#54585f', '#6e6a5e']
+
+// Precompute each spectator's spot, facing, size + a per-person hop phase, so
+// the animation loop just bounces them (no re-sampling the terrain every frame).
+const _co = new Object3D()
+_co.rotation.order = 'YXZ'
+const CROWD_MEMBERS = CROWD.map((p, i) => ({
+  x: p.x,
+  z: p.z,
+  gy: terrainHeight(p.x, p.z),
+  heading: Math.atan2(PARADE.x - p.x, 0.001), // face the route
+  scale: 0.92 + (i % 5) * 0.04,
+  phase: (i * 2.399963) % (Math.PI * 2),
+  rate: 2.2 + (i % 7) * 0.28, // varied hop tempo so they're not in lockstep
+  down: 0, // seconds left "down" after being clipped by the car (mutated in-frame)
+}))
+const PARADE_CZ = (PARADE.z0 + PARADE.z1) / 2
+const CROWD_HIT_R = 1.6 // player-center to spectator distance that counts as a clip
+
 function Crowd() {
-  const ref = useRef<InstancedMesh>(null)
-  const geo = useMemo(() => new CapsuleGeometry(0.28, 0.95, 4, 7).translate(0, 0.92, 0), [])
-  const shirts = useMemo(() => ['#b9b0a0', '#9aa3ad', '#a8b29e', '#b5a98f', '#8f9aa8'], [])
+  const torsoRef = useRef<InstancedMesh>(null)
+  const headRef = useRef<InstancedMesh>(null)
+  const legsRef = useRef<InstancedMesh>(null)
+  const n = CROWD.length
+  const torsoGeo = useMemo(() => new CapsuleGeometry(0.26, 0.5, 4, 8).translate(0, 1.05, 0), [])
+  const headGeo = useMemo(() => new SphereGeometry(0.16, 8, 8).translate(0, 1.58, 0), [])
+  const legsGeo = useMemo(() => new BoxGeometry(0.3, 0.66, 0.22).translate(0, 0.33, 0), [])
+  // colours are static — set once
   useLayoutEffect(() => {
-    const m = ref.current
-    if (!m) return
-    const o = new Object3D()
     const c = new Color()
-    CROWD.forEach((p, i) => {
-      o.position.set(p.x, terrainHeight(p.x, p.z), p.z) // stand each person on the local grade
-      o.updateMatrix()
-      m.setMatrixAt(i, o.matrix)
-      m.setColorAt(i, c.set(shirts[i % shirts.length]))
+    CROWD_MEMBERS.forEach((_, i) => {
+      torsoRef.current?.setColorAt(i, c.set(CROWD_SHIRTS[i % CROWD_SHIRTS.length]))
+      legsRef.current?.setColorAt(i, c.set(CROWD_SLACKS[i % CROWD_SLACKS.length]))
     })
-    m.instanceMatrix.needsUpdate = true
-    if (m.instanceColor) m.instanceColor.needsUpdate = true
-  }, [shirts])
+    if (torsoRef.current?.instanceColor) torsoRef.current.instanceColor.needsUpdate = true
+    if (legsRef.current?.instanceColor) legsRef.current.instanceColor.needsUpdate = true
+  }, [])
+  // hop with excitement (wilder as the car nears) — and clip like a pedestrian:
+  // drive into a spectator and it's a logged HR incident + a clock penalty, so
+  // plowing the crowd is no longer free. They drop, then pop back up.
+  useFrame((_, delta) => {
+    const torso = torsoRef.current
+    const head = headRef.current
+    const legs = legsRef.current
+    if (!torso || !head || !legs) return
+    const dt = Math.min(delta, 0.05)
+    const t = performance.now() * 0.001
+    const cx = carPosition.x
+    const cz = carPosition.z
+    const dist = Math.hypot(cx - PARADE.x, cz - PARADE_CZ)
+    const excite = Math.max(0.3, Math.min(1.6, 1.6 - dist / 45)) // wilder up close
+    for (let i = 0; i < CROWD_MEMBERS.length; i++) {
+      const m = CROWD_MEMBERS[i]
+      if (m.down > 0) {
+        m.down = Math.max(0, m.down - dt)
+        _co.position.set(m.x, -50, m.z) // hidden while down
+        _co.scale.setScalar(0.001)
+        _co.rotation.set(0, 0, 0)
+        _co.updateMatrix()
+        torso.setMatrixAt(i, _co.matrix)
+        head.setMatrixAt(i, _co.matrix)
+        legs.setMatrixAt(i, _co.matrix)
+        continue
+      }
+      // clip check vs the player car — same consequence as the sidewalk peds
+      const ddx = m.x - cx
+      const ddz = m.z - cz
+      if (ddx * ddx + ddz * ddz < CROWD_HIT_R * CROWD_HIT_R) {
+        m.down = 4
+        hr.incidents++
+        hr.pulse++
+        driveClock.minutes += HR_TIME_PENALTY
+      }
+      const hop = Math.abs(Math.sin(t * m.rate + m.phase)) * 0.26 * excite
+      _co.position.set(m.x, m.gy + hop, m.z)
+      _co.rotation.set(0, m.heading, 0)
+      _co.scale.setScalar(m.scale)
+      _co.updateMatrix()
+      torso.setMatrixAt(i, _co.matrix)
+      head.setMatrixAt(i, _co.matrix)
+      legs.setMatrixAt(i, _co.matrix)
+    }
+    torso.instanceMatrix.needsUpdate = true
+    head.instanceMatrix.needsUpdate = true
+    legs.instanceMatrix.needsUpdate = true
+  })
   return (
-    <instancedMesh ref={ref} args={[geo, undefined, CROWD.length]} castShadow>
-      <meshStandardMaterial roughness={0.9} />
-    </instancedMesh>
+    <>
+      <instancedMesh ref={legsRef} args={[legsGeo, undefined, n]} castShadow>
+        <meshStandardMaterial roughness={0.9} />
+      </instancedMesh>
+      <instancedMesh ref={torsoRef} args={[torsoGeo, undefined, n]} castShadow>
+        <meshStandardMaterial roughness={0.9} />
+      </instancedMesh>
+      {/* blank beige head — no face, same joke as the roaming pedestrians */}
+      <instancedMesh ref={headRef} args={[headGeo, undefined, n]} castShadow>
+        <meshStandardMaterial color="#c2b6a3" roughness={0.85} />
+      </instancedMesh>
+    </>
   )
 }
 

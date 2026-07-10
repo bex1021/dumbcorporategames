@@ -42,16 +42,22 @@ export function DriveCamera() {
     // the car) so it never sinks into the hillside or flies up off a crest.
     // Boom length is normally the configured distance, but if a building sits
     // behind the car the camera would end up inside a wall — so march the boom
-    // in from full length until the camera point is clear (min 2.2 m so it never
-    // jams into the car). This keeps the view out of buildings on tight corners.
+    // in until the camera point is clear. The floor is 5 m: closer than that and
+    // the steep look-down drops the car to the very bottom of the frame (where
+    // the HUD bar hides it), so we'd rather accept a little wall than lose the
+    // car. That still lifts the camera out of the deep-inside-a-building case.
     let dist = DRIVE_CAMERA.distance
-    while (dist > 2.2 && pointInBuilding(carPosition.x + sin * dist, carPosition.z + cos * dist, 1.3)) {
-      dist -= 0.6
+    while (dist > 5 && pointInBuilding(carPosition.x + sin * dist, carPosition.z + cos * dist, 1.0)) {
+      dist -= 0.5
     }
     const camX = carPosition.x + sin * dist
     const camZ = carPosition.z + cos * dist
     const camGround = terrainHeight(camX, camZ)
-    desired.set(camX, Math.max(camGround, ty) + DRIVE_CAMERA.height, camZ)
+    // Scale height with the boom so the look-DOWN angle (and thus the car's spot
+    // on screen) stays constant when the boom pulls in near a building — a short
+    // boom at full height would look down too steeply and drop the car low.
+    const camHeight = DRIVE_CAMERA.height * Math.max(0.66, dist / DRIVE_CAMERA.distance)
+    desired.set(camX, Math.max(camGround, ty) + camHeight, camZ)
     // Soft follow (clamped delta keeps it stable after a tab refocus).
     const a = 1 - Math.exp(-DRIVE_CAMERA.followRate * Math.min(delta, 0.05))
     camera.position.lerp(desired, a)
@@ -66,12 +72,15 @@ export function DriveCamera() {
       crash.shake = Math.max(0, crash.shake - Math.min(delta, 0.05) * 3.5)
     }
 
-    // aim slightly up/down the road ahead — but CLAMP the rise so a steep hill
-    // doesn't pitch the camera into the sky and lose the car.
+    // Aim a touch up/down the road ahead for a sense of the grade — but the
+    // UP bias is capped HARD (+1.2 m). Any higher and the look-target rises above
+    // the camera, pitching it up to look up the hill and dropping the car clean
+    // off the bottom of the frame (the "where's my car?" bug). Downhill bias can
+    // be larger since looking down only raises the car in frame, never hides it.
     const aheadX = carPosition.x - sin * DRIVE_CAMERA.lookAhead
     const aheadZ = carPosition.z - cos * DRIVE_CAMERA.lookAhead
     const rise = terrainHeight(aheadX, aheadZ) - ty
-    const bias = Math.max(-3, Math.min(4.5, rise * 0.45))
+    const bias = Math.max(-2.5, Math.min(1.2, rise * 0.2))
     look.set(carPosition.x, ty + DRIVE_CAMERA.lookHeight + bias, carPosition.z)
     camera.lookAt(look)
   })

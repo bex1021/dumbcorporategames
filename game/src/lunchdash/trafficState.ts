@@ -11,7 +11,7 @@
 //   - parked cars are just cars with `parked: true`: they never move and always
 //     act as solid obstacles.
 
-import { ROADS, paintGaps, roadWidth, SIGNALS, PARADE, type Road } from './cityLayout'
+import { ROADS, paintGaps, roadWidth, SIGNALS, PARADE, DEST_POINTS, STOREFRONTS, type Road } from './cityLayout'
 import { carPosition } from './carState'
 import { honk } from './honk'
 import { tickSignals, signalState } from './signalState'
@@ -25,6 +25,7 @@ export type TrafficCar = {
   speed: number // m/s
   off: number // signed lateral offset from centerline
   colorIdx: number
+  vtype: string // vehicle archetype key (see VEHICLE_SPECS)
   stall: number // seconds left knocked-out after a ram (moving cars only)
   honkCd: number // cooldown (s) before this car can honk again
   // live world transform (written by updateTraffic, read by renderer + collision)
@@ -33,7 +34,91 @@ export type TrafficCar = {
   heading: number
 }
 
-export const TRAFFIC_COLORS = ['#b8bcc2', '#9aa0a6', '#cdb89a', '#7d8893', '#86918c', '#b7a39c', '#a9b0a0', '#cabf9f']
+// ── vehicle archetypes ──────────────────────────────────────────────────────
+// A diverse, colourful fleet: sedans + SUVs + a few taxis, pickups, delivery
+// vans, sports cars, and city buses. Each carries its own silhouette (body +
+// cabin/window band + wheel size), collision box, speed multiplier, and colour
+// palette. The renderer (Traffic.tsx) draws one instanced set per type; the
+// collision resolver reads the per-type half-extents. `weight` sets how common
+// each type is; picks are deterministic (index hash) so replays stay stable.
+export type VehicleSpec = {
+  key: string
+  weight: number
+  colors: string[]
+  cabinColor: string
+  body: [number, number, number]
+  cabin: [number, number, number]
+  cabinZ: number
+  cabinMode: 'roof' | 'band'
+  wheelR: number
+  axle: number // half wheelbase (front/rear wheel z-offset)
+  track: number // half track (left/right wheel x-offset)
+  halfW: number // collision half-width
+  halfL: number // collision half-length
+  speedMul: number
+}
+
+export const VEHICLE_SPECS: VehicleSpec[] = [
+  {
+    key: 'sedan', weight: 7, cabinColor: '#23262c', cabinMode: 'roof',
+    body: [1.9, 0.6, 4.2], cabin: [1.5, 0.55, 2.0], cabinZ: 0.12,
+    wheelR: 0.42, axle: 1.5, track: 0.92, halfW: 1.0, halfL: 2.1, speedMul: 1.0,
+    colors: ['#c1543f', '#3f6fae', '#4a8f6f', '#d8b34a', '#8f8f96', '#c8ccd0', '#5a5f66', '#7a4f8a', '#b8bcc2', '#2f3439'],
+  },
+  {
+    key: 'suv', weight: 4, cabinColor: '#20242a', cabinMode: 'roof',
+    body: [2.02, 0.95, 4.6], cabin: [1.78, 0.72, 2.7], cabinZ: 0.05,
+    wheelR: 0.5, axle: 1.6, track: 1.0, halfW: 1.06, halfL: 2.35, speedMul: 0.96,
+    colors: ['#2f3439', '#c8ccd0', '#3f6fae', '#7a3f3f', '#46583f', '#8f8f96', '#5a4230'],
+  },
+  {
+    key: 'taxi', weight: 2, cabinColor: '#1c1c1c', cabinMode: 'roof',
+    body: [1.9, 0.62, 4.2], cabin: [1.5, 0.55, 2.0], cabinZ: 0.12,
+    wheelR: 0.42, axle: 1.5, track: 0.92, halfW: 1.0, halfL: 2.1, speedMul: 1.0,
+    colors: ['#f2b60c', '#f0a800'],
+  },
+  {
+    key: 'pickup', weight: 2, cabinColor: '#23262c', cabinMode: 'roof',
+    body: [1.95, 0.7, 4.9], cabin: [1.68, 0.66, 1.9], cabinZ: -0.95,
+    wheelR: 0.48, axle: 1.62, track: 0.95, halfW: 1.06, halfL: 2.45, speedMul: 0.98,
+    colors: ['#b8402f', '#2f4a6f', '#3a4034', '#8f8f96', '#c8ccd0', '#5a4a2f', '#101316'],
+  },
+  {
+    key: 'van', weight: 2, cabinColor: '#2a2e34', cabinMode: 'band',
+    body: [2.08, 1.5, 5.2], cabin: [2.02, 0.5, 1.1], cabinZ: -2.0,
+    wheelR: 0.46, axle: 1.7, track: 0.98, halfW: 1.08, halfL: 2.6, speedMul: 0.94,
+    colors: ['#e8e8ea', '#c1543f', '#3f6fae', '#4a8f6f', '#d8b34a', '#d9d2c4'],
+  },
+  {
+    key: 'sports', weight: 1, cabinColor: '#111417', cabinMode: 'roof',
+    body: [1.96, 0.5, 4.1], cabin: [1.4, 0.4, 1.5], cabinZ: 0.2,
+    wheelR: 0.44, axle: 1.5, track: 1.0, halfW: 1.0, halfL: 2.05, speedMul: 1.28,
+    colors: ['#d81e2f', '#f2b90c', '#111417', '#e8e8ea', '#c0c4c8', '#2f6f9f'],
+  },
+  {
+    key: 'bus', weight: 1, cabinColor: '#9fd0e6', cabinMode: 'band',
+    body: [2.5, 1.95, 9.6], cabin: [2.54, 0.72, 8.6], cabinZ: 0.2,
+    wheelR: 0.56, axle: 3.2, track: 1.15, halfW: 1.35, halfL: 4.8, speedMul: 0.82,
+    colors: ['#2f6f9f', '#3f8f5f', '#b8402f', '#5a5f9f', '#c9a227'],
+  },
+]
+
+export const VSPEC: Record<string, VehicleSpec> = Object.fromEntries(VEHICLE_SPECS.map((s) => [s.key, s]))
+
+// deterministic 0..1 hash of an integer (no RNG → stable across replays)
+function h01(n: number): number {
+  const x = Math.sin(n * 91.73 + 13.11) * 43758.5453
+  return x - Math.floor(x)
+}
+const _WEIGHT_TOTAL = VEHICLE_SPECS.reduce((a, s) => a + s.weight, 0)
+function pickVehicle(n: number): VehicleSpec {
+  let h = h01(n) * _WEIGHT_TOTAL
+  for (const s of VEHICLE_SPECS) {
+    if (h < s.weight) return s
+    h -= s.weight
+  }
+  return VEHICLE_SPECS[0]
+}
 
 export const traffic: { cars: TrafficCar[] } = { cars: [] }
 
@@ -66,14 +151,16 @@ export function initTraffic() {
     const perDir = Math.max(2, Math.round(L / 110))
     for (const dir of [1, -1] as const) {
       for (let i = 0; i < perDir; i++) {
+        const spec = pickVehicle(ci)
         const c: TrafficCar = {
           parked: false,
           road: r,
           dir,
           t: ((i + (dir === 1 ? 0 : 0.5)) / perDir) % 1,
-          speed: 9 + ((ri + i) % 3) * 1.6, // 9–12 m/s, a little variety
+          speed: (9 + ((ri + i) % 3) * 1.6) * spec.speedMul, // 9–12 m/s × type
           off: dir === 1 ? lane : -lane,
-          colorIdx: ci % TRAFFIC_COLORS.length,
+          colorIdx: Math.floor(h01(ci + 7) * spec.colors.length),
+          vtype: spec.key,
           stall: 0,
           honkCd: 0,
           x: 0,
@@ -116,6 +203,12 @@ export function initTraffic() {
         const cz = r.a.z + (r.b.z - r.a.z) * t + pz * curb * side
         // only park in the built-up core — not out toward the edges / countryside
         if (Math.abs(cx) > 235 || cz < -118 || cz > 228) continue
+        // keep the objective frontages clear: no cars parked on the Alignly HQ
+        // drop-off or in the drive-thru pull-ins (that read as blocking the door)
+        if (Math.hypot(cx - DEST_POINTS.office.x, cz - DEST_POINTS.office.z) < 20) continue
+        if (STOREFRONTS.some((s) => Math.hypot(cx - s.zx, cz - s.zz) < 13)) continue
+        const pk = pickVehicle(ci * 3 + 1)
+        const pspec = pk.key === 'bus' ? VSPEC.sedan : pk // buses don't street-park
         cars.push({
           parked: true,
           road: null,
@@ -123,7 +216,8 @@ export function initTraffic() {
           t: 0,
           speed: 0,
           off: 0,
-          colorIdx: ci % TRAFFIC_COLORS.length,
+          colorIdx: Math.floor(h01(ci + 19) * pspec.colors.length),
+          vtype: pspec.key,
           stall: 0,
           honkCd: 0,
           x: cx,
@@ -225,8 +319,6 @@ export function updateTraffic(dt: number) {
 // Player-vs-car collision as an ORIENTED BOX (cars are long, not round), so a
 // "hit" only registers on real contact — not when you're a car-width to the side.
 // Moving cars get knocked ("stalled") on contact; parked cars are immovable walls.
-const HALF_W = 1.0 // car half-width
-const HALF_L = 2.1 // car half-length
 export function resolveTrafficCollision(px: number, pz: number, r: number) {
   let x = px
   let z = pz
@@ -235,6 +327,10 @@ export function resolveTrafficCollision(px: number, pz: number, r: number) {
   for (const c of traffic.cars) {
     // NOTE: rammed cars stay SOLID (no drive-through). They're paused via `stall`
     // in updateTraffic and shoved aside below, but they never go non-collidable.
+    // Per-type collision box — a bus is a much bigger wall than a sports car.
+    const spec = VSPEC[c.vtype] || VSPEC.sedan
+    const HALF_W = spec.halfW
+    const HALF_L = spec.halfL
     const sh = Math.sin(c.heading)
     const ch = Math.cos(c.heading)
     // player position in the car's local frame (rotate world delta by -heading)
