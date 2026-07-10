@@ -8,6 +8,7 @@
 // stakes + controls. Dismiss with click / Enter / Space.
 
 import { useEffect, useState } from 'react'
+import { CarriedMeters } from '../ui/CarriedMeters'
 
 const MONO = '"IBM Plex Mono", "SF Mono", ui-monospace, Menlo, monospace'
 const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
@@ -74,6 +75,11 @@ export function DriveIntro({ onStart }: { onStart: () => void }) {
         </div>
         <div style={{ fontFamily: MONO, fontSize: 11, color: 'rgba(233,227,212,0.4)', marginTop: 12 }}>
           (click anywhere or press Enter)
+        </div>
+        {/* The morning's dashboard, frozen — continuity from the standup you
+            just came from. Renders nothing if there's no Phase 1 on record. */}
+        <div style={{ marginTop: 26 }}>
+          <CarriedMeters align="center" tone="dark" />
         </div>
       </div>
     </button>

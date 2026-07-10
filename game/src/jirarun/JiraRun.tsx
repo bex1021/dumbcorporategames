@@ -12,6 +12,7 @@ import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { Link } from 'react-router-dom'
 import { ExecSegue } from '../ui/ExecSegue'
+import { writePhase2Final } from '../state/campaignState'
 import { RunnerWorld, type HudState, type Checkpoint } from './RunnerWorld'
 import { TOTAL_UPDATES, PAL } from './runnerConfig'
 import type { DeathCause } from './simulation'
@@ -474,6 +475,9 @@ function WinScreen({ result, onDesktop }: { result: RunResult; onDesktop: () => 
   useEffect(() => {
     // persist what was earned this win so the level-select menu can show it
     saveJRUnlocked(earned.map((a) => a.id))
+    // Receipts: carry the run forward (Phase 3 radio / Phase 4 Exec can
+    // reference how the ticket sprint went). See campaignState.ts.
+    writePhase2Final({ updatesDeposited: 4, storyPoints: result.score, distractionsSurvived: total })
     const pops = earned.map((_, i) => setTimeout(() => audio.playAchievementPop(i), i * POP_STAGGER_MS))
     const fan = setTimeout(() => audio.playAchievementFanfare(), (earned.length - 1) * POP_STAGGER_MS + 550)
     return () => { pops.forEach(clearTimeout); clearTimeout(fan) }

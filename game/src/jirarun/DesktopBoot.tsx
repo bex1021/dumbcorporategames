@@ -14,6 +14,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, type CSSProperties, type ReactNode, type PointerEvent as ReactPointerEvent } from 'react'
 import { STARTER_PINGS, AMBIENT_POOL, type SlackTemplate } from '../content/slack'
 import { audio } from '../audio/AudioManager'
+import { CarriedMeters } from '../ui/CarriedMeters'
 
 type AppId = 'slack' | 'chrome' | 'spotify'
 
@@ -322,6 +323,11 @@ export function DesktopBoot({ onEnter, skipBoot = false }: { onEnter: () => void
               Update your tickets →
             </span>
             <div className="text-white/40 text-[11px] mt-3">(click anywhere or press Enter)</div>
+            {/* The standup's dashboard, frozen — you're still on the same
+                project, it's just later now. Nothing renders without a P1 run. */}
+            <div className="mt-6 flex justify-center">
+              <CarriedMeters align="center" tone="dark" />
+            </div>
           </div>
       </button>
     </div>

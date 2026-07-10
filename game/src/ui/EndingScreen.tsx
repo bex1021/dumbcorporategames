@@ -12,6 +12,7 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { markBeaten } from '../state/progress'
+import { writePhase1Final } from '../state/campaignState'
 import {
   useGameStore,
   selectFormattedTime,
@@ -174,8 +175,17 @@ export function EndingScreen() {
   // (see state/progress.ts) so it's safe to fire on every win and replay.
   useEffect(() => {
     if (phase !== 'ended' || !ending) return
-    if (ENDING_COPY[ending as EndingKey]?.goalMet) markBeaten('phase1')
-  }, [phase, ending])
+    if (ENDING_COPY[ending as EndingKey]?.goalMet) {
+      markBeaten('phase1')
+      // Receipts: hand the day's final meters + every NPC choice forward so
+      // Phase 2/3/4 can carry them (dimmed meter strip, pings that quote what
+      // you actually said, the Exec's Phase 4 opener). See campaignState.ts.
+      writePhase1Final({
+        projectStatus, pissedOff, meetingLoad, alignment, timeMinutes,
+        npcChoices, ending,
+      })
+    }
+  }, [phase, ending, projectStatus, pissedOff, meetingLoad, alignment, timeMinutes, npcChoices])
 
   if (phase !== 'ended' || !ending) return null
   const copy = ENDING_COPY[ending as EndingKey]

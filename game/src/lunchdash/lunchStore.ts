@@ -6,6 +6,7 @@ import { crash, damageTier, type DamageTier } from './crashState'
 import { hr } from './pedState'
 import { scoreTier, type ReturnTier } from './scoring'
 import { markBeaten } from '../state/progress'
+import { writePhase3Final } from '../state/campaignState'
 
 // Objective progress + the RUN OUTCOME for the Lunch Dash drive. The active
 // destination advances as the car reaches each stop; reaching the last stop
@@ -94,7 +95,15 @@ export const useLunchStore = create<LunchState>()((set, get) => ({
       // campaign chain unlocks Phase 4. (This was previously never called, so a
       // Phase 4 gated on phase3 could never have unlocked.)
       markBeaten('phase3')
-      set({ stepIndex: next, done: true, outcome: 'win', final: capture(true, 'win', DESTINATIONS.length) })
+      const f = capture(true, 'win', DESTINATIONS.length)
+      // Receipts: the return tier + driving crimes feed the Phase 4 Exec opener
+      // (Composed → "glad you're back in one piece"; hits → "the Sepulveda
+      // incident"). See campaignState.ts + the Phase 4 blueprint.
+      writePhase3Final({
+        returnTier: f.returnTier, delivered: f.delivered, pedestrianHits: f.pedestrianHits,
+        bowlState: f.bowlState, minutesUsed: f.minutesUsed, wasLate: f.wasLate,
+      })
+      set({ stepIndex: next, done: true, outcome: 'win', final: f })
     } else {
       set({ stepIndex: next })
     }
