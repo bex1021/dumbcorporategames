@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { Link } from 'react-router-dom'
+import { ExecSegue } from '../ui/ExecSegue'
 import { RunnerWorld, type HudState, type Checkpoint } from './RunnerWorld'
 import { TOTAL_UPDATES, PAL } from './runnerConfig'
 import type { DeathCause } from './simulation'
@@ -517,11 +518,21 @@ function WinScreen({ result, onDesktop }: { result: RunResult; onDesktop: () => 
                 <JRMetric label="Actual business value" value="$0.00" bad />
               </div>
             </div>
-            <div className="flex flex-col gap-2">
-              <div className="self-start px-3 py-1.5 rounded text-[11px] uppercase tracking-widest text-[#5e6c84] bg-[#eef1f4] border border-[#dfe1e6]">Phase 3 · coming soon</div>
+            {/* The missing segue: the Exec hands you to Lunch Dash and, in the
+                same breath, is why the salmon bowl exists at all — it's no
+                longer a prop that appears from nowhere in Phase 3. Same card,
+                same knock, same voice as every other phase boundary. */}
+            <div className="flex flex-col gap-2 items-start">
+              <ExecSegue
+                kind="slack"
+                time="10:46 AM"
+                message={<>Great hustle 🙂 Since you're heading out — do me a huge solid and grab my salmon bowl from Corporate Slop Bowlz? Back by noon, we've got the Architecture Sync. You're a lifesaver.</>}
+                to="/play/lunch-dash"
+                ctaLabel="Head out for lunch →"
+              />
               <div className="flex gap-2 flex-wrap">
                 <button onClick={onDesktop} className="px-4 py-2.5 rounded border border-[#dfe1e6] bg-white text-[#42526e] text-[13px] font-medium hover:bg-[#f4f5f7] transition">⎋ Back to desk</button>
-                <Link to="/play" className="px-5 py-2.5 rounded bg-[#0052cc] text-white text-[13px] font-semibold hover:bg-[#0747a6] transition text-center">☰ Level select</Link>
+                <Link to="/play" className="px-5 py-2.5 rounded border border-[#dfe1e6] bg-white text-[#42526e] text-[13px] font-medium hover:bg-[#f4f5f7] transition text-center">☰ Level select</Link>
                 <Link to="/" className="px-4 py-2.5 rounded border border-[#dfe1e6] bg-white text-[#42526e] text-[13px] font-medium hover:bg-[#f4f5f7] transition text-center">← Studio</Link>
               </div>
             </div>

@@ -20,6 +20,7 @@ import {
 } from '../state/gameStore'
 import { ACHIEVEMENTS } from '../content/achievements'
 import { audio } from '../audio/AudioManager'
+import { ExecSegue } from './ExecSegue'
 import {
   TICKETS,
   ticketOutcome,
@@ -358,12 +359,15 @@ export function EndingScreen() {
                 is always available. */}
             {copy.goalMet ? (
               <div className="flex flex-col gap-2">
-                <Link
+                {/* The Exec hands you to Jira Run in his own voice — the same
+                    card that recurs at every phase boundary (see ExecSegue). */}
+                <ExecSegue
+                  kind="slack"
+                  time="10:16 AM"
+                  message={<>Standup survived — whole team's "aligned" now 🙂 The board still shows yesterday, though. Update your Jira tickets before the notes go out? Should be quick.</>}
                   to="/play/jira-run"
-                  className="w-full px-4 py-3 rounded bg-[#0052cc] text-white text-[14px] font-semibold hover:bg-[#0747a6] transition shadow-sm text-center"
-                >
-                  Proceed to the next level →
-                </Link>
+                  ctaLabel="Back to your desk →"
+                />
                 <div className="flex gap-2">
                   <button
                     onClick={() => reset()}

@@ -61,7 +61,9 @@ class AudioManager {
   start() {
     if (this.started) return
     try {
-      this.ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
+      // Reuse a context a prior notify() already created, so the office
+      // ambient attaches to the same graph instead of orphaning it.
+      this.ctx = this.ctx ?? new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
       this.startHvac()
       this.officeMusic = new OfficeMusic(this.ctx, this.muted)
       this.started = true
@@ -72,6 +74,27 @@ class AudioManager {
       // eslint-disable-next-line no-console
       console.warn('AudioContext init failed', e)
     }
+  }
+
+  /**
+   * One-off notification sound usable OUTSIDE office gameplay — the shared
+   * cross-phase segue (ExecSegue) fires this on every phase's ending screen
+   * so the Exec's Slack knock is the day's leitmotif. Unlike start(), it
+   * lazily creates a BARE AudioContext (no HVAC drone, no office music) so
+   * calling it on the Jira Run / Lunch Dash ending screens doesn't suddenly
+   * boot the office ambient. Best-effort: silently no-ops if the browser
+   * blocks audio. Falls back to the synth ping if the mp3 hasn't loaded yet.
+   */
+  notify(cue: SoundCue) {
+    if (!this.ctx) {
+      try {
+        this.ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
+        void this.loadSamples()
+      } catch {
+        return
+      }
+    }
+    this.play(cue)
   }
 
   private async loadSamples() {

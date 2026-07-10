@@ -7,6 +7,7 @@
 import { Link } from 'react-router-dom'
 import { useLunchStore, type RunFinal } from './lunchStore'
 import { resetRun } from './runReset'
+import { ExecSegue } from '../ui/ExecSegue'
 
 const MONO = '"IBM Plex Mono", "SF Mono", ui-monospace, Menlo, monospace'
 
@@ -161,9 +162,20 @@ export function Retrospective() {
               ✕ Exit
             </Link>
           </div>
-          <div style={{ marginTop: 12, textAlign: 'center', fontSize: 11, letterSpacing: '0.14em', opacity: 0.4 }}>
-            [ Phase 4 · Executive Review · coming soon ]
-          </div>
+          {/* On a delivered run, the Exec closes the day the same way he
+              opened every phase — one more calendar drop, same card, same
+              knock. Phase 4 (the fight) isn't built yet, so the CTA is a
+              tease; the visual thread holds regardless. */}
+          {final.delivered && (
+            <div style={{ marginTop: 18 }}>
+              <ExecSegue
+                kind="calendar"
+                time="12:01 PM"
+                message={<>Bowl received, thank you 🙂 Last thing today — let's do a quick sync on the portal refresh. Popped 30 min on your calendar. Shouldn't take long.</>}
+                comingSoonLabel="4:30 PM · Executive Review · coming soon"
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>

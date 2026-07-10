@@ -5,6 +5,7 @@ import { bowl, bowlTier, type BowlTier } from './bowlState'
 import { crash, damageTier, type DamageTier } from './crashState'
 import { hr } from './pedState'
 import { scoreTier, type ReturnTier } from './scoring'
+import { markBeaten } from '../state/progress'
 
 // Objective progress + the RUN OUTCOME for the Lunch Dash drive. The active
 // destination advances as the car reaches each stop; reaching the last stop
@@ -89,6 +90,10 @@ export const useLunchStore = create<LunchState>()((set, get) => ({
     if (get().done) return
     const next = get().stepIndex + 1
     if (next >= DESTINATIONS.length) {
+      // Delivering everything back to HQ is the Phase 3 WIN — record it so the
+      // campaign chain unlocks Phase 4. (This was previously never called, so a
+      // Phase 4 gated on phase3 could never have unlocked.)
+      markBeaten('phase3')
       set({ stepIndex: next, done: true, outcome: 'win', final: capture(true, 'win', DESTINATIONS.length) })
     } else {
       set({ stepIndex: next })
