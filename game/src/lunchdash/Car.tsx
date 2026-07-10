@@ -27,6 +27,11 @@ import { terrainHeight } from './terrain'
 export function Car() {
   const ref = useRef<Group>(null)
   const bodyRef = useRef<Group>(null)
+  const shadowRef = useRef<Group>(null)
+  // Suspension spring: `y` is the body's vertical offset (compression, m) and
+  // `v` its velocity. It settles back to 0 with a stiff spring + damping, so the
+  // car dips on hard landings and rebounds instead of snapping to the ground.
+  const susp = useRef({ y: 0, v: 0 })
   const keys = useKeyboard()
   const [tier, setTier] = useState<DamageTier>('pristine')
   const tierRef = useRef<DamageTier>('pristine')
@@ -198,6 +203,9 @@ export function Car() {
         carAir.y = gh
         carAir.vy = 0
         carAir.airborne = false
+        // compress the suspension on touchdown so the car dips + rebounds
+        // instead of stopping dead (harder landing → deeper dip)
+        susp.current.v -= Math.min(impact, 16) * 0.05
         if (impact > AIR.hardLanding) {
           crash.shake = Math.max(crash.shake, Math.min(1, impact / 14)) // landing jolt
           if (bowl.carrying) sloshBowl(0, impact * 0.03, dt) // a hard landing jostles the bowl
@@ -247,12 +255,32 @@ export function Car() {
       const hL = terrainHeight(carPosition.x - rX * W, carPosition.z - rZ * W)
       const slopePitch = Math.atan2(hF - hB, 2 * L) // nose up when climbing
       const slopeRoll = Math.atan2(hR - hL, 2 * W)
+
+      // suspension spring: settle back to rest with a little weight-transfer
+      // squat under accel/brake, so the car breathes over bumps + landings
+      const sp = susp.current
+      sp.v += (-70 * sp.y - 13 * sp.v) * dt // stiff spring + damping toward rest
+      if (!carAir.airborne) sp.v += Math.max(-8, Math.min(8, accel)) * 0.003 // squat/dive
+      sp.y += sp.v * dt
+      sp.y = Math.max(-0.3, Math.min(0.12, sp.y))
+      body.position.y = sp.y
+
       if (carAir.airborne) {
         // mid-jump: pitch the body to the flight path — nose up rising, dropping on the way down
         const horiz = Math.max(Math.abs(carTelemetry.speed), 3)
         body.rotation.set(Math.atan2(carAir.vy, horiz), 0, steerRoll)
       } else {
         body.rotation.set(accelPitch + slopePitch, 0, steerRoll + slopeRoll)
+      }
+
+      // tilt the fake shadow to the ground slope so it stops burying into hills,
+      // and keep it pinned to the ground (shrinking) while the car is airborne.
+      const sh = shadowRef.current
+      if (sh) {
+        sh.rotation.set(slopePitch, 0, slopeRoll)
+        const lift = Math.max(0, carAir.y - gh)
+        sh.position.y = -lift // parent group rides at carAir.y; push shadow back to ground
+        sh.scale.setScalar(Math.max(0.5, 1 - lift * 0.06))
       }
     }
   })
@@ -262,7 +290,9 @@ export function Car() {
       <group ref={bodyRef}>
         <CarMesh tier={tier} />
       </group>
-      <BlobShadow />
+      <group ref={shadowRef}>
+        <BlobShadow />
+      </group>
     </group>
   )
 }

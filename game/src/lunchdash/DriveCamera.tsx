@@ -14,6 +14,7 @@ import { DRIVE_CAMERA } from './driveConfig'
 import { carPosition, carFacing, carAir } from './carState'
 import { crash } from './crashState'
 import { terrainHeight } from './terrain'
+import { pointInBuilding } from './cityLayout'
 
 const desired = new Vector3()
 const look = new Vector3()
@@ -39,8 +40,16 @@ export function DriveCamera() {
     // Camera sits behind the car; on a slope that's higher/lower ground than the
     // car. Keep it above WHICHEVER is higher (the ground under the camera, or
     // the car) so it never sinks into the hillside or flies up off a crest.
-    const camX = carPosition.x + sin * DRIVE_CAMERA.distance
-    const camZ = carPosition.z + cos * DRIVE_CAMERA.distance
+    // Boom length is normally the configured distance, but if a building sits
+    // behind the car the camera would end up inside a wall — so march the boom
+    // in from full length until the camera point is clear (min 2.2 m so it never
+    // jams into the car). This keeps the view out of buildings on tight corners.
+    let dist = DRIVE_CAMERA.distance
+    while (dist > 2.2 && pointInBuilding(carPosition.x + sin * dist, carPosition.z + cos * dist, 1.3)) {
+      dist -= 0.6
+    }
+    const camX = carPosition.x + sin * dist
+    const camZ = carPosition.z + cos * dist
     const camGround = terrainHeight(camX, camZ)
     desired.set(camX, Math.max(camGround, ty) + DRIVE_CAMERA.height, camZ)
     // Soft follow (clamped delta keeps it stable after a tab refocus).

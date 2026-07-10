@@ -233,7 +233,8 @@ export function resolveTrafficCollision(px: number, pz: number, r: number) {
   let hit = false
   let push = 0
   for (const c of traffic.cars) {
-    if (!c.parked && c.stall > 0) continue // already knocked aside — drive through
+    // NOTE: rammed cars stay SOLID (no drive-through). They're paused via `stall`
+    // in updateTraffic and shoved aside below, but they never go non-collidable.
     const sh = Math.sin(c.heading)
     const ch = Math.cos(c.heading)
     // player position in the car's local frame (rotate world delta by -heading)
@@ -273,7 +274,13 @@ export function resolveTrafficCollision(px: number, pz: number, r: number) {
     z += -plx * sh + plz * ch
     hit = true
     push = Math.max(push, pen)
-    if (!c.parked) c.stall = 1.6
+    // moving car: pause briefly (a "shaken driver" beat) but stay solid, and
+    // nudge it toward the curb so a bump visibly knocks it aside when it resumes
+    if (!c.parked) {
+      c.stall = Math.max(c.stall, 1.0)
+      const laneSign = c.off >= 0 ? 1 : -1
+      c.off = laneSign * Math.min(Math.abs(c.off) + 0.6, Math.abs(c.off) + 1.2)
+    }
   }
   return { x, z, hit, push }
 }

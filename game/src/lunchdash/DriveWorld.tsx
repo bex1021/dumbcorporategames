@@ -3,8 +3,9 @@
 // park trees render as InstancedMesh (one draw call each). See cityLayout.
 
 import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
-import { Text, Billboard } from '@react-three/drei'
+import { Text, Billboard, Environment, Lightformer } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
+import { RoundedBoxGeometry } from 'three-stdlib'
 import {
   Object3D,
   Color,
@@ -149,7 +150,13 @@ ROOFS.forEach((r, i) => {
   }
 })
 
-const CITY_BOXES: BoxItem[] = [...BOX_ITEMS, ...TIER_ITEMS, ...BAND_ITEMS, ...STORE_ITEMS, ...AC_ITEMS]
+// Split into matte structure vs. glass: the opaque building masses/roofs/AC
+// units render flat, while the window bands + storefront glass go into their
+// own instanced draw with a glossy, sky-reflecting material (see InstancedBoxes
+// `glass` + the <Environment> in DriveWorld). This is what makes the city
+// shimmer instead of reading as painted stripes.
+const CITY_OPAQUE: BoxItem[] = [...BOX_ITEMS, ...TIER_ITEMS, ...AC_ITEMS]
+const CITY_GLASS: BoxItem[] = [...BAND_ITEMS, ...STORE_ITEMS]
 
 // Wooden water towers — the NYC silhouette — on brownstone + Manhattan roofs.
 const WT_RECTS: Rect[] = [
@@ -217,15 +224,49 @@ const STOP_SIGNS: { x: number; z: number }[] = []
 }
 
 // Satire billboards — placed in the cleared bridge-approach / countryside
-// strips so they never clip a building. The ads ARE the world-building.
+// strips so they never clip a building. The ads ARE the world-building: a wall
+// of nonsense AI-startup pitches you can't drive away from, SF-style — every
+// one confidently vague, none of them explaining what the company actually does.
 const BILLBOARDS: { x: number; z: number; ry: number; top: string; sub: string }[] = [
-  { x: -58, z: 90, ry: 0, top: 'CORPORATE SLOP BOWLZ', sub: 'we feed the masses™' },
-  { x: 100, z: 90, ry: 0, top: 'ShipMart', sub: 'we lose it differently™' },
-  { x: -58, z: 206, ry: Math.PI, top: 'Alignly', sub: 'alignment-as-a-service™' },
-  { x: 100, z: 206, ry: Math.PI, top: 'SYNERGY LINKS', sub: 'golf for stakeholders™' },
-  { x: -55, z: -260, ry: Math.PI / 2, top: 'Suds & Fold', sub: 'your weekend, professionally dry-cleaned™' },
-  { x: 123, z: -250, ry: -Math.PI / 2, top: 'DEPRECATED MEMORIAL', sub: 'rest in production™' },
+  { x: -58, z: 90, ry: 0, top: 'SYNERGY.AI', sub: 'agentic alignment for your alignment™' },
+  { x: 100, z: 90, ry: 0, top: 'DELVE', sub: 'Series F · still pre-revenue™' },
+  { x: -58, z: 206, ry: Math.PI, top: 'LATENT', sub: "we don't know what it does either™" },
+  { x: 100, z: 206, ry: Math.PI, top: 'PROMPTLY', sub: 'the AI that attends your meetings for you™' },
+  { x: -55, z: -260, ry: Math.PI / 2, top: 'FRICTIONLESS', sub: 'remove the human from human resources™' },
+  { x: 123, z: -250, ry: -Math.PI / 2, top: 'TRUSTFALL AI', sub: 'your data is safe with us*™' },
 ]
+
+// Nonsense AI-startup ad bank for the ROOFTOP billboards — the corporate grip
+// you can't escape even mid-lunch. Every tagline is plausible-sounding and
+// completely hollow; the accent color just makes each sign glow at dusk.
+const ROOFTOP_ADS: { top: string; sub: string; accent: string }[] = [
+  { top: 'HYPERSCALE', sub: 'boil the ocean, faster™', accent: '#ff3a6e' },
+  { top: 'RECURSIVE', sub: 'we put AI in your AI™', accent: '#8b5cf6' },
+  { top: 'NORTH STAR', sub: 'a metric for your metrics™', accent: '#3aa0ff' },
+  { top: 'PARSE', sub: 'turns your PDFs into other PDFs™', accent: '#f5c518' },
+  { top: 'STAKEHOLDER', sub: 'the app that CCs everyone™', accent: '#ff6f3a' },
+  { top: 'VELOCITY', sub: 'ideate · iterate · offboard™', accent: '#22c39a' },
+  { top: 'CIRCLE BACK', sub: 'async synergy, realized™', accent: '#3aa0ff' },
+  { top: 'SLOPCORP', sub: 'now hiring 400 prompt engineers™', accent: '#ff6f3a' },
+  { top: 'WAGMI CAPITAL', sub: 'we tokenized lunch™', accent: '#8b5cf6' },
+  { top: 'PARADIGM', sub: 'shifting, indefinitely™', accent: '#ff3a6e' },
+  { top: 'RECLAIM', sub: 'a platform for platforms™', accent: '#22c39a' },
+  { top: 'ONWARD.AI', sub: 'disrupting disruption™', accent: '#f5c518' },
+  { top: 'MENLO', sub: 'pre-seed · post-truth™', accent: '#3aa0ff' },
+  { top: 'ENTERPRISE', sub: 'solutions for solutions™', accent: '#ff6f3a' },
+  { top: 'PIVOTAL', sub: 'we found product-market myth™', accent: '#8b5cf6' },
+  { top: 'GROWTHLOOP', sub: 'up and to the right™', accent: '#ff3a6e' },
+  { top: 'COGNITION', sub: 'thinks so you don’t have to™', accent: '#22c39a' },
+  { top: 'BLUESKY', sub: 'ideating at scale™', accent: '#3aa0ff' },
+]
+
+// The tallest downtown roofs that carry an ad — spread across the skyline so
+// the ads read from every street. Static (derived once): sorted by height so
+// the biggest towers get the signage.
+const AD_ROOFS = [...ROOFS]
+  .filter((r) => r.srcH > 34 && r.w >= 6)
+  .sort((a, b) => b.srcH - a.srcH)
+  .slice(0, ROOFTOP_ADS.length)
 
 // tree variety — most park/country trees stay conifers; 2 in 5 become
 // round-canopy deciduous so the greenery stops being identical cones
@@ -236,6 +277,7 @@ export function DriveWorld() {
   return (
     <>
       <SkyDome />
+      <CityEnv />
       <DriveLights />
       <Ground />
       <Patches rects={COUNTRY_FIELDS} y={0.015} color="#7e8a55" />
@@ -251,13 +293,15 @@ export function DriveWorld() {
       <Docks />
       <Tunnel />
       <Overpass />
-      <InstancedBoxes items={CITY_BOXES} />
+      <InstancedBoxes items={CITY_OPAQUE} />
+      <InstancedBoxes items={CITY_GLASS} glass />
       <BasePlinths />
       <WaterTowers />
       <Trees />
       <StreetLights />
       <Hydrants />
       <Billboards />
+      <RooftopAds />
       <Palms />
       <AlleyProps />
       <Storefronts />
@@ -275,8 +319,8 @@ function DriveLights() {
   // Lower fill so the sun's shadows actually read; the sun carries the scene.
   return (
     <>
-      <ambientLight intensity={0.42} color="#f0eee8" />
-      <hemisphereLight args={['#dfe3e6', '#9a978f', 0.3]} />
+      <ambientLight intensity={0.44} color="#ecdcc2" />
+      <hemisphereLight args={['#cddcf0', '#b6987a', 0.36]} />
       <SunLight />
     </>
   )
@@ -297,7 +341,9 @@ function SunLight() {
     if (!l) return
     const ax = Math.round(carPosition.x / 8) * 8
     const az = Math.round(carPosition.z / 8) * 8
-    l.position.set(ax + 110, 170, az + 70)
+    // Golden hour: sun dropped low (was y=170) and pushed out, so it rakes
+    // across the city at ~25° and throws long, dramatic shadows.
+    l.position.set(ax + 132, 74, az + 92)
     target.position.set(ax, 0, az)
     target.updateMatrixWorld()
   })
@@ -306,8 +352,8 @@ function SunLight() {
       <directionalLight
         ref={ref}
         castShadow
-        intensity={1.1}
-        color="#f3ecdd"
+        intensity={1.35}
+        color="#ffdca6"
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
         shadow-camera-left={-95}
@@ -331,9 +377,9 @@ function SkyDome() {
   const geo = useMemo(() => {
     const g = new SphereGeometry(880, 24, 12)
     const pos = g.attributes.position
-    const zen = new Color('#8fb3d4')
-    const hor = new Color('#d6dde1')
-    const low = new Color('#e2e4e0')
+    const zen = new Color('#5c83b6') // deeper blue overhead
+    const hor = new Color('#ffc888') // warm golden-hour horizon band
+    const low = new Color('#eac697') // gold haze below the horizon
     const c = new Color()
     const colors = new Float32Array(pos.count * 3)
     for (let i = 0; i < pos.count; i++) {
@@ -942,8 +988,20 @@ function Overpass() {
 }
 
 type BoxItem = { x: number; y: number; z: number; w: number; h: number; d: number; color: string }
-function InstancedBoxes({ items }: { items: BoxItem[] }) {
+// A single unit RoundedBoxGeometry, shared by every instanced box in the city.
+// The tiny 0.055 corner radius is the whole trick behind "less blocky": the sun
+// now catches a soft highlight along every edge instead of a razor-sharp line,
+// so a plain cuboid reads as a moulded object. It's one geometry reused across
+// thousands of instances, so it costs one draw call, same as before.
+let _roundedUnitBox: RoundedBoxGeometry | null = null
+function roundedUnitBox(): RoundedBoxGeometry {
+  if (!_roundedUnitBox) _roundedUnitBox = new RoundedBoxGeometry(1, 1, 1, 2, 0.055)
+  return _roundedUnitBox
+}
+
+function InstancedBoxes({ items, glass = false }: { items: BoxItem[]; glass?: boolean }) {
   const ref = useRef<InstancedMesh>(null)
+  const geo = useMemo(() => roundedUnitBox(), [])
   useLayoutEffect(() => {
     const m = ref.current
     if (!m) return
@@ -960,10 +1018,36 @@ function InstancedBoxes({ items }: { items: BoxItem[] }) {
     if (m.instanceColor) m.instanceColor.needsUpdate = true
   }, [items])
   return (
-    <instancedMesh ref={ref} args={[undefined, undefined, items.length]} castShadow receiveShadow>
-      <boxGeometry args={[1, 1, 1]} />
-      <meshStandardMaterial />
+    <instancedMesh ref={ref} args={[geo, undefined, items.length]} castShadow receiveShadow>
+      {glass ? (
+        // Window glass: smooth + metallic so it mirrors the sky/gold from the
+        // <Environment>. A faint warm emissive reads as interior lights left on,
+        // so windows glow on the shadow side instead of going black at dusk.
+        <meshStandardMaterial metalness={0.88} roughness={0.16} envMapIntensity={1.15} emissive="#ffcf87" emissiveIntensity={0.16} />
+      ) : (
+        // Matte structure: keep reflections almost off so masonry stays masonry.
+        <meshStandardMaterial roughness={0.85} metalness={0.0} envMapIntensity={0.18} />
+      )}
     </instancedMesh>
+  )
+}
+
+// The reflected environment the window glass samples. Built entirely in-engine
+// from a few glowing panels (no HDR download), evoking a warm golden-hour sky:
+// a bright gold band low on the sun side, cool blue up high. `frames={1}` bakes
+// it once — it's static scenery, so this costs nothing per frame.
+function CityEnv() {
+  return (
+    <Environment resolution={128} frames={1}>
+      {/* warm horizon / sun side */}
+      <Lightformer form="rect" intensity={2.2} color="#ffd9a0" scale={[60, 18, 1]} position={[40, 12, -60]} rotation={[0, 0, 0]} />
+      <Lightformer form="rect" intensity={1.1} color="#ffb877" scale={[50, 10, 1]} position={[60, 5, 20]} rotation={[0, -Math.PI / 2, 0]} />
+      {/* cool sky overhead + opposite side */}
+      <Lightformer form="rect" intensity={1.0} color="#bcd4ea" scale={[80, 80, 1]} position={[0, 60, 0]} rotation={[Math.PI / 2, 0, 0]} />
+      <Lightformer form="rect" intensity={0.6} color="#8fb0d0" scale={[60, 20, 1]} position={[-50, 14, 40]} rotation={[0, Math.PI / 2, 0]} />
+      {/* dim ground bounce so glass isn't black underneath */}
+      <Lightformer form="rect" intensity={0.35} color="#6b6357" scale={[100, 100, 1]} position={[0, -30, 0]} rotation={[-Math.PI / 2, 0, 0]} />
+    </Environment>
   )
 }
 
@@ -1203,6 +1287,53 @@ function Billboards() {
               </Text>
               <Text position={[0, 5.85, 0.14]} fontSize={0.48} color="#8a4a3a" anchorX="center" anchorY="middle">
                 {b.sub}
+              </Text>
+            </Suspense>
+          </group>
+        )
+      })}
+    </>
+  )
+}
+
+// Rooftop billboards — nonsense AI ads bolted to the tallest downtown towers,
+// each facing the city centre so they read from the streets below. This is the
+// "you can't escape the corporate grip" layer: even out for lunch, the skyline
+// is still pitching you agentic synergy.
+function RooftopAds() {
+  return (
+    <>
+      {AD_ROOFS.map((r, i) => {
+        const ad = ROOFTOP_ADS[i % ROOFTOP_ADS.length]
+        const ry = Math.atan2(-r.x, -r.z) // face the map centre (the +Z panel front)
+        const PW = Math.max(7, Math.min(15, Math.min(r.w, r.d) * 1.7))
+        const PH = PW * 0.4
+        const legH = 1.5
+        return (
+          <group key={i} position={[r.x, r.topY, r.z]} rotation={[0, ry, 0]}>
+            {/* support legs */}
+            {[-PW * 0.32, PW * 0.32].map((lx) => (
+              <mesh key={lx} position={[lx, legH / 2, 0]} castShadow>
+                <boxGeometry args={[0.2, legH, 0.2]} />
+                <meshStandardMaterial color="#33363c" />
+              </mesh>
+            ))}
+            {/* the sign panel */}
+            <mesh position={[0, legH + PH / 2, 0]} castShadow>
+              <boxGeometry args={[PW, PH, 0.22]} />
+              <meshStandardMaterial color="#14161a" metalness={0.1} roughness={0.7} />
+            </mesh>
+            {/* glowing accent bar along the bottom (pops at dusk) */}
+            <mesh position={[0, legH + 0.14, 0.13]}>
+              <boxGeometry args={[PW, 0.26, 0.06]} />
+              <meshStandardMaterial color={ad.accent} emissive={ad.accent} emissiveIntensity={1.1} toneMapped={false} />
+            </mesh>
+            <Suspense fallback={null}>
+              <Text position={[0, legH + PH * 0.6, 0.14]} fontSize={PH * 0.32} color="#f4f6fa" anchorX="center" anchorY="middle" maxWidth={PW * 0.92} letterSpacing={0.02}>
+                {ad.top}
+              </Text>
+              <Text position={[0, legH + PH * 0.26, 0.14]} fontSize={PH * 0.13} color={ad.accent} anchorX="center" anchorY="middle" maxWidth={PW * 0.9}>
+                {ad.sub}
               </Text>
             </Suspense>
           </group>

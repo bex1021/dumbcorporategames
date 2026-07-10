@@ -580,6 +580,20 @@ function pushOutOfRect(cx: number, cz: number, r: Rect, rad: number): { x: numbe
   return { x: cx, z: r.maxZ + rad, hit: true }
 }
 
+// Cheap "is this point inside/near a solid structure" test — used by the chase
+// camera to keep its boom out of buildings (water/bridges don't obstruct the
+// high camera, so we only check SOLIDS here, not WATER).
+export function pointInBuilding(x: number, z: number, r: number): boolean {
+  for (const s of SOLIDS) {
+    const qx = Math.max(s.minX, Math.min(x, s.maxX))
+    const qz = Math.max(s.minZ, Math.min(z, s.maxZ))
+    const dx = x - qx
+    const dz = z - qz
+    if (dx * dx + dz * dz < r * r) return true
+  }
+  return false
+}
+
 export function resolveCarCollision(x: number, z: number, r: number): { x: number; z: number; hit: boolean } {
   let cx = x
   let cz = z
