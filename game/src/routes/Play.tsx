@@ -21,6 +21,7 @@ import {
 } from '../state/progress'
 import { ACHIEVEMENTS, loadUnlocked } from '../content/achievements'
 import { JR_ACHIEVEMENTS_CATALOG, loadJRUnlocked } from '../content/jrAchievements'
+import { HrFileCode } from '../ui/HrFileCode'
 
 type Tone = 'cleared' | 'current' | 'locked' | 'soon'
 
@@ -107,8 +108,12 @@ export default function Play() {
             </div>
           </div>
 
+          {/* Export/import the whole day as one code — so "saves to this
+              browser" no longer means "dies with a cookie clear." */}
+          <HrFileCode />
+
           <p className="mt-7 text-[11px] text-[#5e6c84]">
-            Progress saves to this browser · no account · clearing cookies resets the path.
+            Progress saves to this browser · no account · back it up above before clearing cookies.
           </p>
         </div>
       </div>
