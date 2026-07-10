@@ -20,6 +20,7 @@ import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { audio } from '../audio/AudioManager'
+import { playAlignlyMotif } from '../audio/alignlyMotif'
 
 type Kind = 'slack' | 'calendar'
 
@@ -50,9 +51,12 @@ export function ExecSegue({
   ctaLabel,
   comingSoonLabel = 'Coming soon',
 }: ExecSegueProps) {
-  // The knock — the day's recurring sound. Best-effort; see audio.notify().
+  // The knock + the Alignly motif — the day's recurring sound AND melody, at
+  // every phase boundary. The motif tucks in just behind the knock so they
+  // read as one "…and we're aligned 🙂" gesture. Both best-effort.
   useEffect(() => {
     audio.notify(kind === 'calendar' ? 'calendar' : 'slack')
+    playAlignlyMotif(0.18)
   }, [kind])
 
   const accent = kind === 'calendar' ? CAL_BLUE : SLACK_GREEN

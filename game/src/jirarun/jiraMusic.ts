@@ -55,9 +55,14 @@ const CHORD = [
 
 // Hand-authored 4-bar lead — a singable, heroic phrase that resolves on the C.
 // Keyed by absolute step (0..63) → { note (MIDI), dur in steps }.
+//
+// Its opening four notes — A4 · C5 · B4 · G4 (steps 0, 8, 12, 24) — ARE the
+// Alignly motif (see audio/alignlyMotif.ts), the 4-note logo played at every
+// phase segue. So the little hook you hear when the Exec hands you off swells,
+// here, into the full heroic theme. Keep these four in sync with ALIGNLY_MOTIF.
 const LEAD: Record<number, { n: number; d: number }> = {
-  0: { n: 69, d: 8 }, 8: { n: 72, d: 4 }, 12: { n: 71, d: 4 }, // bar1 (Am): A4 — C5 B4
-  16: { n: 69, d: 8 }, 24: { n: 67, d: 8 }, // bar2 (F):  A4 — G4
+  0: { n: 69, d: 8 }, 8: { n: 72, d: 4 }, 12: { n: 71, d: 4 }, // bar1 (Am): A4 — C5 B4  ← motif
+  16: { n: 69, d: 8 }, 24: { n: 67, d: 8 }, // bar2 (F):  A4 — G4  ← motif resolves here
   32: { n: 67, d: 4 }, 36: { n: 69, d: 4 }, 40: { n: 67, d: 4 }, 44: { n: 64, d: 4 }, // bar3 (C): G A G E
   48: { n: 62, d: 8 }, 56: { n: 67, d: 8 }, // bar4 (G):  D4 — G4
 }
