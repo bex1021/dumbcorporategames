@@ -123,7 +123,10 @@ export default function Play() {
 
 // ─── One node on the progression track (placeholder level card) ──────────────
 function PhaseNode({ phase, tone, beaten }: { phase: CampaignPhase; tone: Tone; beaten: Set<PhaseId> }) {
-  const reveal = beaten.has(phase.id) || phase.requires === null
+  // Reveal the name of cleared phases, the opener, AND the one you can play
+  // right now (so the next step is obvious). Only truly locked/unbuilt phases
+  // ahead stay a "???" surprise.
+  const reveal = beaten.has(phase.id) || phase.requires === null || tone === 'current'
   const title = reveal ? phase.title : '???'
   const playable = tone === 'cleared' || tone === 'current'
   const dim = tone === 'locked' || tone === 'soon'

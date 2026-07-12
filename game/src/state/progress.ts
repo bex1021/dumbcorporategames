@@ -58,14 +58,14 @@ export const CAMPAIGN: CampaignPhase[] = [
     id: 'phase3',
     n: 3,
     label: 'PHASE 3',
-    title: 'Lunch Run',
-    sub: 'CODENAME · STEERCO LUNCH',
+    title: 'Lunch Dash',
+    sub: 'BACK BY 1:00',
     blurb:
-      'It is 11 AM. The SteerCo lunch order just fell through. The meeting after the meeting after the standup. Not yet shipping.',
-    route: null, // coming soon
+      "It's noon. The exec pings you: grab his Corporate Slop Bowlz order, get your own lunch, and be back by 1:00 for the Architecture Sync — the meeting that's key. The bowl does not travel well.",
+    route: '/play/lunch-dash',
     requires: 'phase2',
-    minutes: 'TBD',
-    controls: 'TBD',
+    minutes: '2–4 MIN',
+    controls: 'WASD',
   },
 ]
 

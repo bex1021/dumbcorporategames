@@ -530,7 +530,7 @@ function WinScreen({ result, onDesktop }: { result: RunResult; onDesktop: () => 
               <ExecSegue
                 kind="slack"
                 time="10:46 AM"
-                message={<>Great hustle 🙂 Since you're heading out — do me a huge solid and grab my salmon bowl from Corporate Slop Bowlz? Back by noon, we've got the Architecture Sync. You're a lifesaver.</>}
+                message={<>Great hustle 🙂 Since you're heading out — do me a huge solid and grab my salmon bowl from Corporate Slop Bowlz? Back by 1:00, we've got the Architecture Sync. You're a lifesaver.</>}
                 to="/play/lunch-dash"
                 ctaLabel="Head out for lunch →"
               />
