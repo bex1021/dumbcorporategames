@@ -59,7 +59,10 @@ export type Storefront = {
 export const STOREFRONTS: Storefront[] = [
   // Corporate Slop Bowlz — far-NW downtown. Building + window pulled WEST off
   // Synergy Ave (x=-43, west edge x=-52) so the canopy lot clears the road.
-  { id: 'bowlz', x: -66, z: -88, w: 15, d: 8, h: 7, zx: -58, zz: -88, color: '#3f7d4f', sign: 'CORPORATE SLOP BOWLZ' },
+  // zx sits 4.5 m off the building's east wall (was 0.5 m — the pull-in marker
+  // was effectively inside the wall, so every pickup ended nose-first in the
+  // building; GreenWrap's zone has 6 m). Canopy + window visuals follow zx.
+  { id: 'bowlz', x: -66, z: -88, w: 15, d: 8, h: 7, zx: -54, zz: -88, color: '#3f7d4f', sign: 'CORPORATE SLOP BOWLZ' },
   // Your Lunch — far-SE sprawl, pulled SOUTH off wide Sepulveda (z=215, south
   // edge z=224) so the drive-thru lot clears the road.
   { id: 'lunch', x: 200, z: 240, w: 13, d: 8, h: 6, zx: 200, zz: 230, color: '#b5603a', sign: 'GreenWrap — DRIVE THRU' },
@@ -90,7 +93,11 @@ function rect(x: number, z: number, w: number, d: number): Rect {
 }
 
 // ---------- water, bridges, approaches ----------
-const RIVER: Rect = { minX: -WORLD_HALF, maxX: WORLD_HALF, minZ: 120, maxZ: 176 }
+// The river spans the FULL ground plane (DRIVE_WORLD.half = 560), not just the
+// ±300 city grid — it used to stop in a straight line at the map edge and you
+// could drive around the end of it across dry riverbed, skipping the bridges
+// (and the dunk) entirely.
+const RIVER: Rect = { minX: -560, maxX: 560, minZ: 120, maxZ: 176 }
 // east edge pulled to -158 so it clears Backlog Ln's west asphalt edge (x-156);
 // otherwise the road's west half ran through the water = an invisible wall where
 // the car gets shoved off the pond mid-lane.
@@ -105,13 +112,27 @@ const APPROACHES: Rect[] = BRIDGES.flatMap((b) => [
   { minX: b.minX - 4, maxX: b.maxX + 4, minZ: 176, maxZ: 210 },
 ])
 
+export function onBridge(x: number, z: number): boolean {
+  return BRIDGES.some((b) => inRect(x, z, b))
+}
+
+// The river/pond hazard predicate: you're over water and NOT on a bridge deck.
+// The car is no longer walled out of the water (it used to be shoved back by
+// resolveCarCollision, which read as an invisible wall) — driving in now dunks
+// you, and the Car's river sequence tows you out. See riverState.ts.
+export function inWater(x: number, z: number): boolean {
+  return WATER.some((w) => inRect(x, z, w)) && !onBridge(x, z)
+}
+
 // Solid railings down each side of the bridge roadway — keeps you on the deck.
+// Half-thickness 0.3 matches the drawn 0.6 m box exactly (it was 0.4, so the
+// wall you felt was 20 cm wider than the wall you saw).
 export const BRIDGE_RAILS: Rect[] = BRIDGES.flatMap((b) => {
   const cx = (b.minX + b.maxX) / 2
   const h = 9.6 // just outside the 18 m roadway
   return [
-    { minX: cx - h - 0.4, maxX: cx - h + 0.4, minZ: 118, maxZ: 178 },
-    { minX: cx + h - 0.4, maxX: cx + h + 0.4, minZ: 118, maxZ: 178 },
+    { minX: cx - h - 0.3, maxX: cx - h + 0.3, minZ: 118, maxZ: 178 },
+    { minX: cx + h - 0.3, maxX: cx + h + 0.3, minZ: 118, maxZ: 178 },
   ]
 })
 
@@ -246,6 +267,50 @@ export function onRoad(x: number, z: number, rad = 0): boolean {
   return false
 }
 
+// Pavement surface height. Sidewalks are ribbons drawn 0.20 m proud of the
+// ground in the band from the kerb out to kerb+4 m; anything STANDING on one
+// (pedestrians, lamp posts, hydrants, stop signs, the parade crowd) must be
+// lifted to match or it stands shin-deep in the concrete. Returns the plain
+// ground height everywhere else, so it is safe to use unconditionally.
+export const SIDEWALK_LIFT = 0.2
+export function onSidewalk(x: number, z: number): boolean {
+  for (const r of ROADS) {
+    const d = pointToSeg(x, z, r.a.x, r.a.z, r.b.x, r.b.z)
+    const kerb = roadWidth(r.type) / 2
+    if (d >= kerb && d <= kerb + 4) return true
+  }
+  return false
+}
+
+// Where the tow truck drops you after a river dunk: the closest point of dry
+// roadway, plus that road's direction so we can face the car along the lane
+// instead of at a random heading. Candidates that project onto a stretch of road
+// still over water (the bridge roads span the river) are REJECTED, so being
+// fished out never dumps you straight back in.
+export function nearestRoadPoint(
+  x: number,
+  z: number,
+): { x: number; z: number; dirX: number; dirZ: number } {
+  let best = { x: SPAWN.x, z: SPAWN.z, dirX: 0, dirZ: -1 }
+  let bestD = Infinity
+  for (const r of ROADS) {
+    const dx = r.b.x - r.a.x
+    const dz = r.b.z - r.a.z
+    const len2 = dx * dx + dz * dz || 1
+    const t = Math.max(0, Math.min(1, ((x - r.a.x) * dx + (z - r.a.z) * dz) / len2))
+    const px = r.a.x + t * dx
+    const pz = r.a.z + t * dz
+    if (inWater(px, pz)) continue // that stretch is mid-river — no good as a drop-off
+    const d = Math.hypot(x - px, z - pz)
+    if (d < bestD) {
+      bestD = d
+      const len = Math.sqrt(len2)
+      best = { x: px, z: pz, dirX: dx / len, dirZ: dz / len }
+    }
+  }
+  return best
+}
+
 // Any DRIVABLE / paved surface — roads, the diagonal avenues, bridge decks,
 // alleys, and parking lots. Used to keep scenery (trees, palms) off pavement:
 // onRoad alone misses avenues, bridges, and lots, which is how trees ended up
@@ -336,13 +401,37 @@ export const DISTRICT_REGIONS: Rect[] = DISTRICTS.map((d) => d.region)
 // instead of buildings on a field. Unmarked (local streets get no lane paint).
 export type AlleySeg = { a: { x: number; z: number }; b: { x: number; z: number } }
 export const ALLEY_W = 5
+// An alley laid parallel to a street and close enough to sit INSIDE its
+// roadway. The grid is generated blind, so ~20 segments landed in a road — one
+// ran dead down Alignment Blvd's centreline for 112 m — which on any cross-slope
+// pushed a 5 m strip of near-black alley asphalt up through the road surface.
+// (Alleys CROSSING a road are fine and stay; that's a normal junction.)
+function alleyInsideRoad(s: AlleySeg): boolean {
+  const vert = s.a.x === s.b.x
+  for (const r of ROADS) {
+    const rVert = r.a.x === r.b.x
+    if (rVert !== vert) continue // crossing, not running inside
+    const clear = roadWidth(r.type) / 2 + ALLEY_W / 2
+    if (vert) {
+      if (Math.abs(s.a.x - r.a.x) >= clear) continue
+      if (Math.max(s.a.z, s.b.z) <= Math.min(r.a.z, r.b.z) || Math.min(s.a.z, s.b.z) >= Math.max(r.a.z, r.b.z)) continue
+    } else {
+      if (Math.abs(s.a.z - r.a.z) >= clear) continue
+      if (Math.max(s.a.x, s.b.x) <= Math.min(r.a.x, r.b.x) || Math.min(s.a.x, s.b.x) >= Math.max(r.a.x, r.b.x)) continue
+    }
+    return true
+  }
+  return false
+}
+
 function genAlleys(): { segs: AlleySeg[]; fences: Rect[] } {
-  const segs: AlleySeg[] = []
+  const all: AlleySeg[] = []
   for (const d of DISTRICTS) {
     const r = d.region
-    for (let x = r.minX + d.step / 2; x < r.maxX - 1; x += d.step) segs.push({ a: { x, z: r.minZ }, b: { x, z: r.maxZ } })
-    for (let z = r.minZ + d.step / 2; z < r.maxZ - 1; z += d.step) segs.push({ a: { x: r.minX, z }, b: { x: r.maxX, z } })
+    for (let x = r.minX + d.step / 2; x < r.maxX - 1; x += d.step) all.push({ a: { x, z: r.minZ }, b: { x, z: r.maxZ } })
+    for (let z = r.minZ + d.step / 2; z < r.maxZ - 1; z += d.step) all.push({ a: { x: r.minX, z }, b: { x: r.maxX, z } })
   }
+  const segs = all.filter((s) => !alleyInsideRoad(s))
   // Connect or cap every alley end: if a street is within reach, EXTEND the
   // alley to meet it (real through-alleys); otherwise CAP it with a back-lot
   // fence so dead ends end at something instead of petering into grass.
@@ -534,7 +623,10 @@ export const COUNTRY_FIELDS: Rect[] = (() => {
     const c = ringPoint(i, 11, 12, 340, 480)
     const w = 50 + h2(i, 13) * 60
     const d = 50 + h2(i, 14) * 60
-    out.push(rect(c.x, c.z, w, d))
+    const f = rect(c.x, c.z, w, d)
+    // the river now runs the full plane width — no crop fields floating on it
+    if (WATER.some((wr) => f.minX < wr.maxX && f.maxX > wr.minX && f.minZ < wr.maxZ && f.maxZ > wr.minZ)) continue
+    out.push(f)
   }
   return out
 })()
@@ -543,6 +635,7 @@ export const COUNTRY_TREES: Tree[] = (() => {
   for (let i = 0; i < 70; i++) {
     const c = ringPoint(i, 21, 22, 330, 500)
     if (onRoad(c.x, c.z, 2)) continue // keep the country roads clear too
+    if (inWater(c.x, c.z)) continue // …and no trees standing in the river
     out.push({ x: c.x, z: c.z, h: 3 + h2(i, 23) * 3.5 })
   }
   return out
@@ -552,6 +645,7 @@ export const BARNS: Building[] = (() => {
   const out: Building[] = []
   for (let i = 0; i < 7; i++) {
     const c = ringPoint(i + 3, 31, 32, 340, 480)
+    if (inWater(c.x, c.z)) continue // no barns in the extended river either
     out.push({ x: c.x, z: c.z, w: 9 + h2(i, 33) * 4, d: 6 + h2(i, 34) * 4, h: 5 + h2(i, 35) * 3, color: pick(reds, h2(i, 36)) })
   }
   return out
@@ -620,16 +714,8 @@ export function resolveCarCollision(x: number, z: number, r: number): { x: numbe
       hit = true
     }
   }
-  const onBridge = BRIDGES.some((b) => cx >= b.minX && cx <= b.maxX && cz >= b.minZ && cz <= b.maxZ)
-  if (!onBridge) {
-    for (const w of WATER) {
-      const res = pushOutOfRect(cx, cz, w, r)
-      if (res.hit) {
-        cx = res.x
-        cz = res.z
-        hit = true
-      }
-    }
-  }
+  // NOTE: water is deliberately NOT a collider. It used to push the car back
+  // out, which felt like an invisible wall along the bank. The river is now
+  // enterable and driving in triggers the dunk sequence (see riverState.ts).
   return { x: cx, z: cz, hit }
 }

@@ -75,6 +75,9 @@ export function initPeds() {
 }
 
 const HIT_R = 2.1 // player-center to ped distance that counts as a clip
+// Seconds a clipped pedestrian stays down. Exported so the renderer can time
+// the fall/lie/rise animation against it (see Pedestrians.tsx).
+export const DOWN_TIME = 4
 
 export function updatePeds(dt: number) {
   for (const p of peds.list) {
@@ -100,7 +103,7 @@ export function updatePeds(dt: number) {
     const dx = p.x - cx
     const dz = p.z - cz
     if (dx * dx + dz * dz < HIT_R * HIT_R) {
-      p.down = 4 // knocked down; gets back up after a few seconds
+      p.down = DOWN_TIME // knocked down; crumples, lies there, then gets up
       hr.incidents++
       hr.pulse++
       driveClock.minutes += HR_TIME_PENALTY // "exchanging info" eats your clock

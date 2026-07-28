@@ -9,9 +9,27 @@
 // the conversation, on the right. Same cohesion thread as every phase's Exec
 // segue (one more calendar drop, the 4:30 tease), just staged as a phone.
 
+import { useEffect, useSyncExternalStore } from 'react'
 import { Link } from 'react-router-dom'
 import { useLunchStore, type RunFinal } from './lunchStore'
 import { resetRun } from './runReset'
+import { LUNCH_ACHIEVEMENTS_CATALOG, saveLunchUnlocked } from '../content/lunchAchievements'
+import { subscribeRadio, getRadioState, toggleRadio } from './driveAudio'
+
+// Earned-conditions keyed by id; the badge metadata (emoji/title/desc) lives in
+// the shared catalog (content/lunchAchievements.ts) so the level-select menu can
+// list them without importing this heavy chunk. Same split as Jira Run.
+const LUNCH_EARNED: Record<string, (f: RunFinal) => boolean> = {
+  delivered: (f) => f.delivered,
+  novalue: (f) => f.delivered,
+  ontime: (f) => f.delivered && !f.wasLate,
+  composed: (f) => f.returnTier === 'composed',
+  bowlintact: (f) => f.delivered && f.bowlState !== 'disheveled',
+  cleanrecord: (f) => f.pedestrianHits === 0,
+  pristine: (f) => f.damage === 'pristine',
+  spare: (f) => f.delivered && f.minutesUsed <= 40,
+  menace: (f) => f.pedestrianHits >= 3,
+}
 
 const MONO = '"IBM Plex Mono", "SF Mono", ui-monospace, Menlo, monospace'
 const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, sans-serif'
@@ -38,12 +56,21 @@ const SUBTASKS = ["Pick up the exec's salmon bowl", 'Pick up your lunch', 'Retur
 export function Retrospective() {
   const done = useLunchStore((s) => s.done)
   const final = useLunchStore((s) => s.final)
+  // radio state so the music toggle reflects on/off (hooks must run every render,
+  // so this + the save-effect sit ABOVE the early return)
+  const radio = useSyncExternalStore(subscribeRadio, getRadioState, getRadioState)
+  // persist the achievement haul once the run resolves
+  useEffect(() => {
+    if (!final) return
+    saveLunchUnlocked(LUNCH_ACHIEVEMENTS_CATALOG.filter((a) => LUNCH_EARNED[a.id]?.(final)).map((a) => a.id))
+  }, [final])
   if (!done || !final) return null
 
   const tier = TIER[final.returnTier]
   const isTimeout = final.outcome === 'timeout'
   const resColor = isTimeout ? '#d76a5a' : tier.color
   const h = headline(final)
+  const earnedIds = new Set(LUNCH_ACHIEVEMENTS_CATALOG.filter((a) => LUNCH_EARNED[a.id]?.(final)).map((a) => a.id))
   const row = (k: string, v: string, vColor?: string) => (
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
       <span style={{ opacity: 0.55 }}>{k}</span>
@@ -62,7 +89,7 @@ export function Retrospective() {
         justifyContent: 'center',
         background: 'rgba(10,11,13,0.82)',
         backdropFilter: 'blur(6px)',
-        fontFamily: MONO,
+        fontFamily: SANS,
         color: '#d9d3c4',
         pointerEvents: 'auto',
         padding: 16,
@@ -84,12 +111,31 @@ export function Retrospective() {
             overflow: 'hidden',
           }}
         >
-          <div style={{ padding: '8px 16px', fontSize: 10.5, letterSpacing: '0.04em', opacity: 0.5, borderBottom: '1px solid rgba(255,255,255,0.07)', background: '#1b1e23' }}>
-            Projects › Personal › Lunch Dash › Retrospective
+          <div style={{ padding: '6px 10px 6px 16px', fontSize: 10.5, letterSpacing: '0.04em', borderBottom: '1px solid rgba(255,255,255,0.07)', background: '#1b1e23', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <span style={{ fontFamily: MONO, opacity: 0.5 }}>Projects › Personal › Lunch Dash › Retrospective</span>
+            <button
+              onClick={toggleRadio}
+              title={radio.on ? 'Turn the radio off' : 'Turn the radio on'}
+              style={{
+                flexShrink: 0,
+                cursor: 'pointer',
+                background: radio.on ? 'rgba(230,193,90,0.14)' : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${radio.on ? 'rgba(230,193,90,0.4)' : 'rgba(217,211,196,0.22)'}`,
+                borderRadius: 5,
+                color: radio.on ? '#e6c15a' : '#8a8f96',
+                fontFamily: SANS,
+                fontSize: 11,
+                padding: '3px 8px',
+                letterSpacing: '0.04em',
+              }}
+            >
+              {radio.on ? '🔊 Music on' : '🔇 Music off'}
+            </button>
           </div>
 
           <div style={{ padding: '14px 18px', overflowY: 'auto' }}>
-            <div style={{ fontSize: 11, letterSpacing: '0.14em', color: tier.color, opacity: 0.95 }}>
+            {/* the ticket ID stays mono — it's a Jira reference, and that's the joke */}
+            <div style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '0.14em', color: tier.color, opacity: 0.95 }}>
               LUNCH-471 · {final.delivered ? '✓ DONE' : '✗ FAILED'}
             </div>
             <div style={{ fontSize: 18, marginTop: 3, marginBottom: 2 }}>Pre-Sync Nourishment Acquisition</div>
@@ -120,6 +166,12 @@ export function Retrospective() {
               {row('Time used', `${final.minutesUsed} of 60 min`, final.wasLate ? '#d76a5a' : undefined)}
               {final.wasLate && row('', `— late by ${final.latenessMin} min`, '#d76a5a')}
               {row('Pedestrians injured', String(final.pedestrianHits), final.pedestrianHits ? '#d99a5a' : undefined)}
+              {final.riverDunks > 0 &&
+                row(
+                  'Vehicle recovered from water',
+                  final.riverDunks === 1 ? 'Once' : `${final.riverDunks} times`,
+                  '#d99a5a',
+                )}
               {row('Vehicle damage', final.damage[0].toUpperCase() + final.damage.slice(1))}
               {row('Bowl status at delivery', final.delivered ? `${TIER[final.bowlState].label} (${final.bowlIntegrity}%)` : 'Undelivered', TIER[final.bowlState].color)}
               {row('Vehicle', 'Personal')}
@@ -140,7 +192,7 @@ export function Retrospective() {
                   border: '1px solid rgba(217,211,196,0.3)',
                   background: tier.color,
                   color: '#15171a',
-                  fontFamily: MONO,
+                  fontFamily: SANS,
                   fontSize: 13,
                   fontWeight: 600,
                   letterSpacing: '0.04em',
@@ -157,7 +209,7 @@ export function Retrospective() {
                   border: '1px solid rgba(217,211,196,0.3)',
                   background: 'rgba(255,255,255,0.04)',
                   color: '#d9d3c4',
-                  fontFamily: MONO,
+                  fontFamily: SANS,
                   fontSize: 12.5,
                   fontWeight: 600,
                   textDecoration: 'none',
@@ -168,6 +220,48 @@ export function Retrospective() {
                 ← Back to levels
               </Link>
             </div>
+          </div>
+        </div>
+
+        {/* ─── middle: Jira-board-themed achievements (earned = golden) ─── */}
+        <div
+          style={{
+            width: 260,
+            maxHeight: '94vh',
+            display: 'flex',
+            flexDirection: 'column',
+            background: '#16181c',
+            border: '1px solid rgba(217,211,196,0.18)',
+            borderRadius: 10,
+            boxShadow: '0 24px 80px rgba(0,0,0,0.6)',
+            overflow: 'hidden',
+          }}
+        >
+          <div style={{ padding: '8px 14px', fontSize: 10.5, letterSpacing: '0.08em', borderBottom: '1px solid rgba(255,255,255,0.07)', background: '#1b1e23', display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ opacity: 0.5 }}>ACHIEVEMENTS</span>
+            <span style={{ color: tier.color, opacity: 0.9 }}>{earnedIds.size} / {LUNCH_ACHIEVEMENTS_CATALOG.length}</span>
+          </div>
+          <div style={{ padding: 10, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 7 }}>
+            {LUNCH_ACHIEVEMENTS_CATALOG.map((a) => {
+              const got = earnedIds.has(a.id)
+              return (
+                <div
+                  key={a.id}
+                  style={{
+                    borderRadius: 7,
+                    padding: '7px 9px',
+                    border: `1px solid ${got ? '#f5cd47' : 'rgba(217,211,196,0.12)'}`,
+                    background: got ? '#fff7d6' : 'rgba(255,255,255,0.02)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <span style={{ fontSize: 15, lineHeight: 1, filter: got ? 'none' : 'grayscale(1)', opacity: got ? 1 : 0.4 }}>{a.emoji}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: got ? '#172b4d' : '#8a8f96', fontFamily: SANS }}>{got ? a.title : 'Locked'}</span>
+                  </div>
+                  {got && <div style={{ fontSize: 10.5, marginTop: 3, lineHeight: 1.35, color: '#42526e', fontFamily: SANS }}>{a.desc}</div>}
+                </div>
+              )
+            })}
           </div>
         </div>
 

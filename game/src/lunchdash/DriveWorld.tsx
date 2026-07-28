@@ -17,11 +17,14 @@ import {
   DoubleSide,
   BackSide,
   MeshStandardMaterial,
+  MeshBasicMaterial,
   DirectionalLight,
   CylinderGeometry,
   BoxGeometry,
+  Mesh,
+  Group,
 } from 'three'
-import { terrainHeight } from './terrain'
+import { terrainHeight, rampHeight, RAMPS } from './terrain'
 import { signalState } from './signalState'
 import { carPosition } from './carState'
 import { DRIVE_WORLD } from './driveConfig'
@@ -47,6 +50,8 @@ import {
   ROADS,
   roadWidth,
   onRoad,
+  onSidewalk,
+  SIDEWALK_LIFT,
   onPaved,
   paintGaps,
   GREEN_AREAS,
@@ -230,11 +235,17 @@ const STOP_SIGNS: { x: number; z: number }[] = []
 // strips so they never clip a building. The ads ARE the world-building: a wall
 // of nonsense AI-startup pitches you can't drive away from, SF-style — every
 // one confidently vague, none of them explaining what the company actually does.
+// Positions are measured so BOTH support poles (local x = ±2.4) and the panel
+// edges (±4) clear the asphalt with room to spare. Three of these used to stand
+// in a live roadway — DELVE and PROMPTLY had a pole 0.4 m INSIDE the asphalt of
+// Deliverable Dr and their panels overhanging 2 m into the lane, and LATENT sat
+// exactly on Sepulveda's kerb line. A billboard planted in traffic is the kind
+// of thing that reads as "unfinished" instantly.
 const BILLBOARDS: { x: number; z: number; ry: number; top: string; sub: string }[] = [
-  { x: -58, z: 90, ry: 0, top: 'SYNERGY.AI', sub: 'agentic alignment for your alignment™' },
-  { x: 100, z: 90, ry: 0, top: 'DELVE', sub: 'Series F · still pre-revenue™' },
-  { x: -58, z: 206, ry: Math.PI, top: 'LATENT', sub: "we don't know what it does either™" },
-  { x: 100, z: 206, ry: Math.PI, top: 'PROMPTLY', sub: 'the AI that attends your meetings for you™' },
+  { x: -64, z: 90, ry: 0, top: 'SYNERGY.AI', sub: 'agentic alignment for your alignment™' },
+  { x: 90, z: 90, ry: 0, top: 'DELVE', sub: 'Series F · still pre-revenue™' },
+  { x: -64, z: 198, ry: Math.PI, top: 'LATENT', sub: "we don't know what it does either™" },
+  { x: 90, z: 198, ry: Math.PI, top: 'PROMPTLY', sub: 'the AI that attends your meetings for you™' },
   { x: -55, z: -260, ry: Math.PI / 2, top: 'FRICTIONLESS', sub: 'remove the human from human resources™' },
   { x: 123, z: -250, ry: -Math.PI / 2, top: 'TRUSTFALL AI', sub: 'your data is safe with us*™' },
 ]
@@ -304,6 +315,7 @@ export function DriveWorld() {
       <StreetLights />
       <Hydrants />
       <Billboards />
+      <JumpRamps />
       <RooftopAds />
       <Palms />
       <AlleyProps />
@@ -422,6 +434,7 @@ function Ground() {
     const grey = new Color('#5e6268')
     const grass = new Color('#5f7d52')
     const water = new Color('#3f6f8c')
+    const dirt = new Color('#8a7355')
     const col = new Color()
     const colors = new Float32Array(pos.count * 3)
     const inAny = (x: number, z: number, rects: Rect[]) =>
@@ -433,6 +446,9 @@ function Ground() {
       const t = terrainHeight(x, wz)
       pos.setZ(i, t)
       if (inAny(x, wz, WATER)) col.copy(water) // river + pond, painted blue
+      // Authored jump ramps read as raw graded earth, so the hump is legible as
+      // something built (and aimable at) rather than an invisible bump.
+      else if (rampHeight(x, wz) > 0.05) col.copy(dirt)
       else if (inAny(x, wz, GREEN_AREAS)) col.copy(grass) // parks, golf, cemetery
       else if (inAny(x, wz, DISTRICT_REGIONS))
         col.copy(grey).multiplyScalar(0.95 + bh(Math.floor(x / 36), Math.floor(wz / 36)) * 0.1) // paved block — tint varies block to block
@@ -453,12 +469,47 @@ function Ground() {
   )
 }
 
+// A rect drawn as a terrain-DRAPED grid in world XZ, rather than a flat plane at
+// a fixed height. Flat planes vanished under the ground wherever the hill tails
+// reached them — four of the six office-park lots and one countryside field
+// were fully buried, so those lots simply had no visible asphalt.
+function drapedRectGeo(r: Rect, yOff: number, step = 6) {
+  const nx = Math.max(1, Math.ceil((r.maxX - r.minX) / step))
+  const nz = Math.max(1, Math.ceil((r.maxZ - r.minZ) / step))
+  const pos = new Float32Array((nx + 1) * (nz + 1) * 3)
+  const idx: number[] = []
+  for (let j = 0; j <= nz; j++) {
+    for (let i = 0; i <= nx; i++) {
+      const x = r.minX + ((r.maxX - r.minX) * i) / nx
+      const z = r.minZ + ((r.maxZ - r.minZ) * j) / nz
+      const o = (j * (nx + 1) + i) * 3
+      pos[o] = x
+      pos[o + 1] = terrainHeight(x, z) + yOff
+      pos[o + 2] = z
+    }
+  }
+  for (let j = 0; j < nz; j++) {
+    for (let i = 0; i < nx; i++) {
+      const a = j * (nx + 1) + i
+      const b = a + 1
+      const c = (j + 1) * (nx + 1) + i
+      const d = c + 1
+      idx.push(a, c, b, b, c, d)
+    }
+  }
+  const g = new BufferGeometry()
+  g.setAttribute('position', new Float32BufferAttribute(pos, 3))
+  g.setIndex(idx)
+  g.computeVertexNormals()
+  return g
+}
+
 function Patches({ rects, y, color }: { rects: Rect[]; y: number; color: string }) {
+  const geos = useMemo(() => rects.map((r) => drapedRectGeo(r, y)), [rects, y])
   return (
     <>
-      {rects.map((r, i) => (
-        <mesh key={i} rotation={[-Math.PI / 2, 0, 0]} position={[(r.minX + r.maxX) / 2, y, (r.minZ + r.maxZ) / 2]} receiveShadow>
-          <planeGeometry args={[r.maxX - r.minX, r.maxZ - r.minZ]} />
+      {geos.map((g, i) => (
+        <mesh key={i} geometry={g} receiveShadow>
           <meshStandardMaterial color={color} />
         </mesh>
       ))}
@@ -467,11 +518,11 @@ function Patches({ rects, y, color }: { rects: Rect[]; y: number; color: string 
 }
 
 function ParkingLots() {
+  const geos = useMemo(() => PARKING.map((r) => drapedRectGeo(r, 0.05)), [])
   return (
     <>
-      {PARKING.map((r, i) => (
-        <mesh key={i} rotation={[-Math.PI / 2, 0, 0]} position={[(r.minX + r.maxX) / 2, 0.03, (r.minZ + r.maxZ) / 2]} receiveShadow>
-          <planeGeometry args={[r.maxX - r.minX, r.maxZ - r.minZ]} />
+      {geos.map((g, i) => (
+        <mesh key={i} geometry={g} receiveShadow>
           <meshStandardMaterial color="#4f5256" />
         </mesh>
       ))}
@@ -510,7 +561,7 @@ function Avenues() {
           }
         }
         return {
-          asphalt: ribbonGeo(a.x, a.z, b.x, b.z, 0, 12, 0.07), // under the main roads at crossings
+          asphalt: ribbonGeo(a.x, a.z, b.x, b.z, 0, 12, 0.07, undefined, 2.5, acrossFor(12)), // under the main roads at crossings
           center: ribbonGeo(a.x, a.z, b.x, b.z, 0, 0.22, 0.11, gaps),
           edges: [ribbonGeo(a.x, a.z, b.x, b.z, -5.4, 0.18, 0.11, gaps), ribbonGeo(a.x, a.z, b.x, b.z, 5.4, 0.18, 0.11, gaps)],
         }
@@ -586,6 +637,16 @@ const RD_PAINT = '#e8e6df' // off-white crosswalk / stop-bar paint
 
 // Build a terrain-draped ribbon geometry along a centerline (shifted sideways
 // by latOffset), so roads + lane lines conform to hills instead of floating.
+//
+// `across` is how many spans to split the ribbon into ACROSS its width. It must
+// be > 1 for anything wide: with a single span the surface is one flat sheet
+// stretched kerb-to-kerb, and wherever the ground is not planar across the road
+// that sheet floats. That was the "car disappears into the hill" bug at
+// Corporate Slop Bowlz — the building pad regraded one kerb of an 18 m arterial
+// and left the other on the hillside, a 10.7 m step, so the asphalt hung up to
+// 2.2 m over the surface the car drives on and swallowed the car whole for a
+// 12 m stretch. Narrow ribbons (lane paint, kerbs) are fine at 1 — they're too
+// thin to diverge. Extra spans cost vertices only, never a draw call.
 function ribbonGeo(
   ax: number,
   az: number,
@@ -596,6 +657,7 @@ function ribbonGeo(
   yOff: number,
   gaps?: [number, number][],
   step = 2.5,
+  across = 1,
 ) {
   const dx = bx - ax
   const dz = bz - az
@@ -603,41 +665,56 @@ function ribbonGeo(
   const px = dz / len // unit perpendicular
   const pz = -dx / len
   const steps = Math.max(2, Math.ceil(len / step)) // fine enough to hug hills (no grass poking through)
-  const pos = new Float32Array((steps + 1) * 6)
+  const cols = Math.max(1, Math.round(across)) + 1 // vertices per rung
+  const pos = new Float32Array((steps + 1) * cols * 3)
   const idx: number[] = []
   for (let i = 0; i <= steps; i++) {
     const t = i / steps
     const cx = ax + dx * t + px * latOffset
     const cz = az + dz * t + pz * latOffset
-    const lx = cx - px * (width / 2)
-    const lz = cz - pz * (width / 2)
-    const rx = cx + px * (width / 2)
-    const rz = cz + pz * (width / 2)
-    const o = i * 6
-    pos[o] = lx
-    pos[o + 1] = terrainHeight(lx, lz) + yOff
-    pos[o + 2] = lz
-    pos[o + 3] = rx
-    pos[o + 4] = terrainHeight(rx, rz) + yOff
-    pos[o + 5] = rz
+    for (let j = 0; j < cols; j++) {
+      const u = j / (cols - 1) - 0.5 // -0.5 (left kerb) → +0.5 (right kerb)
+      const vx = cx + px * (width * u)
+      const vz = cz + pz * (width * u)
+      const o = (i * cols + j) * 3
+      pos[o] = vx
+      pos[o + 1] = terrainHeight(vx, vz) + yOff
+      pos[o + 2] = vz
+    }
   }
   for (let i = 0; i < steps; i++) {
-    // skip this quad if its midpoint falls in a gap (intersection box / dash gap)
+    // skip this rung if its midpoint falls in a gap (intersection box / dash gap)
     if (gaps) {
       const tMid = (i + 0.5) / steps
       if (gaps.some((g) => tMid > g[0] && tMid < g[1])) continue
     }
-    const a0 = i * 2
-    const a1 = i * 2 + 1
-    const a2 = (i + 1) * 2
-    const a3 = (i + 1) * 2 + 1
-    idx.push(a0, a2, a1, a1, a2, a3)
+    for (let j = 0; j < cols - 1; j++) {
+      const a0 = i * cols + j // left, near
+      const a1 = i * cols + j + 1 // right, near
+      const a2 = (i + 1) * cols + j // left, far
+      const a3 = (i + 1) * cols + j + 1 // right, far
+      idx.push(a0, a2, a1, a1, a2, a3)
+    }
   }
   const g = new BufferGeometry()
   g.setAttribute('position', new Float32BufferAttribute(pos, 3))
   g.setIndex(idx)
   g.computeVertexNormals()
   return g
+}
+
+// How many cross-spans a drivable surface of the given width needs. ~3 m per
+// span keeps the residual float well under a wheel's radius even on the
+// steepest cross-slopes in the city.
+function acrossFor(width: number): number {
+  return Math.max(2, Math.round(width / 3))
+}
+
+// Standing height for anything on the pavement — see onSidewalk in cityLayout.
+// Sidewalk ribbons are drawn 0.20 m proud of the ground, so props placed at raw
+// terrain height stood shin-deep in the concrete.
+function walkHeight(x: number, z: number): number {
+  return terrainHeight(x, z) + (onSidewalk(x, z) ? SIDEWALK_LIFT : 0)
 }
 
 // Add a 3 m-dash / 9 m-gap pattern (the real 10:30 ft standard) on top of the
@@ -675,9 +752,14 @@ function RoadSeg({ road }: { road: Road }) {
     add(W / 2 - 0.5, 0.18, RD_WHITE)
     const sw = W / 2 + 2 // sidewalks just outside each edge
     return {
-      asphalt: ribbonGeo(a.x, a.z, b.x, b.z, 0, W, 0.08), // continuous — paving runs through the box
+      // continuous — paving runs through the box. Tessellated across its width
+      // so the surface follows the ground instead of hanging over it.
+      asphalt: ribbonGeo(a.x, a.z, b.x, b.z, 0, W, 0.08, undefined, 2.5, acrossFor(W)),
       // sidewalks ride a touch higher + a light curb strip at the road edge
-      walks: [ribbonGeo(a.x, a.z, b.x, b.z, -sw, 4, 0.2, swGaps), ribbonGeo(a.x, a.z, b.x, b.z, sw, 4, 0.2, swGaps)],
+      walks: [
+        ribbonGeo(a.x, a.z, b.x, b.z, -sw, 4, 0.2, swGaps, 2.5, acrossFor(4)),
+        ribbonGeo(a.x, a.z, b.x, b.z, sw, 4, 0.2, swGaps, 2.5, acrossFor(4)),
+      ],
       curbs: [
         ribbonGeo(a.x, a.z, b.x, b.z, -(W / 2 - 0.05), 0.7, 0.165, swGaps),
         ribbonGeo(a.x, a.z, b.x, b.z, W / 2 - 0.05, 0.7, 0.165, swGaps),
@@ -720,17 +802,28 @@ function Bridges() {
         const cz = (b.minZ + b.maxZ) / 2
         return (
           <group key={i}>
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[cx, 0.08, cz]} receiveShadow>
+            {/* Deck sits 3 cm BELOW the road asphalt that crosses it. Both were
+                at exactly 0.08 before, and coplanar surfaces 11 mm apart
+                z-fight: the 18 m strip where the road crosses the deck
+                shimmered between light and dark grey from ~100 m out. The road
+                is the visible driving surface here; the deck is its shoulder. */}
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[cx, 0.05, cz]} receiveShadow>
               <planeGeometry args={[w, d]} />
               <meshStandardMaterial color="#8b9097" />
             </mesh>
-            {/* railings down the roadway edges (match the BRIDGE_RAILS colliders) */}
-            <mesh position={[cx - 9.6, 0.95, cz]} castShadow>
-              <boxGeometry args={[0.6, 1.9, d]} />
+            {/* Railings down the roadway edges. Span z 118..178 — the WATER
+                span plus a 2 m margin, exactly matching the BRIDGE_RAILS
+                colliders. They used to run the full deck rect (z 112..184),
+                which poked a 1.9 m wall 2 m into Riverbank Rd and 4 m into
+                Esplanade at every bridge corner — "a random big fence in the
+                middle of the road" — and left 6 m of drawn-but-intangible
+                railing at each bridge mouth. */}
+            <mesh position={[cx - 9.6, 0.95, 148]} castShadow>
+              <boxGeometry args={[0.6, 1.9, 60]} />
               <meshStandardMaterial color="#b6bcc2" />
             </mesh>
-            <mesh position={[cx + 9.6, 0.95, cz]} castShadow>
-              <boxGeometry args={[0.6, 1.9, d]} />
+            <mesh position={[cx + 9.6, 0.95, 148]} castShadow>
+              <boxGeometry args={[0.6, 1.9, 60]} />
               <meshStandardMaterial color="#b6bcc2" />
             </mesh>
           </group>
@@ -816,15 +909,26 @@ function TrafficLightHead({ position }: { position: [number, number, number] }) 
 // Clean intersection markings at the signalized crossings: continental (zebra)
 // crosswalks framing each box + a fat stop bar set back behind each. The lane
 // paint is already clipped to leave the box bare, so these read crisp instead of
-// tangling with through-lines. All signals sit on flat ground (y≈0), so the
-// markings are flat quads at a fixed height. Merged into one geometry = 1 draw.
+// tangling with through-lines. Merged into one geometry = 1 draw.
+//
+// Each corner samples the terrain. These used to be emitted at a flat world
+// y=0.13 on the assumption that "all signals sit on flat ground" — false: the
+// hill tails reach downtown, so the two busiest intersections (Synergy ×
+// Alignment, Deliverable × Alignment) had their crossings buried 5-6 m
+// underground and simply didn't appear.
 function buildSignalGeo() {
   const Y = 0.13
   const pos: number[] = []
   const idx: number[] = []
   const quad = (cx: number, cz: number, hx: number, hz: number) => {
     const n = pos.length / 3
-    pos.push(cx - hx, Y, cz - hz, cx + hx, Y, cz - hz, cx + hx, Y, cz + hz, cx - hx, Y, cz + hz)
+    const c: [number, number][] = [
+      [cx - hx, cz - hz],
+      [cx + hx, cz - hz],
+      [cx + hx, cz + hz],
+      [cx - hx, cz + hz],
+    ]
+    for (const [x, z] of c) pos.push(x, terrainHeight(x, z) + Y, z)
     idx.push(n, n + 1, n + 2, n, n + 2, n + 3)
   }
   const D = 3 // crosswalk band depth (~10 ft)
@@ -877,16 +981,29 @@ function Alleys() {
       const px = (dz / len) * hw
       const pz = (-dx / len) * hw
       const steps = Math.max(2, Math.ceil(len / 4))
+      // same cross-tessellation the roads use — a single kerb-to-kerb sheet
+      // rides up through the road surface on any cross-slope
+      const cols = acrossFor(ALLEY_W) + 1
       const base = pos.length / 3
       for (let i = 0; i <= steps; i++) {
         const t = i / steps
         const cx = s.a.x + dx * t
         const cz = s.a.z + dz * t
-        pos.push(cx - px, terrainHeight(cx - px, cz - pz) + 0.06, cz - pz, cx + px, terrainHeight(cx + px, cz + pz) + 0.06, cz + pz)
+        for (let j = 0; j < cols; j++) {
+          const u = (j / (cols - 1)) * 2 - 1 // -1 (left) → +1 (right)
+          const vx = cx + px * u
+          const vz = cz + pz * u
+          pos.push(vx, terrainHeight(vx, vz) + 0.06, vz)
+        }
       }
       for (let i = 0; i < steps; i++) {
-        const a0 = base + i * 2
-        idx.push(a0, a0 + 2, a0 + 1, a0 + 1, a0 + 2, a0 + 3)
+        for (let j = 0; j < cols - 1; j++) {
+          const a0 = base + i * cols + j
+          const a1 = a0 + 1
+          const a2 = base + (i + 1) * cols + j
+          const a3 = a2 + 1
+          idx.push(a0, a2, a1, a1, a2, a3)
+        }
       }
     }
     const g = new BufferGeometry()
@@ -1189,7 +1306,7 @@ function StreetLights() {
   useLayoutEffect(() => {
     const o = new Object3D()
     LAMP_POSTS.forEach((p, i) => {
-      o.position.set(p.x, terrainHeight(p.x, p.z), p.z)
+      o.position.set(p.x, walkHeight(p.x, p.z), p.z)
       o.rotation.set(0, p.rot, 0)
       o.updateMatrix()
       poleRef.current?.setMatrixAt(i, o.matrix)
@@ -1223,7 +1340,7 @@ function StopSigns() {
   useLayoutEffect(() => {
     const o = new Object3D()
     STOP_SIGNS.forEach((p, i) => {
-      o.position.set(p.x, terrainHeight(p.x, p.z), p.z)
+      o.position.set(p.x, walkHeight(p.x, p.z), p.z)
       o.rotation.set(0, Math.PI / 4, 0)
       o.updateMatrix()
       postRef.current?.setMatrixAt(i, o.matrix)
@@ -1251,7 +1368,7 @@ function Hydrants() {
     if (!m) return
     const o = new Object3D()
     HYDRANTS.forEach((p, i) => {
-      o.position.set(p.x, terrainHeight(p.x, p.z) + 0.31, p.z)
+      o.position.set(p.x, walkHeight(p.x, p.z) + 0.31, p.z)
       o.updateMatrix()
       m.setMatrixAt(i, o.matrix)
     })
@@ -1262,6 +1379,79 @@ function Hydrants() {
       <cylinderGeometry args={[0.17, 0.21, 0.62, 8]} />
       <meshStandardMaterial color="#a8442f" />
     </instancedMesh>
+  )
+}
+
+// Jump-ramp dressing. The ramps themselves are terrain (see RAMPS in
+// terrain.ts); this is the roadworks that explains them — hazard barrels down
+// both shoulders and a works notice for a project that was obviously descoped
+// halfway through. The sign is the joke: the ramp exists because somebody
+// shipped half a flyover and moved on.
+const RAMP_SIGNS = [
+  { top: 'GRADE SEPARATION INITIATIVE', sub: 'phase 1 of 4 · remaining phases deprioritised' },
+  { top: 'ELEVATED CORRIDOR PROGRAM', sub: 'delivered to scope as descoped · Q3' },
+]
+
+function JumpRamps() {
+  return (
+    <>
+      {RAMPS.map((r, i) => {
+        const s = Math.sin(r.ry)
+        const c = Math.cos(r.ry)
+        const sign = RAMP_SIGNS[i % RAMP_SIGNS.length]
+        // hazard barrels along both shoulders, following the hump's profile
+        const barrels: { x: number; z: number; y: number }[] = []
+        const steps = 7
+        for (let k = 0; k <= steps; k++) {
+          const along = -r.len / 2 + (k / steps) * r.len
+          for (const side of [-1, 1]) {
+            const across = side * (r.halfW + 1.4)
+            const x = r.x + along * s + across * c
+            const z = r.z + along * c - across * s
+            barrels.push({ x, z, y: terrainHeight(x, z) })
+          }
+        }
+        // works notice sits off the near toe, angled to face oncoming traffic
+        const sx = r.x - (r.len / 2 + 7) * s + (r.halfW + 4) * c
+        const sz = r.z - (r.len / 2 + 7) * c - (r.halfW + 4) * s
+        return (
+          <group key={i}>
+            {barrels.map((b, j) => (
+              <group key={j} position={[b.x, b.y, b.z]}>
+                <mesh position={[0, 0.45, 0]} castShadow>
+                  <cylinderGeometry args={[0.34, 0.4, 0.9, 8]} />
+                  <meshStandardMaterial color="#d4641f" />
+                </mesh>
+                <mesh position={[0, 0.62, 0]}>
+                  <cylinderGeometry args={[0.36, 0.36, 0.2, 8]} />
+                  <meshStandardMaterial color="#ede6d6" />
+                </mesh>
+              </group>
+            ))}
+            {/* panel faces back down the approach: its +z normal rotated by
+                ry+π points along -(ramp axis), i.e. at oncoming traffic */}
+            <group position={[sx, terrainHeight(sx, sz), sz]} rotation={[0, r.ry + Math.PI, 0]}>
+              <mesh position={[0, 1.5, 0]} castShadow>
+                <cylinderGeometry args={[0.1, 0.12, 3, 6]} />
+                <meshStandardMaterial color="#4a4d52" />
+              </mesh>
+              <mesh position={[0, 3.3, 0]} castShadow>
+                <boxGeometry args={[5.4, 1.9, 0.16]} />
+                <meshStandardMaterial color="#e8a317" />
+              </mesh>
+              <Suspense fallback={null}>
+                <Text position={[0, 3.68, 0.1]} fontSize={0.35} color="#23262b" anchorX="center" anchorY="middle" maxWidth={5}>
+                  {sign.top}
+                </Text>
+                <Text position={[0, 3.0, 0.1]} fontSize={0.235} color="#5a4526" anchorX="center" anchorY="middle" maxWidth={5}>
+                  {sign.sub}
+                </Text>
+              </Suspense>
+            </group>
+          </group>
+        )
+      })}
+    </>
   )
 }
 
@@ -1369,22 +1559,78 @@ function Palms() {
 }
 
 // --- landmarks ---
+// Every landmark name used to be bare text hanging in the sky above its
+// building — nothing holding it up, no reason for it to be there, and it read
+// as a debug label rather than part of the world. Each now gets a real
+// monument sign planted at the kerb-side edge of the site, angled to face the
+// city so you read it on the approach.
+function landmarkRadius(l: Landmark): number {
+  if (l.kind === 'stadium') return l.r
+  if (l.kind === 'capitol') return 13
+  return Math.max(l.w, l.d) / 2
+}
+
 function Landmarks() {
   return (
     <>
-      {LANDMARKS.map((l, i) => (
-        <group key={i} position={[l.x, terrainHeight(l.x, l.z), l.z]}>
-          <LandmarkMesh l={l} />
-          <Suspense fallback={null}>
-            <Billboard position={[0, l.kind === 'stadium' ? 18 : 16, 0]}>
-              <Text fontSize={2.4} color="#1c1c1c" anchorX="center" anchorY="middle">
-                {l.label}
-              </Text>
-            </Billboard>
-          </Suspense>
-        </group>
-      ))}
+      {LANDMARKS.map((l, i) => {
+        // face the city centre: put the sign on the side of the site nearest
+        // the origin and turn its panel to look that way
+        const len = Math.hypot(l.x, l.z) || 1
+        const dx = -l.x / len
+        const dz = -l.z / len
+        const off = landmarkRadius(l) + 7
+        const sx = l.x + dx * off
+        const sz = l.z + dz * off
+        return (
+          <group key={i}>
+            <group position={[l.x, terrainHeight(l.x, l.z), l.z]}>
+              <LandmarkMesh l={l} />
+            </group>
+            <LandmarkSign x={sx} z={sz} ry={Math.atan2(dx, dz)} label={l.label} />
+          </group>
+        )
+      })}
     </>
+  )
+}
+
+// A corporate monument sign: stone base, panel, and the name cut into it. Same
+// object family as the storefront signage, so landmarks stop looking annotated
+// and start looking developed.
+function LandmarkSign({ x, z, ry, label }: { x: number; z: number; ry: number; label: string }) {
+  const w = Math.max(9, label.length * 0.86)
+  const gy = terrainHeight(x, z)
+  return (
+    <group position={[x, gy, z]} rotation={[0, ry, 0]}>
+      {/* plinth */}
+      <mesh position={[0, 0.35, 0]} castShadow receiveShadow>
+        <boxGeometry args={[w + 1.4, 0.7, 1.5]} />
+        <meshStandardMaterial color="#8d8b84" roughness={0.9} />
+      </mesh>
+      {/* panel */}
+      <mesh position={[0, 2.35, 0]} castShadow>
+        <boxGeometry args={[w, 3.1, 0.5]} />
+        <meshStandardMaterial color="#26292e" roughness={0.65} />
+      </mesh>
+      {/* accent bar along the bottom of the panel */}
+      <mesh position={[0, 1.05, 0.27]}>
+        <boxGeometry args={[w - 0.6, 0.16, 0.06]} />
+        <meshStandardMaterial color="#c9a24a" emissive="#c9a24a" emissiveIntensity={0.35} />
+      </mesh>
+      <Suspense fallback={null}>
+        <Text
+          position={[0, 2.5, 0.28]}
+          fontSize={1.15}
+          color="#efe9dc"
+          anchorX="center"
+          anchorY="middle"
+          maxWidth={w - 1}
+        >
+          {label}
+        </Text>
+      </Suspense>
+    </group>
   )
 }
 
@@ -1450,19 +1696,23 @@ function LandmarkMesh({ l }: { l: Landmark }) {
       </group>
     )
   }
-  // cemetery — green field + grid of little markers
-  const markers: [number, number][] = []
+  // Cemetery — a grid of little markers, each planted on its OWN ground height.
+  // The flat green field plane that used to sit under them is gone: the ground
+  // mesh already paints this footprint green (GREEN_AREAS), so it was redundant
+  // AND rigid — across this hillside it buried its north-west corner 7 m and
+  // cantilevered the south-east corner 2 m into the air, taking half the
+  // headstones underground with it.
+  const base = terrainHeight(l.x, l.z) // the group's own Y — markers offset from it
+  const markers: [number, number, number][] = []
   for (let mx = -l.w / 2 + 6; mx < l.w / 2 - 4; mx += 7) {
-    for (let mz = -l.d / 2 + 6; mz < l.d / 2 - 4; mz += 9) markers.push([mx, mz])
+    for (let mz = -l.d / 2 + 6; mz < l.d / 2 - 4; mz += 9) {
+      markers.push([mx, terrainHeight(l.x + mx, l.z + mz) - base, mz])
+    }
   }
   return (
     <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
-        <planeGeometry args={[l.w, l.d]} />
-        <meshStandardMaterial color="#5f7d52" />
-      </mesh>
-      {markers.map(([mx, mz], i) => (
-        <mesh key={i} position={[mx, 0.5, mz]}>
+      {markers.map(([mx, my, mz], i) => (
+        <mesh key={i} position={[mx, my + 0.5, mz]}>
           <boxGeometry args={[0.8, 1, 0.3]} />
           <meshStandardMaterial color="#c4c8c2" />
         </mesh>
@@ -1568,12 +1818,18 @@ function OfficeDropoff() {
   const gy = terrainHeight(ox, oz + 12)
   return (
     <group>
+      {/* Wall-mounted lettering on the tower's south face — was a Billboard,
+          i.e. free-floating text that swivelled to follow the camera and read
+          as a label rather than signage. HQ_BUILDING is 16 m deep, so the south
+          face is at oz + 8; the letters sit just proud of it on a backing band. */}
+      <mesh position={[ox, 34, oz + 8.06]}>
+        <boxGeometry args={[13.5, 4.6, 0.25]} />
+        <meshStandardMaterial color="#1e2637" roughness={0.7} />
+      </mesh>
       <Suspense fallback={null}>
-        <Billboard position={[ox, 34, oz + 8.3]}>
-          <Text fontSize={3.4} color="#cfd8ea" anchorX="center" anchorY="middle">
-            ALIGNLY
-          </Text>
-        </Billboard>
+        <Text position={[ox, 34, oz + 8.22]} fontSize={3.4} color="#cfd8ea" anchorX="center" anchorY="middle">
+          ALIGNLY
+        </Text>
       </Suspense>
       {/* entrance canopy on the south face */}
       <mesh position={[ox, gy + 4, oz + 9]} castShadow>
@@ -1612,26 +1868,134 @@ function Beacons() {
 
 type BeaconState = 'active' | 'future' | 'done'
 
+// A DESTINATION MARKER, not scenery. The old version was a static coloured
+// post with the stop's name as bare text hovering beside it, which read as part
+// of the world rather than as UI pointing you somewhere. This is a proper game
+// marker: a spinning, bobbing diamond, a radar ring pinging outward on the
+// ground, a light shaft, and a label on an actual backing plate — all of it
+// brightening as you close in, and flaring when you arrive.
 function Beacon({ d, state }: { d: Destination; state: BeaconState }) {
   const active = state === 'active'
-  const labelColor = active ? '#111111' : state === 'done' ? '#6a6a6a' : '#555555'
+  const done = state === 'done'
+  const diamond = useRef<Mesh>(null)
+  const ring = useRef<Mesh>(null)
+  const beam = useRef<Mesh>(null)
+  const post = useRef<Mesh>(null)
+  const plate = useRef<Group>(null)
+
+  // Your Lunch sits under the elevated freeway — everything here is clamped so
+  // the marker never impales the concrete deck.
+  const ground = terrainHeight(d.x, d.z)
+  const underDeck =
+    d.x >= OVERPASS.minX && d.x <= OVERPASS.maxX && Math.abs(d.z - OVERPASS.z) <= OVERPASS.width / 2 + 1
+  const ceiling = underDeck ? OVERPASS.y - 0.9 - ground : Infinity
+  const beamH = Math.min(46, ceiling)
+  const floatY = Math.min(6.2, ceiling - 2.2)
+  const labelY = Math.min(9.4, ceiling - 0.8)
+
+  useFrame(() => {
+    const t = performance.now() / 1000
+    // 0 far → 1 right on top of it. Drives every "getting warmer" cue.
+    const dist = Math.hypot(carPosition.x - d.x, carPosition.z - d.z)
+    const near = active ? Math.max(0, Math.min(1, 1 - (dist - 8) / 110)) : 0
+    const arrived = active && dist < 12
+    const pulse = 0.5 + 0.5 * Math.sin(t * 2.1) // gentle, ~0.33 Hz — never a strobe
+
+    if (diamond.current) {
+      diamond.current.rotation.y = t * 1.1
+      diamond.current.position.y = floatY + Math.sin(t * 1.7) * 0.42
+      const s = (active ? 1 : 0.55) * (1 + near * 0.28 + (arrived ? pulse * 0.16 : 0))
+      diamond.current.scale.setScalar(s)
+      const mm = diamond.current.material as MeshStandardMaterial
+      mm.emissiveIntensity = active ? 0.9 + near * 1.6 + pulse * 0.4 : 0.12
+    }
+    // radar ping: a ring that expands and fades, restarting every ~1.6 s
+    if (ring.current) {
+      const cycle = (t % 1.6) / 1.6
+      const s = 1.6 + cycle * (5.5 + near * 5)
+      ring.current.scale.set(s, s, s)
+      const rm = ring.current.material as MeshBasicMaterial
+      rm.opacity = active ? (1 - cycle) * (0.30 + near * 0.4) : 0
+      ring.current.visible = active
+    }
+    if (beam.current) {
+      const bm = beam.current.material as MeshBasicMaterial
+      bm.opacity = active ? 0.06 + near * 0.16 + pulse * 0.03 : 0
+      beam.current.visible = active
+    }
+    if (post.current) {
+      const pm = post.current.material as MeshStandardMaterial
+      pm.emissiveIntensity = active ? 0.5 + near * 1.1 : done ? 0.05 : 0.12
+    }
+    if (plate.current) {
+      // the label leans in a touch as you approach so it stays legible
+      const s = 1 + near * 0.22
+      plate.current.scale.setScalar(active ? s : 0.72)
+    }
+  })
+
+  const dim = done ? '#6a6a6a' : d.color
+
   return (
-    <group position={[d.x, terrainHeight(d.x, d.z), d.z]}>
-      <mesh position={[0, 5, 0]}>
-        <cylinderGeometry args={[1.0, 1.0, 10, 20]} />
-        <meshStandardMaterial color={d.color} emissive={d.color} emissiveIntensity={active ? 0.6 : 0.15} />
+    <group position={[d.x, ground, d.z]}>
+      {/* ground pad + expanding radar ring */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.06, 0]}>
+        <ringGeometry args={[1.5, 2.1, 28]} />
+        <meshBasicMaterial color={dim} transparent opacity={active ? 0.5 : 0.16} depthWrite={false} />
       </mesh>
-      {active && (
-        <mesh position={[0, 38, 0]}>
-          <cylinderGeometry args={[1.8, 1.8, 76, 16, 1, true]} />
-          <meshBasicMaterial color={d.color} transparent opacity={0.16} depthWrite={false} side={2} />
+      <mesh ref={ring} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.07, 0]}>
+        <ringGeometry args={[1.9, 2.15, 32]} />
+        <meshBasicMaterial color={d.color} transparent opacity={0} depthWrite={false} />
+      </mesh>
+
+      {/* short grounded post — gives the floating diamond something to belong to */}
+      <mesh ref={post} position={[0, Math.min(1.6, ceiling / 2), 0]}>
+        <cylinderGeometry args={[0.34, 0.44, Math.min(3.2, ceiling), 12]} />
+        <meshStandardMaterial color={dim} emissive={d.color} emissiveIntensity={0.3} />
+      </mesh>
+
+      {/* the marker itself */}
+      {beamH > 2 && (
+        <mesh ref={beam} position={[0, beamH / 2, 0]}>
+          <cylinderGeometry args={[2.0, 1.2, beamH, 18, 1, true]} />
+          <meshBasicMaterial color={d.color} transparent opacity={0} depthWrite={false} side={2} />
         </mesh>
       )}
+      <mesh ref={diamond} position={[0, floatY, 0]}>
+        <octahedronGeometry args={[1.15, 0]} />
+        <meshStandardMaterial
+          color={dim}
+          emissive={d.color}
+          emissiveIntensity={0.9}
+          metalness={0.3}
+          roughness={0.25}
+          flatShading
+        />
+      </mesh>
+
+      {/* label on a real plate, with a colour bar — not naked floating text */}
       <Suspense fallback={null}>
-        <Billboard position={[0, active ? 12 : 11, 0]}>
-          <Text fontSize={active ? 2.6 : 1.7} color={labelColor} anchorX="center" anchorY="middle">
-            {d.short}
-          </Text>
+        <Billboard position={[0, labelY, 0]}>
+          <group ref={plate}>
+            <mesh position={[0, 0, -0.05]}>
+              <planeGeometry args={[Math.max(7.2, d.short.length * 0.82), 2.1]} />
+              <meshBasicMaterial color="#14161a" transparent opacity={active ? 0.9 : 0.55} depthWrite={false} />
+            </mesh>
+            <mesh position={[0, -0.88, -0.03]}>
+              <planeGeometry args={[Math.max(7.2, d.short.length * 0.82), 0.16]} />
+              <meshBasicMaterial color={dim} transparent opacity={active ? 1 : 0.5} depthWrite={false} />
+            </mesh>
+            <Text
+              fontSize={1.02}
+              color={active ? '#f2efe6' : '#9a9a9a'}
+              anchorX="center"
+              anchorY="middle"
+              outlineWidth={0.02}
+              outlineColor="#000000"
+            >
+              {done ? `✓ ${d.short}` : d.short}
+            </Text>
+          </group>
         </Billboard>
       </Suspense>
     </group>

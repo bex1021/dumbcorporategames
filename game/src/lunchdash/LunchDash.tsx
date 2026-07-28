@@ -19,9 +19,11 @@ import { GameClock } from './GameClock'
 import { CinematicEffects } from './CinematicEffects'
 import { DRIVE_CAMERA } from './driveConfig'
 import { carPosition, carFacing, carTelemetry, carAir } from './carState'
-import { SPAWN, ALLEYS, ALLEY_W, ALLEY_PROPS, BUILDINGS, ROADS } from './cityLayout'
+import { SPAWN, ALLEYS, ALLEY_W, ALLEY_PROPS, BUILDINGS, ROADS, inWater, nearestRoadPoint } from './cityLayout'
+import { river } from './riverState'
+import { driveClock } from './clockState'
 import { terrainHeight } from './terrain'
-import { bowl, bowlTier, sloshBowl } from './bowlState'
+import { bowl, bowlTier, sloshBowl, armBowl } from './bowlState'
 import { traffic, resolveTrafficCollision } from './trafficState'
 import { peds, hr, updatePeds } from './pedState'
 import { useLunchStore } from './lunchStore'
@@ -45,7 +47,11 @@ export default function LunchDash() {
 
   // The intro card holds the clock at 11:00 (GameClock only mounts once the
   // player starts the car) so reading the brief doesn't cost them the run.
-  const [started, setStarted] = useState(false)
+  // A photomode door (press-kit capture, DEV-only) skips the intro entirely.
+  const [started, setStarted] = useState(() =>
+    import.meta.env.DEV &&
+    ['bowl', 'parade'].includes(new URLSearchParams(window.location.search).get('photomode') ?? '')
+  )
 
   // Tune the car radio to the market-news bed for the whole session; tear all
   // audio down when we leave Lunch Dash.
@@ -55,6 +61,26 @@ export default function LunchDash() {
   // and objective state so navigating in always starts clean at 11:00.
   useEffect(() => {
     resetRun()
+    // Dev-only photomode doors (press-kit capture): ?photomode=<door> skips the
+    // intro and primes the scene for a promo shot. Doors:
+    //   bowl   — salmon bowl aboard, long straight on Synergy Ave for swerving
+    //   parade — bowl aboard, pointed at the downtown parade barricades
+    if (import.meta.env.DEV) {
+      const door = new URLSearchParams(window.location.search).get('photomode')
+      if (door === 'bowl' || door === 'parade') {
+        useLunchStore.getState().advance() // Slop Bowlz stop is "done"
+        armBowl() // bowl in the cupholder, integrity 100
+        const spot = door === 'parade'
+          ? { x: -43, z: 70 } // Synergy Ave, short run-up into the parade zone
+          : { x: -43, z: 220 } // south arterial straight — room to swerve hard
+        carPosition.set(spot.x, 0, spot.z)
+        carFacing.y = 0 // forward is -z: both doors drive north up Synergy Ave
+        const gy = terrainHeight(spot.x, spot.z)
+        carAir.y = gy
+        carAir.prevGh = gy
+        startRadio() // `started` already true via the useState initializer
+      }
+    }
     // dev-only teleport hook for auditing the city: __lunch.go(x, z, facingRad)
     if (import.meta.env.DEV) {
       ;(window as unknown as { __lunch?: unknown }).__lunch = {
@@ -83,6 +109,10 @@ export default function LunchDash() {
         traffic,
         peds,
         hr,
+        river,
+        inWater,
+        nearestRoadPoint,
+        clock: driveClock,
         resolveTrafficCollision,
         updatePeds,
         // layout inspection hooks

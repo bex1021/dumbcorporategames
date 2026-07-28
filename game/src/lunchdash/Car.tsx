@@ -10,20 +10,25 @@
 // "does driving + the follow camera feel good". Bouncy-bumper collision, the
 // salmon bowl, pedestrians and traffic all come in later slices.
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Group, Mesh } from 'three'
-import { useKeyboard } from '../hooks/useKeyboard'
-import { DRIVE, DRIVE_WORLD, AIR } from './driveConfig'
+import { useKeyboard, type KeyMap } from '../hooks/useKeyboard'
+import { DRIVE, DRIVE_WORLD, AIR, RIVER } from './driveConfig'
 import { carPosition, carFacing, carTelemetry, carAir } from './carState'
-import { resolveCarCollision, SPAWN, PARADE } from './cityLayout'
+import { resolveCarCollision, SPAWN, PARADE, inWater } from './cityLayout'
+import { river, riverHasControl, updateRiver, beginDunk } from './riverState'
 import { boundary } from './boundaryState'
 import { crash, damageTier, type DamageTier } from './crashState'
 import { bowl, sloshBowl } from './bowlState'
 import { resolveTrafficCollision } from './trafficState'
 import { useLunchStore } from './lunchStore'
-import { terrainHeight } from './terrain'
-import { updateEngine, engineOff, screech, setParadeMix, playerHonk, toggleRadio } from './driveAudio'
+import { terrainHeight, rampHeight } from './terrain'
+import { updateEngine, engineOff, screech, crashHit, setParadeMix, playerHonk, toggleRadio } from './driveAudio'
+
+// Stand-in for the key map while the river has the car — every control reads
+// as released, so the sink can't be steered or throttled out of.
+const NO_KEYS: KeyMap = { forward: false, back: false, left: false, right: false }
 
 export function Car() {
   const ref = useRef<Group>(null)
@@ -33,17 +38,22 @@ export function Car() {
   // `v` its velocity. It settles back to 0 with a stiff spring + damping, so the
   // car dips on hard landings and rebounds instead of snapping to the ground.
   const susp = useRef({ y: 0, v: 0 })
+  // the four wheel groups (front pair first), animated in the frame loop below
+  const wheelRefs = useRef<(Group | null)[]>([])
+  const wheelSpin = useRef(0)
+  const wheelSteer = useRef(0)
   const keys = useKeyboard()
   const [tier, setTier] = useState<DamageTier>('pristine')
   const tierRef = useRef<DamageTier>('pristine')
 
-  // H = honk, R = toggle the car radio. Separate from the drive keys (which are
-  // held) since these are taps. Engine winds down when the car unmounts.
+  // Space = honk, Q = toggle the car radio. Both sit right under the left hand
+  // that's already on WASD (Space is the thumb, Q the pinky) — far comfier mid-
+  // drive than the old H/R reach. Taps, not holds. Engine winds down on unmount.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.repeat) return
-      if (e.key === 'h' || e.key === 'H') playerHonk()
-      else if (e.key === 'r' || e.key === 'R') toggleRadio()
+      if (e.code === 'Space') { e.preventDefault(); playerHonk() }
+      else if (e.code === 'KeyQ') toggleRadio()
     }
     window.addEventListener('keydown', onKey)
     return () => {
@@ -67,7 +77,14 @@ export function Car() {
     // poisons the suspension spring and renders the car body at "nowhere"
     // (invisible) forever. (This was the "where's my car" bug.)
     const dt = Math.max(1e-4, Math.min(delta, 0.05)) // clamp big frames (tab refocus) + never 0
-    const k = keys.current
+
+    // --- river: while you're in the water the car is not yours ---
+    // Sinking, being fished out and dropped back on the road all run here; the
+    // controls go dead for the duration (there is no other input-suppression
+    // path in this loop, so the key map is simply blanked).
+    const riverLocked = riverHasControl()
+    if (riverLocked) updateRiver(dt)
+    const k = riverLocked ? NO_KEYS : keys.current
 
     // --- longitudinal speed ---
     let target = 0
@@ -85,10 +102,14 @@ export function Car() {
       }
     }
     const before = carTelemetry.speed
-    const approach = 1 - Math.exp(-rate * dt)
-    carTelemetry.speed += (target - carTelemetry.speed) * approach
-    if (!k.forward && !k.back && Math.abs(carTelemetry.speed) < DRIVE.stopEps) {
-      carTelemetry.speed = 0
+    // While the river has the car, updateRiver owns its speed (water drag) —
+    // don't also apply engine coasting on top of it.
+    if (!riverLocked) {
+      const approach = 1 - Math.exp(-rate * dt)
+      carTelemetry.speed += (target - carTelemetry.speed) * approach
+      if (!k.forward && !k.back && Math.abs(carTelemetry.speed) < DRIVE.stopEps) {
+        carTelemetry.speed = 0
+      }
     }
 
     // --- steering (left = left, can't pivot in place) ---
@@ -139,6 +160,7 @@ export function Car() {
           carTelemetry.speed = -moveSign * impact * 0.35 * intoWall
           crash.severity += (impact / 30) * intoWall
           crash.shake = Math.min(1, impact / 22)
+          crashHit(Math.min(1, (impact / 25) * intoWall))
         } else {
           // gentle contact → collide-and-slide (stop head-on, slide glancing)
           carTelemetry.speed *= (1 - 0.93 * intoWall) * 0.97
@@ -151,7 +173,15 @@ export function Car() {
     // traffic + parked cars — bump moving cars aside, hit parked ones like walls.
     // Lighter than a building: cars give, so less recoil and less damage.
     // tighter than the building radius — a car "hit" should need real contact
-    const tcol = resolveTrafficCollision(carPosition.x, carPosition.z, 1.1)
+    // pass the player's world velocity so the struck car can take momentum off
+    // us (see the transfer block in resolveTrafficCollision)
+    const tcol = resolveTrafficCollision(
+      carPosition.x,
+      carPosition.z,
+      1.1,
+      fwdX * carTelemetry.speed,
+      fwdZ * carTelemetry.speed,
+    )
     if (tcol.hit) {
       const nx = tcol.x - carPosition.x
       const nz = tcol.z - carPosition.z
@@ -163,9 +193,15 @@ export function Car() {
         const intoCar = Math.max(0, (-moveSign * (fwdX * nx + fwdZ * nz)) / nl)
         const impact = Math.abs(carTelemetry.speed)
         if (intoCar > 0.5 && impact > 11) {
-          carTelemetry.speed = -moveSign * impact * 0.28 * intoCar // recoil
+          // You SHOVE a car — you don't bounce off it. Momentum went into the
+          // other car (see resolveTrafficCollision), so we bleed speed rather
+          // than reversing: at a hard hit you keep roughly a third of it and
+          // barge through, which is what makes the impact read as mass meeting
+          // mass instead of masonry.
+          carTelemetry.speed = moveSign * impact * Math.max(0.18, 0.45 - intoCar * 0.22)
           crash.severity += (impact / 45) * intoCar // lighter than a wall
           crash.shake = Math.min(1, impact / 26)
+          crashHit(Math.min(1, (impact / 30) * intoCar) * 0.8) // cars give a little
           if (bowl.carrying) sloshBowl(0, impact * 0.012 * intoCar, dt)
         } else {
           carTelemetry.speed *= (1 - 0.8 * intoCar) * 0.98 // scrape past
@@ -196,16 +232,23 @@ export function Car() {
       sloshBowl(latAccel, sevGain, dt)
     }
 
+    // --- into the drink? ---
+    // The water is no longer a wall, so crossing the bank actually puts you in
+    // the river. Everything that follows (sinking, the tow, the time penalty)
+    // is handled by updateRiver above on subsequent frames.
+    if (!riverLocked && inWater(carPosition.x, carPosition.z)) beginDunk()
+
     // soft countryside boundary — warn far out, snap back to HQ past the limit
     const distFromCenter = Math.hypot(carPosition.x, carPosition.z)
     if (distFromCenter > DRIVE_WORLD.returnRadius) {
+      const spawnY = terrainHeight(SPAWN.x, SPAWN.z)
       carPosition.set(SPAWN.x, 0, SPAWN.z)
       carFacing.y = 0
       carTelemetry.speed = 0
-      carAir.y = 0
+      carAir.y = spawnY
       carAir.vy = 0
       carAir.airborne = false
-      carAir.prevGh = 0
+      carAir.prevGh = spawnY
       carAir.climb = 0
       boundary.zone = 'in'
       boundary.returnPulse++
@@ -215,7 +258,16 @@ export function Car() {
 
     // --- vertical: catch air over crests, fall under gravity, land with a thud ---
     const gh = terrainHeight(carPosition.x, carPosition.z) // ground height under the car
-    if (carAir.airborne) {
+    if (riverLocked) {
+      // Going under. The riverbed is painted flat ground, so the sink is faked
+      // by riding the body below the waterline. Air state is pinned clear the
+      // whole time so surfacing never reads as a launch.
+      carAir.y = gh - RIVER.sinkDepth * river.submersion
+      carAir.vy = 0
+      carAir.airborne = false
+      carAir.prevGh = gh
+      carAir.climb = 0
+    } else if (carAir.airborne) {
       carAir.vy -= AIR.gravity * dt
       carAir.y += carAir.vy * dt
       if (carAir.y <= gh) {
@@ -228,6 +280,7 @@ export function Car() {
         susp.current.v -= Math.min(impact, 16) * 0.05
         if (impact > AIR.hardLanding) {
           crash.shake = Math.max(crash.shake, Math.min(1, impact / 14)) // landing jolt
+          crashHit(Math.min(1, (impact - AIR.hardLanding) / 12) * 0.7) // suspension slam
           if (bowl.carrying) sloshBowl(0, impact * 0.03, dt) // a hard landing jostles the bowl
           if (impact > 12) crash.severity += (impact - 12) * 0.02 // really hard landings scuff
         }
@@ -240,12 +293,18 @@ export function Car() {
       const vGround = Math.max(-60, Math.min(60, (gh - carAir.prevGh) / dt))
       carAir.y = gh
       carAir.climb = Math.max(vGround, carAir.climb)
-      // launch only if going FAST, after a STEEP climb, right at the CREST —
-      // popping a touch gentler than the climb so it lifts smoothly, no jerk.
-      const fastEnough = Math.abs(carTelemetry.speed) >= AIR.minSpeed
-      if (fastEnough && carAir.climb > AIR.launchMin && vGround < carAir.climb * AIR.crestRatio) {
+      // Launch only if going FAST, after a STEEP climb, right at the CREST.
+      // On an authored ramp the gates relax and the boost goes up, so a kicker
+      // actually sends you; ordinary hill grade stays a gentle lift, which
+      // keeps incidental terrain from repeatedly jolting the bowl.
+      const onRamp = rampHeight(carPosition.x, carPosition.z) > 0.15
+      const minSpeed = onRamp ? AIR.rampMinSpeed : AIR.minSpeed
+      const launchMin = onRamp ? AIR.rampLaunchMin : AIR.launchMin
+      const boost = onRamp ? AIR.rampBoost : AIR.crestBoost
+      const fastEnough = Math.abs(carTelemetry.speed) >= minSpeed
+      if (fastEnough && carAir.climb > launchMin && vGround < carAir.climb * AIR.crestRatio) {
         carAir.airborne = true
-        carAir.vy = carAir.climb * AIR.crestBoost
+        carAir.vy = carAir.climb * boost
         carAir.climb = 0
       } else if (vGround <= 0.05) {
         carAir.climb = 0 // back on the flat without launching — forget the climb
@@ -253,8 +312,11 @@ export function Car() {
     }
     carAir.prevGh = gh
 
-    // write transform — Y is the air-aware height (terrain when grounded, up on a jump)
-    g.position.set(carPosition.x, carAir.y, carPosition.z)
+    // write transform — Y is the air-aware height (terrain when grounded, up on
+    // a jump), lifted onto the ROAD SURFACE (ribbons draw at terrain + 0.08;
+    // planting the car at raw terrain kept its tyres 8 cm deep in the asphalt).
+    // Render-only: physics (carAir) stays on the analytic terrain.
+    g.position.set(carPosition.x, carAir.y + 0.08, carPosition.z)
     g.rotation.y = carFacing.y
 
     // subtle weight cues on the body only: nose up on accel / dip on brake,
@@ -287,12 +349,34 @@ export function Car() {
       if (!Number.isFinite(sp.y)) { sp.y = 0; sp.v = 0 }
       body.position.y = sp.y
 
-      if (carAir.airborne) {
+      if (riverLocked) {
+        // going under nose-first, with a slow list to one side — reads as the
+        // car settling into the water rather than descending through the floor
+        body.rotation.set(0.30 * river.submersion, 0, 0.16 * river.submersion)
+      } else if (carAir.airborne) {
         // mid-jump: pitch the body to the flight path — nose up rising, dropping on the way down
         const horiz = Math.max(Math.abs(carTelemetry.speed), 3)
         body.rotation.set(Math.atan2(carAir.vy, horiz), 0, steerRoll)
       } else {
         body.rotation.set(accelPitch + slopePitch, 0, steerRoll + slopeRoll)
+      }
+
+      // ── wheels: roll with distance travelled, front pair turns with steering ──
+      // Rolling is driven by distance (speed × dt ÷ radius), not by a fixed
+      // rate, so the wheels stop dead when the car does and creep when it
+      // creeps. Static wheels are the single loudest "nothing is actually
+      // moving" tell in a driving game.
+      wheelSpin.current += (carTelemetry.speed * dt) / 0.37
+      if (wheelSpin.current > Math.PI * 2) wheelSpin.current -= Math.PI * 2
+      else if (wheelSpin.current < 0) wheelSpin.current += Math.PI * 2
+      // ease toward the commanded angle so the wheels don't snap between locks
+      const steerTarget = -steer * 0.42 * (0.35 + 0.65 * ramp)
+      wheelSteer.current += (steerTarget - wheelSteer.current) * (1 - Math.exp(-14 * dt))
+      for (let i = 0; i < 4; i++) {
+        const w = wheelRefs.current[i]
+        if (!w) continue
+        w.rotation.y = i < 2 ? wheelSteer.current : 0 // only the front pair steers
+        w.rotation.x = wheelSpin.current
       }
 
       // tilt the fake shadow to the ground slope so it stops burying into hills,
@@ -301,7 +385,9 @@ export function Car() {
       if (sh) {
         sh.rotation.set(slopePitch, 0, slopeRoll)
         const lift = Math.max(0, carAir.y - gh)
-        sh.position.y = -lift // parent group rides at carAir.y; push shadow back to ground
+        // parent group rides at carAir.y + 0.08 (road-surface lift); -0.06
+        // leaves the blob 2 cm proud of the asphalt plane so neither z-fights
+        sh.position.y = -lift - 0.06
         sh.scale.setScalar(Math.max(0.5, 1 - lift * 0.06))
       }
     }
@@ -322,7 +408,7 @@ export function Car() {
   return (
     <group ref={ref}>
       <group ref={bodyRef}>
-        <CarMesh tier={tier} />
+        <CarMesh tier={tier} wheelRefs={wheelRefs} />
       </group>
       <group ref={shadowRef}>
         <BlobShadow />
@@ -336,7 +422,7 @@ export function Car() {
 // low-profile wheels, and the signature full-width rear light bar. Pearl white
 // so it pops against the beige traffic. Length runs along Z, front at -Z (so
 // the camera behind sees the fastback + light bar — the recognizable angle).
-function CarMesh({ tier }: { tier: DamageTier }) {
+function CarMesh({ tier, wheelRefs }: { tier: DamageTier; wheelRefs: RefObject<(Group | null)[]> }) {
   const dmg = tier === 'wrecked' ? 3 : tier === 'dinged' ? 2 : tier === 'scuffed' ? 1 : 0
   const BODY = ['#e6e8ea', '#d4d4d2', '#b6b3af', '#9c9893'][dmg] // dulls as it takes damage
   const GLASS = dmg >= 3 ? '#16181b' : '#22252b'
@@ -394,7 +480,16 @@ function CarMesh({ tier }: { tier: DamageTier }) {
       </mesh>
       {/* flush low-profile wheels with a hubcap */}
       {wheels.map(([x, z], i) => (
-        <group key={i} position={[x, 0.37, z]}>
+        <group
+          key={i}
+          // YXZ so the steer angle (Y) is applied before the rolling spin (X),
+          // which is what lets a turned front wheel still roll correctly
+          rotation-order="YXZ"
+          ref={(g) => {
+            wheelRefs.current[i] = g
+          }}
+          position={[x, 0.37, z]}
+        >
           <mesh rotation={[0, 0, Math.PI / 2]}>
             <cylinderGeometry args={[0.37, 0.37, 0.22, 18]} />
             <meshStandardMaterial color={TIRE} />
@@ -403,6 +498,20 @@ function CarMesh({ tier }: { tier: DamageTier }) {
             <cylinderGeometry args={[0.2, 0.2, 0.04, 14]} />
             <meshStandardMaterial color={HUB} metalness={0.4} roughness={0.4} />
           </mesh>
+          {/* SPOKES. Without these the wheel is a plain cylinder with a
+              concentric hubcap — perfectly rotationally symmetric, so it looks
+              identical at every angle and the (correct) spin is invisible.
+              Five spokes give the rotation something to read against. */}
+          {[0, 1, 2, 3, 4].map((s) => (
+            <mesh
+              key={s}
+              position={[x > 0 ? 0.14 : -0.14, 0, 0]}
+              rotation={[(s * Math.PI) / 2.5, 0, Math.PI / 2]}
+            >
+              <boxGeometry args={[0.055, 0.03, 0.34]} />
+              <meshStandardMaterial color="#e6eaee" metalness={0.45} roughness={0.35} />
+            </mesh>
+          ))}
         </group>
       ))}
 

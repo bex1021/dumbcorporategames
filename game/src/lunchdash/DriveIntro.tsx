@@ -117,8 +117,11 @@ export function DriveIntro({ onStart }: { onStart: () => void }) {
         <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'rgba(233,227,212,0.7)', margin: '16px auto 0', maxWidth: 400 }}>
           Grab the exec's bowl downtown, grab your own lunch, and be back at HQ before the 1:00 sync. The bowl does not travel well.
         </p>
-        <div style={{ fontFamily: MONO, fontSize: 12, letterSpacing: '0.06em', color: 'rgba(233,227,212,0.5)', marginTop: 18 }}>
-          WASD / arrows to drive · H to honk · E to interact
+        {/* key NAMES stay mono (they're literal keycaps); the prose is sans */}
+        <div style={{ fontFamily: FONT, fontSize: 12.5, color: 'rgba(233,227,212,0.55)', marginTop: 18 }}>
+          <span style={{ fontFamily: MONO }}>WASD</span> to drive ·{' '}
+          <span style={{ fontFamily: MONO }}>Space</span> to honk ·{' '}
+          <span style={{ fontFamily: MONO }}>E</span> to interact
         </div>
         <div style={{
           display: 'inline-block', marginTop: 20,
@@ -128,8 +131,8 @@ export function DriveIntro({ onStart }: { onStart: () => void }) {
         }}>
           On it — head out →
         </div>
-        <div style={{ fontFamily: MONO, fontSize: 11, color: 'rgba(233,227,212,0.4)', marginTop: 12 }}>
-          (click anywhere or press Enter)
+        <div style={{ fontFamily: FONT, fontSize: 11.5, color: 'rgba(233,227,212,0.4)', marginTop: 12 }}>
+          click anywhere or press <span style={{ fontFamily: MONO }}>Enter</span>
         </div>
         {/* The morning's dashboard, frozen — continuity from the standup you
             just came from. Renders nothing if there's no Phase 1 on record. */}

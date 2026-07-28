@@ -4,6 +4,7 @@ import { driveClock, START_MIN, END_MIN } from './clockState'
 import { bowl, bowlTier, type BowlTier } from './bowlState'
 import { crash, damageTier, type DamageTier } from './crashState'
 import { hr } from './pedState'
+import { river } from './riverState'
 import { scoreTier, type ReturnTier } from './scoring'
 import { markBeaten } from '../state/progress'
 import { writePhase3Final } from '../state/campaignState'
@@ -27,6 +28,7 @@ export type RunFinal = {
   wasLate: boolean // past 12:00 (only meaningful pre-deadline; noon is now a hard fail)
   latenessMin: number
   pedestrianHits: number
+  riverDunks: number // times the car had to be fished out of the water
   bowlIntegrity: number
   bowlState: BowlTier
   damage: DamageTier
@@ -44,6 +46,7 @@ function capture(delivered: boolean, outcome: RunOutcome, stopsCompleted: number
     wasLate: arrivedMin > END_MIN,
     latenessMin: Math.max(0, Math.round(arrivedMin - END_MIN)),
     pedestrianHits: hr.incidents,
+    riverDunks: river.dunks,
     bowlIntegrity: Math.round(bowl.integrity),
     bowlState: bowlTier(bowl.integrity),
     damage: damageTier(crash.severity),

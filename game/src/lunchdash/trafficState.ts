@@ -11,7 +11,7 @@
 //   - parked cars are just cars with `parked: true`: they never move and always
 //     act as solid obstacles.
 
-import { ROADS, paintGaps, roadWidth, SIGNALS, PARADE, DEST_POINTS, STOREFRONTS, type Road } from './cityLayout'
+import { ROADS, paintGaps, roadWidth, SIGNALS, PARADE, DEST_POINTS, STOREFRONTS, resolveCarCollision, type Road } from './cityLayout'
 import { carPosition } from './carState'
 import { honk } from './honk'
 import { tickSignals, signalState } from './signalState'
@@ -24,10 +24,27 @@ export type TrafficCar = {
   t: number // 0..1 along the road
   speed: number // m/s
   off: number // signed lateral offset from centerline
+  laneOff: number // the lane it BELONGS in — off eases back here after a shove
   colorIdx: number
   vtype: string // vehicle archetype key (see VEHICLE_SPECS)
   stall: number // seconds left knocked-out after a ram (moving cars only)
   honkCd: number // cooldown (s) before this car can honk again
+  // U-turn at the end of the road (see updateTraffic) — seconds remaining, plus
+  // the headings/lane offsets to sweep between while it happens
+  turn: number
+  turnFrom: number
+  turnTo: number
+  offFrom: number
+  // KNOCKED FREE. A car that takes a real hit leaves its rail and moves as a
+  // free body for a moment: shoved along the impact direction, spinning from
+  // the off-centre load. `free` is seconds of free motion left; when it settles
+  // the car either rejoins its lane or, if `wreck` reached 1, stays put as a
+  // totalled hulk and becomes permanent scenery.
+  vx: number
+  vz: number
+  spin: number
+  free: number
+  wreck: number // 0 = mint, >= 1 = totalled
   // live world transform (written by updateTraffic, read by renderer + collision)
   x: number
   z: number
@@ -139,6 +156,131 @@ function placeMoving(c: TrafficCar) {
   c.heading = Math.atan2(-c.dir * ux, -c.dir * uz) // car front is -Z at heading 0
 }
 
+// the heading a car WOULD have travelling `dir` along its road
+function headingFor(c: TrafficCar, dir: 1 | -1): number {
+  const r = c.road!
+  const L = roadLen(r)
+  return Math.atan2((-dir * (r.b.x - r.a.x)) / L, (-dir * (r.b.z - r.a.z)) / L)
+}
+
+// shortest signed angular distance a→b
+function angDelta(a: number, b: number): number {
+  let d = (b - a) % (Math.PI * 2)
+  if (d > Math.PI) d -= Math.PI * 2
+  if (d < -Math.PI) d += Math.PI * 2
+  return d
+}
+
+// ── getting hit ─────────────────────────────────────────────────────────────
+// Tunables for the knocked-free state. A car used to behave like a bollard: it
+// stalled for a second and stayed exactly on its rail, so ramming one at 50 mph
+// felt like hitting masonry. Now the impact transfers momentum — the struck car
+// is shoved along your travel direction, spinning from the off-centre load, and
+// carries real damage.
+const KNOCK_TRANSFER = 0.62 // fraction of your speed handed to the car you hit
+const KNOCK_DRAG = 1.25 // 1/s — how fast a shoved car scrubs off its speed
+const SPIN_DRAG = 1.9
+// m/s of transferred momentum that totals a car outright. Sized against the
+// player's actual top speed: DRIVE.maxSpeed is 25 m/s and KNOCK_TRANSFER is
+// 0.62, so the hardest possible dead-on hit delivers ~15.5. At 15 that means a
+// flat-out square hit writes a car off (1.03), a 22 m/s hit leaves it wounded
+// but driveable (0.91), and glancing blows accumulate over several hits. Set
+// any higher and totalling becomes unreachable in one collision.
+const WRECK_AT = 15
+const FREE_MAX = 4.0 // seconds a car can stay off its rail
+const PARK_BUDGE = 11 // m/s below which a PARKED car won't move at all
+
+// Put a car back on its lane after it settles: recover `t` by projecting its
+// world position onto the road, and set `off` from the actual lateral error so
+// the existing lane-easing walks it back rather than snapping.
+function rejoinRail(c: TrafficCar) {
+  const r = c.road
+  if (!r) return
+  const dx = r.b.x - r.a.x
+  const dz = r.b.z - r.a.z
+  const L2 = dx * dx + dz * dz || 1
+  const L = Math.sqrt(L2)
+  c.t = Math.max(0, Math.min(1, ((c.x - r.a.x) * dx + (c.z - r.a.z) * dz) / L2))
+  const onX = r.a.x + dx * c.t
+  const onZ = r.a.z + dz * c.t
+  const px = -dz / L
+  const pz = dx / L
+  c.off = (c.x - onX) * px + (c.z - onZ) * pz
+  c.heading = headingFor(c, c.dir)
+  c.vx = 0
+  c.vz = 0
+  c.spin = 0
+  c.free = 0
+}
+
+// One frame of free-body motion for a knocked car. Returns true if it is still
+// airborne-ish (i.e. the caller should skip the normal rail logic).
+function stepKnocked(c: TrafficCar, dt: number): boolean {
+  if (c.free <= 0) return false
+  c.free = Math.max(0, c.free - dt)
+  const spec = VSPEC[c.vtype] || VSPEC.sedan
+
+  c.x += c.vx * dt
+  c.z += c.vz * dt
+  c.heading += c.spin * dt
+  const k = Math.exp(-KNOCK_DRAG * dt)
+  c.vx *= k
+  c.vz *= k
+  c.spin *= Math.exp(-SPIN_DRAG * dt)
+
+  // a shoved car still can't go through buildings — it crumples against them
+  const col = resolveCarCollision(c.x, c.z, spec.halfW)
+  if (col.hit) {
+    c.x = col.x
+    c.z = col.z
+    const sp = Math.hypot(c.vx, c.vz)
+    c.wreck += sp / (WRECK_AT * 1.6) // hitting scenery hurts too
+    c.vx *= -0.22
+    c.vz *= -0.22
+    c.spin *= 0.5
+  }
+
+  // CHAIN REACTION: barge anything we plough into, so a hard hit can start a
+  // pile-up rather than passing through the car in front.
+  const speed = Math.hypot(c.vx, c.vz)
+  if (speed > 2.5) {
+    for (const o of traffic.cars) {
+      if (o === c) continue
+      const d = Math.hypot(o.x - c.x, o.z - c.z)
+      if (d > spec.halfL + (VSPEC[o.vtype] || VSPEC.sedan).halfL) continue
+      if (o.parked && speed < PARK_BUDGE) continue
+      const inv = 1 / (d || 1)
+      const nx = (o.x - c.x) * inv
+      const nz = (o.z - c.z) * inv
+      const give = speed * 0.5
+      o.vx += nx * give
+      o.vz += nz * give
+      o.spin += 0.4 * (nx * c.vz - nz * c.vx) * 0.05
+      o.wreck += give / (WRECK_AT * 2)
+      o.free = Math.max(o.free, 2.2)
+      o.parked = false // even a parked car is loose once something hits it
+      c.vx *= 0.55
+      c.vz *= 0.55
+      break
+    }
+  }
+
+  if (c.free <= 0 || speed < 0.7) {
+    if (c.wreck >= 1 || !c.road) {
+      // totalled: it stops here for good and becomes part of the scenery
+      c.parked = true
+      c.free = 0
+      c.vx = 0
+      c.vz = 0
+      c.spin = 0
+    } else {
+      rejoinRail(c)
+      c.stall = Math.max(c.stall, 0.6) // a beat to gather itself before driving on
+    }
+  }
+  return true
+}
+
 export function initTraffic() {
   const cars: TrafficCar[] = []
   let ci = 0
@@ -159,10 +301,20 @@ export function initTraffic() {
           t: ((i + (dir === 1 ? 0 : 0.5)) / perDir) % 1,
           speed: (9 + ((ri + i) % 3) * 1.6) * spec.speedMul, // 9–12 m/s × type
           off: dir === 1 ? lane : -lane,
+          laneOff: dir === 1 ? lane : -lane,
           colorIdx: Math.floor(h01(ci + 7) * spec.colors.length),
           vtype: spec.key,
           stall: 0,
           honkCd: 0,
+          turn: 0,
+          turnFrom: 0,
+          turnTo: 0,
+          offFrom: 0,
+          vx: 0,
+          vz: 0,
+          spin: 0,
+          free: 0,
+          wreck: 0,
           x: 0,
           z: 0,
           heading: 0,
@@ -216,10 +368,20 @@ export function initTraffic() {
           t: 0,
           speed: 0,
           off: 0,
+          laneOff: 0,
           colorIdx: Math.floor(h01(ci + 19) * pspec.colors.length),
           vtype: pspec.key,
           stall: 0,
           honkCd: 0,
+          turn: 0,
+          turnFrom: 0,
+          turnTo: 0,
+          offFrom: 0,
+          vx: 0,
+          vz: 0,
+          spin: 0,
+          free: 0,
+          wreck: 0,
           x: cx,
           z: cz,
           heading: Math.atan2(-ux, -uz), // aligned with the curb
@@ -233,6 +395,8 @@ export function initTraffic() {
 }
 
 const FOLLOW_DIST = 15 // start slowing when something is this close ahead (m)
+// How long a car takes to swing around at the end of its road (seconds).
+const TURN_TIME = 1.7
 const STOP_GAP = 6.5 // come to a full stop at this gap
 const PATH_HALF = 3.0 // lateral half-width of the lane a car "watches" ahead of it
 let globalHonkCd = 0 // throttle so honks don't pile into a wall of noise
@@ -241,12 +405,37 @@ export function updateTraffic(dt: number) {
   const cars = traffic.cars
   globalHonkCd = Math.max(0, globalHonkCd - dt)
   tickSignals(dt)
+  // knocked-free cars move before anything else, and can be shoved even while
+  // "parked" (a parked car that gets hit comes loose)
   for (const c of cars) {
-    if (c.parked) continue
+    if (c.free > 0) stepKnocked(c, dt)
+  }
+  for (const c of cars) {
+    if (c.parked || c.free > 0) continue
     c.honkCd = Math.max(0, c.honkCd - dt)
     if (c.stall > 0) {
       c.stall = Math.max(0, c.stall - dt)
+      // keep placing it while knocked out — a ram's shove must be VISIBLE as it
+      // happens, not banked up and released as a teleport when the stall ends
+      placeMoving(c)
       continue
+    }
+    // Mid-U-turn at the end of the road: hold station, sweep the nose around and
+    // slide across into the opposite lane. placeMoving derives heading from
+    // `dir` (already flipped), so the eased heading is applied after it.
+    if (c.turn > 0) {
+      c.turn = Math.max(0, c.turn - dt)
+      const p = 1 - c.turn / TURN_TIME
+      const s = p * p * (3 - 2 * p)
+      c.off = c.offFrom + (c.laneOff - c.offFrom) * s
+      placeMoving(c)
+      c.heading = c.turnFrom + angDelta(c.turnFrom, c.turnTo) * s
+      continue
+    }
+    // ease back into the proper lane after a shove (placeMoving reads `off`)
+    if (c.off !== c.laneOff) {
+      c.off += (c.laneOff - c.off) * (1 - Math.exp(-0.9 * dt))
+      if (Math.abs(c.off - c.laneOff) < 0.02) c.off = c.laneOff
     }
     const L = roadLen(c.road!)
     const fx = -Math.sin(c.heading) // forward unit vector (front is -Z at heading 0)
@@ -310,8 +499,27 @@ export function updateTraffic(dt: number) {
       c.honkCd = 3
       globalHonkCd = 0.8
     }
-    c.t += (c.dir * v * dt) / L
-    c.t = ((c.t % 1) + 1) % 1
+    // End of the road: the car makes a U-TURN and drives back the other way in
+    // the opposite lane.
+    //
+    // It used to teleport to the far end instead, hidden behind a "is the seam
+    // far away and behind the camera" test. That could never be reliable — you
+    // swing the camera constantly while driving, so a car 250 m out (where fog
+    // hides almost nothing) would wrap the instant you glanced away and be gone
+    // when you looked back. Turning around is diegetic, needs no camera
+    // bookkeeping at all, and makes a car vanishing structurally impossible.
+    const tNext = c.t + (c.dir * v * dt) / L
+    if (tNext > 1 || tNext < 0) {
+      c.t = tNext > 1 ? 1 : 0
+      c.turn = TURN_TIME
+      c.turnFrom = c.heading
+      c.offFrom = c.off
+      c.dir = c.dir === 1 ? -1 : 1
+      c.turnTo = headingFor(c, c.dir)
+      c.laneOff = -c.laneOff // the opposite lane is now "its" lane
+    } else {
+      c.t = tNext
+    }
     placeMoving(c)
   }
 }
@@ -319,11 +527,12 @@ export function updateTraffic(dt: number) {
 // Player-vs-car collision as an ORIENTED BOX (cars are long, not round), so a
 // "hit" only registers on real contact — not when you're a car-width to the side.
 // Moving cars get knocked ("stalled") on contact; parked cars are immovable walls.
-export function resolveTrafficCollision(px: number, pz: number, r: number) {
+export function resolveTrafficCollision(px: number, pz: number, r: number, pvx = 0, pvz = 0) {
   let x = px
   let z = pz
   let hit = false
   let push = 0
+  const pSpeed = Math.hypot(pvx, pvz)
   for (const c of traffic.cars) {
     // NOTE: rammed cars stay SOLID (no drive-through). They're paused via `stall`
     // in updateTraffic and shoved aside below, but they never go non-collidable.
@@ -372,11 +581,31 @@ export function resolveTrafficCollision(px: number, pz: number, r: number) {
     push = Math.max(push, pen)
     // moving car: pause briefly (a "shaken driver" beat) but stay solid, and
     // nudge it toward the curb so a bump visibly knocks it aside when it resumes
-    if (!c.parked) {
-      c.stall = Math.max(c.stall, 1.0)
-      const laneSign = c.off >= 0 ? 1 : -1
-      c.off = laneSign * Math.min(Math.abs(c.off) + 0.6, Math.abs(c.off) + 1.2)
+    // MOMENTUM TRANSFER. How hard the hit was, and how squarely it landed:
+    // glancing contact barely moves the car, a square hit sends it.
+    const movable = !c.parked || pSpeed > PARK_BUDGE
+    if (pSpeed > 3.5 && movable) {
+      const inv = 1 / pSpeed
+      const dirX = pvx * inv
+      const dirZ = pvz * inv
+      const toX = c.x - px
+      const toZ = c.z - pz
+      const tl = Math.hypot(toX, toZ) || 1
+      const square = Math.max(0, (dirX * toX + dirZ * toZ) / tl) // 1 = dead-on
+      if (square > 0.15) {
+        const give = pSpeed * KNOCK_TRANSFER * square
+        c.vx += dirX * give
+        c.vz += dirZ * give
+        // an off-centre hit spins it — lx is the contact's lateral offset in
+        // the car's own frame, so clipping a corner twirls it realistically
+        c.spin += -(lx / HALF_W) * give * 0.055
+        c.wreck += give / WRECK_AT
+        c.free = Math.min(FREE_MAX, Math.max(c.free, 1.2 + give * 0.12))
+        c.parked = false // knocked loose, whatever it was doing before
+        c.stall = 0
+      }
     }
+    if (!c.parked) c.stall = Math.max(c.stall, 0.5)
   }
   return { x, z, hit, push }
 }

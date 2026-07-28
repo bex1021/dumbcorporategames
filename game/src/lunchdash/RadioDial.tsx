@@ -77,7 +77,7 @@ export function RadioDial() {
           }}
         />
       </div>
-      <div style={{ fontSize: 9, opacity: 0.42, letterSpacing: '0.1em', marginTop: 6 }}>VOLUME · R to toggle</div>
+      <div style={{ fontSize: 9, opacity: 0.42, letterSpacing: '0.1em', marginTop: 6 }}>VOLUME · Q to toggle</div>
     </div>
   )
 }

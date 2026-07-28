@@ -11,6 +11,7 @@ import { resetBowl } from './bowlState'
 import { resetTraffic } from './trafficState'
 import { resetPeds } from './pedState'
 import { resetPickup } from './pickupState'
+import { resetRiver } from './riverState'
 import { useLunchStore } from './lunchStore'
 
 export function resetRun() {
@@ -32,5 +33,6 @@ export function resetRun() {
   resetTraffic()
   resetPeds()
   resetPickup()
+  resetRiver()
   useLunchStore.getState().reset()
 }

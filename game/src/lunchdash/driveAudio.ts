@@ -117,6 +117,146 @@ export function screech(intensity: number) {
   src.stop(t + 0.55)
 }
 
+// ───────────────────────── crash impact ─────────────────────────
+// A real collision is not a click — it's a ~450 ms EVENT: sheet metal buckling,
+// glass and trim rattling loose, then the body settling. The first version of
+// this fired one 30 ms blip and read as a "pop". This builds it in stages:
+//
+//   1. CRUNCH   low-passed noise with a slow attack — metal folding, not a tick
+//   2. IMPACT   a pitch-diving body thud you feel more than hear
+//   3. DEBRIS   3-5 randomised high ticks scattered over 250 ms (glass + trim)
+//   4. GROAN    a short detuned pair that sags — the shell flexing back
+//
+// `force` is 0..1 and scales length, brightness and how much debris there is.
+let crashCd = 0
+export function crashHit(force: number) {
+  const c = ac()
+  if (!c || !master) return
+  const now = performance.now()
+  if (now < crashCd) return // one event per contact, not a machine-gun
+  crashCd = now + 220
+  const f = Math.max(0.15, Math.min(1, force))
+  const t = c.currentTime
+  const dur = 0.30 + f * 0.34
+
+  // 1. CRUNCH — the main body of the sound
+  const src = c.createBufferSource()
+  src.buffer = noise(c)
+  src.loop = true
+  src.playbackRate.value = 0.55 + f * 0.35
+  const lp = c.createBiquadFilter()
+  lp.type = 'lowpass'
+  lp.frequency.setValueAtTime(900 + f * 2200, t)
+  lp.frequency.exponentialRampToValueAtTime(240, t + dur)
+  lp.Q.value = 3.2 // resonant, so it rings like a panel rather than hissing
+  const dist = c.createWaveShaper()
+  const curve = new Float32Array(257)
+  for (let i = 0; i < 257; i++) {
+    const x = (i / 128) - 1
+    curve[i] = Math.tanh(x * (2 + f * 4))
+  }
+  dist.curve = curve
+  const ng = c.createGain()
+  ng.gain.setValueAtTime(0.0001, t)
+  ng.gain.linearRampToValueAtTime(0.10 + f * 0.30, t + 0.022) // slow-ish attack = crunch
+  ng.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+  src.connect(lp); lp.connect(dist); dist.connect(ng); ng.connect(master)
+  src.start(t); src.stop(t + dur + 0.05)
+
+  // 2. IMPACT — the mass arriving
+  const o = c.createOscillator()
+  o.type = 'sine'
+  o.frequency.setValueAtTime(190 + f * 70, t)
+  o.frequency.exponentialRampToValueAtTime(32, t + 0.22)
+  const og = c.createGain()
+  og.gain.setValueAtTime(0.0001, t)
+  og.gain.exponentialRampToValueAtTime(0.10 + f * 0.30, t + 0.015)
+  og.gain.exponentialRampToValueAtTime(0.0001, t + 0.34)
+  o.connect(og); og.connect(master)
+  o.start(t); o.stop(t + 0.36)
+
+  // 3. DEBRIS — scattered ticks so the tail isn't a clean fade
+  const bits = 2 + Math.round(f * 3)
+  for (let i = 0; i < bits; i++) {
+    const at = t + 0.05 + Math.random() * (0.1 + f * 0.2)
+    const d = c.createBufferSource()
+    d.buffer = noise(c)
+    d.loop = true
+    const bp = c.createBiquadFilter()
+    bp.type = 'bandpass'
+    bp.frequency.value = 2600 + Math.random() * 3200
+    bp.Q.value = 7
+    const dg = c.createGain()
+    dg.gain.setValueAtTime(0.0001, at)
+    dg.gain.exponentialRampToValueAtTime(0.02 + f * 0.05, at + 0.006)
+    dg.gain.exponentialRampToValueAtTime(0.0001, at + 0.09)
+    d.connect(bp); bp.connect(dg); dg.connect(master)
+    d.start(at); d.stop(at + 0.12)
+  }
+
+  // 4. GROAN — the shell flexing back, only on solid hits
+  if (f > 0.4) {
+    const gg = c.createGain()
+    gg.gain.setValueAtTime(0.0001, t + 0.04)
+    gg.gain.exponentialRampToValueAtTime(0.03 * f, t + 0.1)
+    gg.gain.exponentialRampToValueAtTime(0.0001, t + 0.55)
+    gg.connect(master)
+    for (const base of [232, 349]) {
+      const g2 = c.createOscillator()
+      g2.type = 'sawtooth'
+      g2.frequency.setValueAtTime(base * (0.95 + f * 0.1), t + 0.04)
+      g2.frequency.exponentialRampToValueAtTime(base * 0.62, t + 0.5)
+      const lp2 = c.createBiquadFilter()
+      lp2.type = 'lowpass'
+      lp2.frequency.value = 1500
+      g2.connect(lp2); lp2.connect(gg)
+      g2.start(t + 0.04); g2.stop(t + 0.56)
+    }
+  }
+}
+
+// ───────────────────────── river splash ─────────────────────────
+// The car going into the water: a broadband noise burst swept downward by a
+// closing lowpass (the impact spray settling), plus a low sine that bends down
+// underneath it (the body going under). Same throwaway-node idiom as screech.
+export function splash() {
+  const c = ac()
+  if (!c || !master) return
+  const t = c.currentTime
+
+  const src = c.createBufferSource()
+  src.buffer = noise(c)
+  src.loop = true
+  const lp = c.createBiquadFilter()
+  lp.type = 'lowpass'
+  lp.frequency.setValueAtTime(5200, t)
+  lp.frequency.exponentialRampToValueAtTime(320, t + 1.1)
+  lp.Q.value = 0.8
+  const g = c.createGain()
+  g.gain.setValueAtTime(0.0001, t)
+  g.gain.exponentialRampToValueAtTime(0.19, t + 0.05)
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 1.3)
+  src.connect(lp)
+  lp.connect(g)
+  g.connect(master)
+  src.start(t)
+  src.stop(t + 1.35)
+
+  // the heavy "gloop" of the body submerging
+  const o = c.createOscillator()
+  o.type = 'sine'
+  o.frequency.setValueAtTime(190, t)
+  o.frequency.exponentialRampToValueAtTime(48, t + 0.65)
+  const og = c.createGain()
+  og.gain.setValueAtTime(0.0001, t)
+  og.gain.exponentialRampToValueAtTime(0.16, t + 0.07)
+  og.gain.exponentialRampToValueAtTime(0.0001, t + 0.8)
+  o.connect(og)
+  og.connect(master)
+  o.start(t)
+  o.stop(t + 0.85)
+}
+
 // ───────────────────────── player horn (H) ─────────────────────────
 export function playerHonk() {
   const c = ac()
@@ -315,7 +455,7 @@ const STATIC_ON = 0.0035 // constant station hiss — barely there (just enough 
 // ── observable radio state, so the on-screen dial (DriveHud) stays in sync
 // whether you use the dial, the mute button, or the R key. useSyncExternalStore
 // needs a STABLE snapshot object, so we only rebuild `radioSnap` on real change.
-let radioVolume = 0.8
+let radioVolume = 0.58 // starts moderate — the dial can push it louder
 let radioSnap = { on: false, volume: radioVolume }
 const radioListeners = new Set<() => void>()
 function pushRadioState() {
@@ -551,7 +691,7 @@ function playSong() {
     lp.type = 'lowpass'
     lp.frequency.value = 13000
     const g = cc.createGain()
-    g.gain.value = 0.9
+    g.gain.value = 0.6 // songs carry more musical energy than the talk — keep them level with the voice
     src.connect(hp)
     hp.connect(lp)
     lp.connect(g)
@@ -591,6 +731,11 @@ export function startRadio() {
   const rm = ensureRadioMaster()
   if (!c || !rm) return
   radioOn = true
+  // Ease the radio up from silence rather than snapping to full volume — so the
+  // moment the drive starts (radio auto-on) it fades in gently instead of a blast.
+  rm.gain.cancelScheduledValues(c.currentTime)
+  rm.gain.setValueAtTime(0.0001, c.currentTime)
+  rm.gain.setTargetAtTime(radioVolume, c.currentTime, 0.9) // ~2.5s to settle
   if (!radioVoiceGain) {
     radioVoiceGain = c.createGain()
     radioVoiceGain.gain.value = 0.85

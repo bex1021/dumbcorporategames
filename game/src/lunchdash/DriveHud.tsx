@@ -14,19 +14,31 @@ import { boundary } from './boundaryState'
 import { crash, damageTier } from './crashState'
 import { bowl, bowlTier } from './bowlState'
 import { hr } from './pedState'
+import { river } from './riverState'
+import { RIVER } from './driveConfig'
 import { pickup } from './pickupState'
 import { useLunchStore, activeStop, stopStateFor } from './lunchStore'
 import { Minimap } from './Minimap'
 import { BowlWidget } from './BowlWidget'
 import { RadioDial } from './RadioDial'
 
+// TYPOGRAPHY. The HUD used to be monospace end to end, which read as a
+// terminal mock-up rather than a game. Prose (objectives, toasts, labels) now
+// uses the same corporate sans as the Alignly shell, and MONO is reserved for
+// things that are literally instrument readouts — the clock, the speedo, the
+// radio frequency, distances. That split is also the joke: the company's UI is
+// sans, the machine's readouts are mono.
 const MONO = '"IBM Plex Mono", "SF Mono", ui-monospace, Menlo, monospace'
+const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif'
+// numerals that should never jitter as they tick
+const NUM: React.CSSProperties = { fontFamily: MONO, fontVariantNumeric: 'tabular-nums' }
 const CHIP: React.CSSProperties = {
   background: 'rgba(24,24,24,0.82)',
   color: '#d9d3c4',
   border: '1px solid rgba(217,211,196,0.25)',
   borderRadius: 6,
-  fontFamily: MONO,
+  fontFamily: SANS,
+  letterSpacing: '0.01em',
   backdropFilter: 'blur(4px)',
 }
 
@@ -62,12 +74,39 @@ export function DriveHud() {
   const hrCountRef = useRef<HTMLSpanElement>(null)
   const lastHrPulse = useRef(0)
   const hrToastHideAt = useRef(0)
+  const riverMurkRef = useRef<HTMLDivElement>(null)
+  const riverToastRef = useRef<HTMLDivElement>(null)
+  const lastRiverPulse = useRef(0)
+  const riverToastHideAt = useRef(0)
   const pickupRef = useRef<HTMLDivElement>(null)
   const pickupPromptRef = useRef<HTMLSpanElement>(null)
   const pickupBarRef = useRef<HTMLDivElement>(null)
   const spillTipRef = useRef<HTMLDivElement>(null)
   const spillTipHideAt = useRef(0)
   const prevBowlSerial = useRef(0)
+  const overboardRef = useRef<HTMLDivElement>(null)
+  const overboardCardRef = useRef<HTMLDivElement>(null)
+  const overboardUntil = useRef(0)
+  const prevSalmonGone = useRef(false)
+  const controlsRef = useRef<HTMLDivElement>(null)
+  const drivenFor = useRef(0) // seconds spent actually moving
+  const idleFor = useRef(0) // seconds spent stopped
+  const lastTick = useRef(0)
+
+  // Honoured by the overboard alert's pulse (see the accessibility note there).
+  // Kept in a ref and re-read on change, so toggling the OS setting mid-session
+  // takes effect immediately rather than being frozen at first render.
+  const reduceMotion = useRef(false)
+  useEffect(() => {
+    if (!window.matchMedia) return
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const sync = () => {
+      reduceMotion.current = mq.matches
+    }
+    sync()
+    mq.addEventListener('change', sync)
+    return () => mq.removeEventListener('change', sync)
+  }, [])
 
   useEffect(() => {
     let raf = 0
@@ -139,6 +178,60 @@ export function DriveHud() {
       if (hrToastRef.current) hrToastRef.current.style.opacity = performance.now() < hrToastHideAt.current ? '1' : '0'
       if (hrChipRef.current) hrChipRef.current.style.opacity = hr.incidents > 0 ? '1' : '0'
       if (hrCountRef.current) hrCountRef.current.textContent = String(hr.incidents)
+      // river dunk — the murk closes over the screen as you go under (and hides
+      // the tow-out teleport), then the notice lands once you're back on tarmac
+      if (riverMurkRef.current) riverMurkRef.current.style.opacity = String(river.murk)
+      if (river.pulse !== lastRiverPulse.current) {
+        lastRiverPulse.current = river.pulse
+        riverToastHideAt.current = performance.now() + RIVER.sinkSeconds * 1000 + 3200
+      }
+      if (riverToastRef.current) {
+        const show = performance.now() < riverToastHideAt.current && river.phase !== 'sinking'
+        riverToastRef.current.style.opacity = show ? '1' : '0'
+      }
+      // SALMON OVERBOARD — the run-defining moment. Losing the bowl silently
+      // meant players drove on for minutes not realising the delivery could no
+      // longer complete, so it gets a full centre-screen alert.
+      //
+      // Accessibility: the pulse is a CARD glow, never a whole-screen flash,
+      // it is time-based (not frame-based) at ~1.2 Hz — well under the 3 Hz
+      // photosensitivity threshold — and it holds perfectly still when the
+      // player has asked for reduced motion.
+      if (bowl.salmonGone && !prevSalmonGone.current) overboardUntil.current = performance.now() + 6000
+      prevSalmonGone.current = bowl.salmonGone
+      if (overboardRef.current && overboardCardRef.current) {
+        const now = performance.now()
+        const left = overboardUntil.current - now
+        const shown = left > 0
+        // fade the last 700 ms out rather than cutting
+        overboardRef.current.style.opacity = shown ? String(Math.min(1, left / 700)) : '0'
+        if (shown && !reduceMotion.current) {
+          const p = 0.5 + 0.5 * Math.sin((now / 1000) * 2 * Math.PI * 1.2)
+          overboardCardRef.current.style.borderColor = `rgba(255,${120 + p * 70},${90 + p * 50},${0.55 + p * 0.45})`
+          overboardCardRef.current.style.boxShadow = `0 0 ${18 + p * 34}px rgba(214,86,66,${0.3 + p * 0.4})`
+          overboardCardRef.current.style.transform = `scale(${1 + p * 0.012})`
+        } else if (shown) {
+          overboardCardRef.current.style.borderColor = 'rgba(255,150,120,0.9)'
+          overboardCardRef.current.style.boxShadow = '0 0 26px rgba(214,86,66,0.45)'
+          overboardCardRef.current.style.transform = 'scale(1)'
+        }
+      }
+      // Controls hint: retire it once the player has demonstrably got it (8 s of
+      // actual driving), bring it back after 6 s parked. A permanent controls
+      // bar is one of the loudest "prototype" tells.
+      {
+        const now = performance.now()
+        const dt = lastTick.current ? Math.min(0.1, (now - lastTick.current) / 1000) : 0
+        lastTick.current = now
+        if (Math.abs(carTelemetry.speed) > 2) {
+          drivenFor.current += dt
+          idleFor.current = 0
+        } else {
+          idleFor.current += dt
+        }
+        const learned = drivenFor.current > 8 && idleFor.current < 6
+        if (controlsRef.current) controlsRef.current.style.opacity = learned ? '0' : '1'
+      }
       // one-time spill-cause tip — fires the first time a bowl rides shotgun
       // (serial hits 1), so the player knows WHAT spills it before it happens
       if (bowl.serial === 1 && prevBowlSerial.current === 0) spillTipHideAt.current = performance.now() + 7000
@@ -165,13 +258,13 @@ export function DriveHud() {
       {/* top-left: TIME + TASKS meters */}
       <div style={{ ...CHIP, position: 'fixed', top: 12, left: 12, padding: '10px 12px', width: 210 }}>
         <div style={{ fontSize: 10, letterSpacing: '0.18em', textTransform: 'uppercase', opacity: 0.6 }}>
-          Time · back by 12:00
+          Time · back by 1:00
         </div>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 2 }}>
-          <span ref={clockRef} style={{ fontSize: 22, fontVariantNumeric: 'tabular-nums' }}>
-            11:00 AM
+          <span ref={clockRef} style={{ ...NUM, fontSize: 22 }}>
+            12:00 PM
           </span>
-          <span style={{ fontSize: 10, opacity: 0.55 }}>/ 12:00</span>
+          <span style={{ fontSize: 10, opacity: 0.55 }}>/ 1:00</span>
         </div>
         {/* countdown bar */}
         <div style={{ height: 5, borderRadius: 3, background: 'rgba(217,211,196,0.15)', marginTop: 6, overflow: 'hidden' }}>
@@ -229,7 +322,7 @@ export function DriveHud() {
             <div style={{ fontSize: 15, marginTop: 2 }}>
               <span style={{ color: dest.color }}>●</span> Get another salmon bowl —{' '}
               <span style={{ opacity: 0.85 }}>{dest.short}</span>{' '}
-              <span ref={distRef} style={{ opacity: 0.7, fontVariantNumeric: 'tabular-nums' }} />
+              <span ref={distRef} style={{ ...NUM, opacity: 0.7 }} />
             </div>
           </>
         ) : (
@@ -240,7 +333,7 @@ export function DriveHud() {
             <div style={{ fontSize: 15, marginTop: 2 }}>
               <span style={{ color: dest.color }}>●</span> {dest.goal} —{' '}
               <span style={{ opacity: 0.85 }}>{dest.short}</span>{' '}
-              <span ref={distRef} style={{ opacity: 0.7, fontVariantNumeric: 'tabular-nums' }} />
+              <span ref={distRef} style={{ ...NUM, opacity: 0.7 }} />
             </div>
           </>
         )}
@@ -308,6 +401,89 @@ export function DriveHud() {
       >
         ⚠ HR INCIDENT — −3 min, and it goes in your file
       </div>
+      {/* SALMON OVERBOARD — centre-screen, unmissable, never blocks input */}
+      <div
+        ref={overboardRef}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          pointerEvents: 'none',
+          opacity: 0,
+          zIndex: 30,
+        }}
+      >
+        <div
+          ref={overboardCardRef}
+          style={{
+            background: 'rgba(28,14,12,0.93)',
+            border: '2px solid rgba(255,150,120,0.9)',
+            borderRadius: 14,
+            padding: '22px 34px',
+            textAlign: 'center',
+            fontFamily: SANS,
+            backdropFilter: 'blur(3px)',
+            maxWidth: '78vw',
+          }}
+        >
+          <div style={{ fontSize: 13, letterSpacing: '0.26em', textTransform: 'uppercase', color: '#ff9c84' }}>
+            ⚠ Salmon overboard
+          </div>
+          <div
+            style={{
+              fontSize: 30,
+              fontWeight: 800,
+              color: '#ffe9e2',
+              margin: '10px 0 6px',
+              letterSpacing: '0.02em',
+              lineHeight: 1.15,
+            }}
+          >
+            The exec's bowl is ruined
+          </div>
+          <div style={{ fontSize: 15, color: '#f0c6bb', lineHeight: 1.5 }}>
+            You can't finish the run without it.
+            <br />
+            Drive back to <strong style={{ color: '#8fd6a0' }}>Corporate Slop Bowlz</strong> for another.
+          </div>
+        </div>
+      </div>
+
+      {/* river dunk: the water closing over the windscreen */}
+      <div
+        ref={riverMurkRef}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          opacity: 0,
+          pointerEvents: 'none',
+          background:
+            'radial-gradient(125% 100% at 50% 42%, rgba(38,92,101,0.5) 0%, rgba(8,30,38,0.97) 100%)',
+        }}
+      />
+      <div
+        ref={riverToastRef}
+        style={{
+          ...CHIP,
+          position: 'fixed',
+          top: 176,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          padding: '8px 16px',
+          fontSize: 13,
+          color: '#cfe6ee',
+          background: 'rgba(20,58,70,0.92)',
+          border: '1px solid rgba(120,190,210,0.5)',
+          opacity: 0,
+          transition: 'opacity 0.25s',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        🌊 VEHICLE RECOVERED FROM WATER — −{RIVER.timePenalty} min, and it goes in your file
+      </div>
+
       <div
         ref={hrChipRef}
         style={{
@@ -326,7 +502,7 @@ export function DriveHud() {
         }}
       >
         <span style={{ opacity: 0.7 }}>HR INCIDENTS</span>
-        <span ref={hrCountRef} style={{ fontVariantNumeric: 'tabular-nums', fontSize: 13 }}>
+        <span ref={hrCountRef} style={{ ...NUM, fontSize: 13 }}>
           0
         </span>
       </div>
@@ -419,7 +595,7 @@ export function DriveHud() {
           gap: 6,
         }}
       >
-        <span ref={speedRef} style={{ fontSize: 30, fontVariantNumeric: 'tabular-nums' }}>
+        <span ref={speedRef} style={{ ...NUM, fontSize: 30 }}>
           0
         </span>
         <span style={{ fontSize: 11, letterSpacing: '0.15em', opacity: 0.7 }}>MPH</span>
@@ -474,8 +650,10 @@ export function DriveHud() {
         </div>
       </div>
 
-      {/* bottom-center: controls hint */}
+      {/* bottom-center: controls hint — fades out once you're clearly driving,
+          and slides back in if you sit still long enough to have forgotten */}
       <div
+        ref={controlsRef}
         style={{
           ...CHIP,
           position: 'fixed',
@@ -485,9 +663,14 @@ export function DriveHud() {
           padding: '8px 14px',
           fontSize: 12,
           letterSpacing: '0.06em',
+          transition: 'opacity 0.6s ease',
         }}
       >
-        W / ↑ accelerate · S / ↓ brake + reverse · A D / ← → steer · H honk · R radio
+        <span style={{ fontFamily: MONO }}>W</span> accelerate ·{' '}
+        <span style={{ fontFamily: MONO }}>S</span> brake + reverse ·{' '}
+        <span style={{ fontFamily: MONO }}>A D</span> steer ·{' '}
+        <span style={{ fontFamily: MONO }}>Space</span> honk ·{' '}
+        <span style={{ fontFamily: MONO }}>Q</span> radio
       </div>
     </div>
   )

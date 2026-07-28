@@ -10,8 +10,8 @@
 import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect } from 'react'
 import { Vector3 } from 'three'
-import { DRIVE_CAMERA } from './driveConfig'
-import { carPosition, carFacing, carAir } from './carState'
+import { DRIVE, DRIVE_CAMERA } from './driveConfig'
+import { carPosition, carFacing, carAir, carTelemetry } from './carState'
 import { crash } from './crashState'
 import { terrainHeight } from './terrain'
 import { pointInBuilding } from './cityLayout'
@@ -30,6 +30,21 @@ export function DriveCamera() {
   }, [camera])
 
   useFrame((_, delta) => {
+    // Speed FOV: widen a few degrees as the car opens up. A fixed FOV means 0
+    // and 56 mph frame identically, so speed has to be read off the numbers
+    // instead of felt. Eased (not snapped) so it breathes rather than pumps,
+    // and it pulls back in under braking, which sells the deceleration.
+    if ('fov' in camera) {
+      const cam = camera as { fov: number; updateProjectionMatrix: () => void }
+      const frac = Math.min(Math.abs(carTelemetry.speed) / DRIVE.maxSpeed, 1)
+      const want = DRIVE_CAMERA.fov + frac * DRIVE_CAMERA.fovGain
+      const k = 1 - Math.exp(-2.2 * Math.min(delta, 0.05)) // slow enough to feel like inertia
+      if (Math.abs(cam.fov - want) > 0.01) {
+        cam.fov += (want - cam.fov) * k
+        cam.updateProjectionMatrix()
+      }
+    }
+
     // Behind the car = +(sin, cos) — the opposite of forward = -(sin, cos).
     const sin = Math.sin(carFacing.y)
     const cos = Math.cos(carFacing.y)
@@ -46,7 +61,9 @@ export function DriveCamera() {
     // the steep look-down drops the car to the very bottom of the frame (where
     // the HUD bar hides it), so we'd rather accept a little wall than lose the
     // car. That still lifts the camera out of the deep-inside-a-building case.
-    let dist = DRIVE_CAMERA.distance
+    // the boom also eases back with speed, which compounds the FOV stretch
+    const spdFrac = Math.min(Math.abs(carTelemetry.speed) / DRIVE.maxSpeed, 1)
+    let dist = DRIVE_CAMERA.distance + spdFrac * DRIVE_CAMERA.distanceGain
     while (dist > 5 && pointInBuilding(carPosition.x + sin * dist, carPosition.z + cos * dist, 1.0)) {
       dist -= 0.5
     }
