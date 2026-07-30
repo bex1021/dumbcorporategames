@@ -23,6 +23,9 @@ const JiraRun = lazy(() => import('./jirarun/JiraRun'))
 // Phase 3 — Lunch Dash (driving). Lazy so its R3F chunk only loads at
 // /play/lunch-dash.
 const LunchDash = lazy(() => import('./lunchdash/LunchDash'))
+// Phase 4 — Performance Review (versus fighter). Build C = graybox capsule
+// fight. Lazy so its R3F chunk only loads at /play/performance-review.
+const PerformanceReview = lazy(() => import('./perfreview/PerformanceReview'))
 
 export default function App() {
   return (
@@ -62,6 +65,16 @@ export default function App() {
             <KeyboardGate>
               <Suspense fallback={<RouteSplash />}>
                 <LunchDash />
+              </Suspense>
+            </KeyboardGate>
+          }
+        />
+        <Route
+          path="/play/performance-review"
+          element={
+            <KeyboardGate>
+              <Suspense fallback={<RouteSplash />}>
+                <PerformanceReview />
               </Suspense>
             </KeyboardGate>
           }
