@@ -21,6 +21,22 @@
 // person inside it. Do NOT uppercase the narrative paragraphs — at this
 // length caps stop being a style and start being a barrier.
 //
+// HUMOR IS LOAD-BEARING. An earlier draft was honest and unrelieved, and
+// read as bleak rather than dry — a wall of grievance nobody finishes. The
+// jokes are what make the sad parts land, so every prose section carries at
+// least one. Rules for them:
+//   · Indict the LANGUAGE, not the people. "De-layer, which manages to make
+//     a person sound like a cake" is fair game; a joke at a laid-off
+//     colleague's expense never is.
+//   · The heavier the subject, the drier the delivery. Section 02 gets the
+//     euphemism jokes precisely because it is the section about layoffs.
+//   · Never undercut a confession in the same breath. The burnout paragraph
+//     stays straight; the joke lands in the paragraph AFTER it ("my calendar
+//     remained excellent"), which is how people actually tell it.
+//   · Specificity is the engine. "Version eleven", "one of them had a logo",
+//     "the physics thingy" — the funny thing is always a real detail, never
+//     a general observation about how offices are bad.
+//
 // ANONYMITY CONTRACT — enforced here and in content/posts.ts:
 //   No name. No employer, past or present. No job titles, industry, city,
 //   or team size. Company-count and years-of-experience only at the coarse
@@ -339,35 +355,50 @@ function WhatHappened() {
       meta="EIGHT YEARS · FOUR COMPANIES · ONE FEELING"
     >
       <P>
-        I wasn't bad at it. I think that's what took the longest to work out. I was
-        fine. Good reviews, hit my goals, could turn a difficult quarter into a deck
-        that used the word "learnings" twice and nobody blinked. And I couldn't have
-        told you what any of it was actually for.
+        I wasn't bad at it. That's the part that took longest to work out. I was fine.
+        Good reviews, hit my goals, could turn a genuinely terrible quarter into a
+        deck where the word "learnings" appeared twice and nobody blinked.
       </P>
       <P>
-        Four companies in eight years, in genuinely different roles — different enough
-        that my resume reads like three careers stapled together — and by the end
-        they'd collapsed in my memory into one composite job. I'd leave a place
-        because it felt hollow and then turn up at the new one and find the hollowness
-        had already been onboarded ahead of me.
+        I just couldn't have told you what any of it was for.
       </P>
       <P>
-        Things I watched: projects funded with enormous ceremony and then quietly
-        killed about eleven months in, with no announcement, ever. Everyone involved
-        moved on and put the dead thing on their promo packet anyway. Managers who
-        were unkind in ways that are almost impossible to write down, which was a
-        skill they had. Promotions going to people whose main contribution was volume.
+        Four companies in eight years, in roles different enough that my resume reads
+        like three careers stapled together, and by the end they'd merged in my memory
+        into one composite job. I'd leave somewhere because it felt hollow, then turn
+        up at the new place and find the hollowness had already been onboarded ahead
+        of me. Same all-hands. Same slide about focus. Same senior person explaining
+        that we needed to be more data-driven, to a room that had been data-driven for
+        a decade and had the dashboards to prove it.
+      </P>
+      <P>
+        I've been through six reorgs. I couldn't tell you what a single one of them
+        changed. I could tell you all six names, because they all had names, and one
+        of them had a logo.
+      </P>
+      <P>
+        Other things I watched: projects funded with enormous ceremony and then killed
+        quietly about eleven months later, with no announcement, ever — and everyone
+        involved putting the dead thing on their promo packet anyway. Managers who
+        were unkind in ways that would never survive being written down, which was
+        precisely the skill. Promotions going to people whose main contribution was
+        volume.
       </P>
       <Pull>
         The loudest people got promoted. The people doing the work got asked to write
         it up for them.
       </Pull>
       <P>
-        And then there was the burnout, which I'm still not good at describing. It
-        wasn't dramatic. No breakdown, no exit interview, no story. I'd open my
-        laptop, see forty-one unread messages, and close it again. Then sit there.
-        Completely able to do the work and completely unable to start. That went on
-        much longer than I told anyone at the time.
+        Then there was the burnout, which I'm still not good at describing. It wasn't
+        dramatic. No breakdown, no exit interview, no story worth telling at a party.
+        I'd open my laptop, look at forty-one unread messages, and close it again.
+        Then sit there. Completely capable of doing the work and completely unable to
+        begin.
+      </P>
+      <P>
+        My calendar, throughout this period, remained excellent. Fully booked. Green
+        across the board. Nobody noticed a thing, which I've since decided says more
+        about the calendar than it does about me.
       </P>
     </Section>
   )
@@ -478,9 +509,19 @@ function TheOtherSide() {
       <P dark>
         Not with any real power. Nobody hands you that. I was the person who produced
         the analysis that made a decision someone else had already made look
-        defensible. You build a file. The file has names in it. Next to the names are
-        columns, and the columns say things like scope and criticality and coverage,
-        and every one of those words is working very hard not to say what it means.
+        defensible.
+      </P>
+      <P dark>
+        You build a file. The file has names in it. Next to the names are columns, and
+        the columns say things like scope and criticality and coverage, and every one
+        of those words is working very hard not to say what it means. Nobody ever says
+        "fire." The verbs on offer are impact, transition, right-size, and — my
+        personal favorite — <i>de-layer</i>, which manages to make a person sound like
+        a cake.
+      </P>
+      <P dark>
+        The file I keep thinking about was called something like Org Health — Working
+        Draft. It was version eleven.
       </P>
       <P dark>
         Everyone in the room is polite. Everyone's professional. There's no villain,
@@ -633,9 +674,10 @@ function WhyAGame() {
         has three or four available responses and all of them work. You can go clarify
         the requirement, which genuinely fixes it and costs you twenty minutes you
         don't have. You can open a ticket, which converts despair into governance. You
-        can schedule a quick sync, which spawns a sub-sync. Or you can say "great,
-        sounds like no blockers" and keep the status GREEN, and two conversations
-        later reality files a complaint.
+        can schedule a quick sync, which spawns a sub-sync — that's a real mechanic,
+        because it's a real thing that happens. Or you can say "great, sounds like no
+        blockers," keep the status GREEN, and let reality file a complaint two
+        conversations later.
       </P>
       <Pull>
         Every option is technically correct. Every option helps the project on paper.
@@ -646,11 +688,13 @@ function WhyAGame() {
         And the game shows you the price before you pay it. Each choice lists exactly
         what it'll do to Project Status, to Team Pissed-Off, to Meeting Load, to the
         clock. You are never tricked. You just watch yourself pick the cheap answer
-        anyway, because the standup is in forty minutes.
+        anyway, because standup is in forty minutes — and then sit with that for a
+        second, because you've done it in real life too.
       </P>
       <P>
-        I didn't invent any of this. I wrote down what I'd been watching for eight
-        years and it turned out to already be a game design. The stakeholder whose
+        I didn't invent any of this. I wrote down eight years of observation and it
+        turned out to already be a game design, difficulty curve included. The
+        stakeholder whose
         sign-off you need before you're allowed to start. The errand you run for
         someone three levels up because that's faster than explaining why you
         shouldn't. Managing upward on a deadline that isn't physically possible, when
@@ -663,9 +707,10 @@ function WhyAGame() {
       </Pull>
       <P>
         Turning it into something you play is the first time any of it has felt
-        useful. I can't fix how offices work. I can make a small free five-minute
-        thing that says yes, that happened, and it was as absurd as you thought it was
-        at the time. Turns out that's worth a lot on a Sunday night.
+        useful. I can't fix how offices work — I've read enough books by people
+        confident they can. I can make a small free five-minute thing that says yes,
+        that happened, and it was as absurd as you thought it was at the time. Turns
+        out that's worth a lot on a Sunday night.
       </P>
     </Section>
   )
@@ -756,7 +801,8 @@ function NotAGameDeveloper() {
         These games were built with AI. Most of the code is generated. I've never
         written a line of engine code, I didn't know what a draw call was six months
         ago, and there are terms sitting in my own project files I'd have to look up
-        before I used one out loud.
+        before using one out loud. I have written the phrase "the physics thingy" in
+        my own commit messages. More than once.
       </P>
       <P>
         I know how a lot of the games community feels about that, and I'm not going to
@@ -779,7 +825,8 @@ function NotAGameDeveloper() {
         What I actually am is someone with a corporate job messing around with an idea
         on evenings and weekends under a fake studio name, because the idea wouldn't
         leave me alone. Making it has taught me more about how games work than twenty
-        years of playing them did. Everything I got wrong is going in the dev log.
+        years of playing them did. Everything I got wrong is going in the dev log,
+        which is currently the most honest performance review I've ever taken part in.
       </P>
       <div style={{
         marginTop: 34,
@@ -855,14 +902,16 @@ function WhatIPlayed() {
         <div style={{ maxWidth: SHELL, margin: '0 auto' }}>
           <P>
             That's the list. Fighting games, an endless runner, an open-world driving
-            game, and a lot of RPGs — which, given what I ended up making, is
-            embarrassing. I didn't plan it as a tribute. I planned a few short games
-            about a morning at work and they came out looking like my childhood.
+            game, and a lot of RPGs — which, next to what I ended up making, is less
+            "inspiration" and more "the receipts." I didn't plan a tribute. I planned
+            a few short games about a morning at work and they came out looking
+            exactly like my childhood.
           </P>
           <P>
             No computer science. Not one class, not one tutorial finished all the way
             through. Just someone who's loved games for a long time and finally had
-            something specific to say.
+            something specific to say — and a day job that kept supplying material
+            whether I asked for it or not.
           </P>
         </div>
       </div>
