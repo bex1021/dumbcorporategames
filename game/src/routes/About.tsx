@@ -615,17 +615,38 @@ function WhyAGame() {
       <P>
         So make it a game. Actually literally. Give it meters, give it a win
         condition, put the scoring system everyone pretends doesn't exist right there
-        on screen, and let the player watch Corporate Progress climb while every other
-        number quietly drops.
+        on screen, and let the player watch Alignment climb while every other number
+        quietly drops.
       </P>
       <P>
         That's it. That's the whole design. There's nothing clever underneath it.
       </P>
       <P>
-        You play someone earnest with seventy-five minutes to get honest status out of
-        five colleagues who have all already said they have no blockers. They're
-        lying. Everyone knows they're lying, including the executive, who doesn't
-        really want the truth. He wants a slide that says GREEN.
+        You play someone earnest with seventy-five minutes to get five colleagues
+        through the morning before standup. Nobody's hiding anything. Every one of
+        them opens with "no blockers," because that's the phrase, and then immediately
+        describes the blocker — because they're not liars, they're just employees.
+      </P>
+      <P>
+        So the game isn't working out who's telling the truth. It's deciding what to
+        do about it, and that's the part that turned out to be a game. Every problem
+        has three or four available responses and all of them work. You can go clarify
+        the requirement, which genuinely fixes it and costs you twenty minutes you
+        don't have. You can open a ticket, which converts despair into governance. You
+        can schedule a quick sync, which spawns a sub-sync. Or you can say "great,
+        sounds like no blockers" and keep the status GREEN, and two conversations
+        later reality files a complaint.
+      </P>
+      <Pull>
+        Every option is technically correct. Every option helps the project on paper.
+        The costs are all somewhere else — on the humans, on the calendar, on next
+        week.
+      </Pull>
+      <P>
+        And the game shows you the price before you pay it. Each choice lists exactly
+        what it'll do to Project Status, to Team Pissed-Off, to Meeting Load, to the
+        clock. You are never tricked. You just watch yourself pick the cheap answer
+        anyway, because the standup is in forty minutes.
       </P>
       <P>
         I didn't invent any of this. I wrote down what I'd been watching for eight

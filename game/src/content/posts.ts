@@ -174,12 +174,12 @@ export const POSTS: Post[] = [
       },
       {
         k: 'code',
-        cap: 'What I had been running, vs. the one that actually inspects the project',
-        t: 'npx tsc --noEmit   # → passes instantly. Checked 0 files.\nnpx tsc -b         # → follows the references. Found real errors.',
+        cap: 'Real numbers from this project. The left one is what I had been running for weeks.',
+        t: 'npx tsc --noEmit   # → exits clean.   0 files checked.\nnpx tsc -b         # → follows refs.  108 files checked.',
       },
       {
         k: 'p',
-        t: 'A pile of errors, first time I ran it properly. Some had been sitting there over a week, in code I\'d shipped, in games people had played. The site worked anyway (browsers forgive things a type checker won\'t) but I\'d been running on a signal that literally could not fail.',
+        t: 'A hundred and eight files it had never once looked at. It found real errors the first time I ran it properly, some of them sitting in code I\'d already shipped, in games people had already played. The site worked anyway — browsers forgive things a type checker won\'t — but I\'d been running on a signal that literally could not fail.',
       },
 
       { k: 'h', t: 'THE PART THAT MADE ME LAUGH, THEN NOT LAUGH' },
@@ -247,7 +247,7 @@ export const POSTS: Post[] = [
       },
       {
         k: 'p',
-        t: 'I know which coworker is lying. I know which lane the obstacle is in. I know the route across town without looking at the map. Every run I did was a run with the answer key, and I was using those runs to decide whether the thing was fair.',
+        t: 'I know what every choice costs before I click it. I know which lane the obstacle is in. I know the route across town without looking at the map. Every run I did was a run with the answer key, and I was using those runs to decide whether the thing was fair.',
       },
 
       { k: 'h', t: 'THE ACHIEVEMENT NOBODY COULD GET' },
@@ -291,7 +291,7 @@ export const POSTS: Post[] = [
       },
       {
         k: 'p',
-        t: 'But the bot is *bad at your game*. No intuition, no pattern recognition, no sense that the guy by the printer is obviously stalling. Most of its losses aren\'t unfairness. They\'re a bad player playing badly, which your game is allowed to punish.',
+        t: 'But the bot is *bad at your game*. No intuition, no pattern recognition, no feel for when a cheap answer now turns into an expensive one three conversations later. Most of its losses aren\'t unfairness. They\'re a bad player playing badly, which your game is allowed to punish.',
       },
       {
         k: 'note',
