@@ -145,7 +145,7 @@ function Hero() {
           YOU ARE LEONARD, AN EARNEST PM AT ALIGNLY. FIVE COWORKERS, 75 MINUTES,
           ONE STANDUP. EVERYONE SAYS{' '}
           <u style={{ background: BR.accent, padding: '0 2px' }}>"NO BLOCKERS."</u>{' '}
-          EVERYONE IS LYING.
+          EVERYONE HAS BLOCKERS.
         </p>
 
         <div style={{
@@ -351,18 +351,19 @@ function Portfolio() {
             You are Leonard, a PM at <b>ALIGNLY</b>. Standup is in <b>75 minutes</b>.
             The exec wants the Customer Happiness Portal Refresh{' '}
             <b style={{ color: BR.green }}>GREEN</b> by end of day. Five of your
-            coworkers have just claimed they have <i>"no blockers."</i> All five
-            are lying.
+            coworkers have just posted <i>"no blockers."</i> All five then tell
+            you the blocker.
           </p>
           <p style={{
             margin: '14px 0 0',
             fontFamily: brFont, fontSize: 15, lineHeight: 1.55, color: '#222',
           }}>
-            Walk the bullpen. Talk to each of them. Extract the truth about what's
-            actually blocked, manage their stress without burning out, and figure
-            out which corporate evasion will keep the project Green without
-            shipping nothing. Every choice costs something — time, your team's
-            patience, your meeting load, your alignment points.
+            Walk the bullpen. Talk to each of them. Hear what's actually blocking
+            each one, manage their stress without burning out, and figure out
+            which corporate evasion will keep the project Green without shipping
+            nothing. Every choice costs something — time, your team's patience,
+            your meeting load, your alignment points. The game shows you the price
+            before you pay it.
           </p>
           <p style={{
             margin: '14px 0 0',
@@ -465,7 +466,7 @@ function HowItPlays() {
 type Shot = { id: string; tag: string; code: string; src: string }
 const SHOTS: Shot[] = [
   { id: 'hero',   tag: 'BULLPEN · 09:14 AM · PM AT ENGINEER POD',           code: 'F.01', src: '/screenshots/01-hero.png' },
-  { id: 'brent',  tag: 'BRENT · ENG · "NO BLOCKERS." (LYING)',                code: 'F.02', src: '/screenshots/07-brent.png' },
+  { id: 'brent',  tag: 'BRENT · ENG · "NO BLOCKERS." (HAS BLOCKERS)',        code: 'F.02', src: '/screenshots/07-brent.png' },
   { id: 'print',  tag: 'PRINTER · PC LOAD LETTER · MELTDOWN IMMINENT',      code: 'F.03', src: '/screenshots/03-printer.png' },
   { id: 'cal',    tag: 'CALENDAR · EVERY SLOT A "QUICK SYNC"',              code: 'F.04', src: '/screenshots/04-calendar.png' },
   { id: 'stand',  tag: 'STANDUP COMPLETE · NO ONE IS OKAY',                 code: 'F.05', src: '/screenshots/05-standup.png' },
@@ -595,8 +596,8 @@ function RawLog() {
     <section id="log" style={{ borderBottom: `4px solid ${BR.ink}` }}>
       <SectionStarter
         eyebrow="RAW LOG · TRANSCRIPT · LOOSELY REDACTED"
-        title={<>WHAT THEY SAID<br />BEFORE THEY LIED.</>}
-        meta="08:58 → 09:03 AM · 10 MESSAGES · 1 LIE PER LINE"
+        title={<>WHAT THEY SAID<br />BEFORE 9 AM.</>}
+        meta="08:58 → 09:03 AM · 10 MESSAGES · EVERY ONE TECHNICALLY TRUE"
         dark
       />
       <div style={{ background: BR.paper, overflowX: isMobile ? 'auto' : undefined }}>

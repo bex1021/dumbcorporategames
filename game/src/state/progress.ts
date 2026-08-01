@@ -35,7 +35,7 @@ export const CAMPAIGN: CampaignPhase[] = [
     title: 'The Standup',
     sub: 'PRE-STANDUP ALIGNMENT',
     blurb:
-      'An earnest PM has 75 minutes to extract alignment from five blocked coworkers before the 10:15 standup. They all say "no blockers." They are lying.',
+      'An earnest PM has 75 minutes to extract alignment from five blocked coworkers before the 10:15 standup. They all say "no blockers," then describe the blocker. Every fix works. Every fix costs something.',
     route: '/play/blocked',
     requires: null,
     minutes: '5–10 MIN',

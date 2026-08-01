@@ -285,7 +285,7 @@ const GAMES: Game[] = [
     // break the pattern, which also hid that the three games are one morning.
     sub: 'PHASE 1 · 9:00 AM · GET ALIGNED',
     blurb:
-      'An earnest PM at the fictional company ALIGNLY has 75 minutes to extract alignment from five blocked coworkers before the 10:15 standup. The exec wants the Customer Happiness Portal Refresh GREEN by EOD. The coworkers all say "no blockers." They are lying.',
+      'An earnest PM at the fictional company ALIGNLY has 75 minutes to extract alignment from five blocked coworkers before the 10:15 standup. The exec wants the Customer Happiness Portal Refresh GREEN by EOD. Every coworker opens with "no blockers," then describes the blocker. Fix it properly, file a ticket, book a sync, or wave it through — every option works, and every option costs something.',
     tags: ['CORPORATE SATIRE', '5–10 MIN', 'WASD + E', 'BROWSER', 'FREE'],
     status: 'LIVE',
     statusKind: 'live',
@@ -477,7 +477,7 @@ function MorningArc() {
     {
       time: '9:00 AM',
       title: 'BLOCKED',
-      hook: 'EXTRACT ALIGNMENT FROM FIVE LIARS BEFORE THE 10:15 STANDUP.',
+      hook: 'EVERY FIX WORKS. EVERY FIX COSTS SOMETHING. STANDUP IS AT 10:15.',
     },
     {
       time: '10:45 AM',
