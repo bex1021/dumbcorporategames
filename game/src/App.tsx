@@ -2,6 +2,9 @@
 //
 // `/`              → studio portfolio landing (Landing.tsx)
 // `/blocked`       → Blocked product/info page (Blocked.tsx)
+// `/about`         → long-form anonymous about page (About.tsx)
+// `/blog`          → dev-log index (Blog.tsx)
+// `/blog/:slug`    → a single dev-log post (BlogPost.tsx)
 // `/play/blocked`  → the actual Blocked 3D game (Game.tsx — was the old App.tsx)
 //
 // Game is lazy-loaded so the marketing pages stay instant; the ~15 MB of
@@ -12,6 +15,9 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { Suspense, lazy } from 'react'
 import Landing from './routes/Landing'
 import Blocked from './routes/Blocked'
+import About from './routes/About'
+import Blog from './routes/Blog'
+import BlogPost from './routes/BlogPost'
 import Play from './routes/Play'
 import MusicLab from './routes/MusicLab'
 import { KeyboardGate } from './ui/KeyboardGate'
@@ -32,6 +38,11 @@ export default function App() {
         <Route path="/play"        element={<Play />} />
         <Route path="/play/music"  element={<MusicLab />} />
         <Route path="/blocked"     element={<Blocked />} />
+        {/* Marketing/editorial pages — plain (non-lazy) like the other
+            brutalist routes; they're text and share the same kit chunk. */}
+        <Route path="/about"       element={<About />} />
+        <Route path="/blog"        element={<Blog />} />
+        <Route path="/blog/:slug"  element={<BlogPost />} />
         {/* All three games are keyboard-only; KeyboardGate shows touch-only
             devices a deadpan IT notice (with an escape hatch) instead of an
             unplayable canvas. It also short-circuits the multi-MB GLB fetch

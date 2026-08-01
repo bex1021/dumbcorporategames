@@ -13,16 +13,18 @@ import { useEffect, useState } from 'react'
 import {
   PageScroll, BR, brFont, brMono,
   Nav, Ticker, SectionStarter, Mission, AboutTheStudio, Signup, Closer, Footer,
-  ctaPrimary, ctaSecondary, useIsMobile,
+  ScreenshotSlot, ctaPrimary, ctaSecondary, useIsMobile,
   type NavLink,
 } from '../brutalist'
 
+// "LOG" → "RAW LOG": with a DEV LOG entry now in the same nav, the in-fiction
+// standup transcript and the studio's build notes needed distinct labels.
 const NAV_LINKS: NavLink[] = [
   { label: 'BLOCKED',      href: '#top',     active: true },
   { label: 'HOW IT PLAYS', href: '#how' },
-  { label: 'LOG',          href: '#log' },
-  { label: 'PRESS',        href: '#press' },
-  { label: 'ABOUT',        href: '#about' },
+  { label: 'RAW LOG',      href: '#log' },
+  { label: 'DEV LOG',      to: '/blog' },
+  { label: 'ABOUT',        to: '/about' },
 ]
 
 export default function Blocked() {
@@ -469,40 +471,6 @@ const SHOTS: Shot[] = [
   { id: 'stand',  tag: 'STANDUP COMPLETE · NO ONE IS OKAY',                 code: 'F.05', src: '/screenshots/05-standup.png' },
   { id: 'plant',  tag: 'OFFICE PLANT · SILENT STAKEHOLDER · BOUNDARIES: YES', code: 'F.06', src: '/screenshots/06-plant.png' },
 ]
-
-// Plain <img> with a striped fallback when the file isn't there yet.
-function ScreenshotSlot({ src, alt, height }: { src: string; alt: string; height: number }) {
-  return (
-    <img
-      src={src}
-      alt={alt}
-      onError={(e) => {
-        // Hide broken-img icon and let the parent's stripe show through.
-        const t = e.currentTarget
-        t.style.opacity = '0'
-        const parent = t.parentElement
-        if (parent && !parent.dataset.fallback) {
-          parent.dataset.fallback = '1'
-          parent.style.background =
-            `repeating-linear-gradient(135deg, ${BR.muted} 0 12px, ${BR.ink} 12px 13px)`
-          // Drop a tag inside the parent
-          const tag = document.createElement('div')
-          tag.textContent = `▢ ${alt}`
-          tag.style.cssText =
-            'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;' +
-            `font-family:${brMono};font-size:11px;letter-spacing:0.1em;text-transform:uppercase;` +
-            `color:${BR.bg};text-align:center;padding:20px;`
-          parent.style.position = 'relative'
-          parent.appendChild(tag)
-        }
-      }}
-      style={{
-        width: '100%', height, display: 'block', objectFit: 'cover',
-        background: BR.ink,
-      }}
-    />
-  )
-}
 
 function Screenshots() {
   const isMobile = useIsMobile()

@@ -66,11 +66,13 @@ export default function Landing() {
   )
 }
 
+// MISSION dropped from the nav when DEV LOG was added — it's already a hero
+// CTA two rows down, and six nav items wrapped to a second line on tablet.
 const NAV_LINKS: NavLink[] = [
   { label: 'GAMES',   href: '#games' },
   { label: 'HR FILE', href: '#career' },
-  { label: 'MISSION', href: '#mission' },
-  { label: 'ABOUT',   href: '#about' },
+  { label: 'DEV LOG', to: '/blog' },
+  { label: 'ABOUT',   to: '/about' },
   { label: 'CONTACT', href: 'mailto:hello@dumbcorporategames.com' },
 ]
 

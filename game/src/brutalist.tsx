@@ -179,6 +179,47 @@ export function SectionStarter({
   )
 }
 
+// ─── Screenshot slot ─────────────────────────────────────────────────────
+// Plain <img> with a striped fallback when the file isn't there yet. Shared
+// by routes/Blocked.tsx (the FROM THE BULLPEN grid) and routes/About.tsx
+// (the two figures in "SO I MADE IT LITERAL").
+// `objectPosition` lets a caller keep the meaningful part of a tall capture
+// in frame — the retrospective on /about is cropped from the bottom, not the
+// middle, so its heading survives.
+export function ScreenshotSlot({
+  src, alt, height, objectPosition = 'center',
+}: { src: string; alt: string; height: number; objectPosition?: string }) {
+  return (
+    <img
+      src={src}
+      alt={alt}
+      onError={(e) => {
+        // Hide broken-img icon and let the parent's stripe show through.
+        const t = e.currentTarget
+        t.style.opacity = '0'
+        const parent = t.parentElement
+        if (parent && !parent.dataset.fallback) {
+          parent.dataset.fallback = '1'
+          parent.style.background =
+            `repeating-linear-gradient(135deg, ${BR.muted} 0 12px, ${BR.ink} 12px 13px)`
+          const tag = document.createElement('div')
+          tag.textContent = `▢ ${alt}`
+          tag.style.cssText =
+            'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;' +
+            `font-family:${brMono};font-size:11px;letter-spacing:0.1em;text-transform:uppercase;` +
+            `color:${BR.bg};text-align:center;padding:20px;`
+          parent.style.position = 'relative'
+          parent.appendChild(tag)
+        }
+      }}
+      style={{
+        width: '100%', height, display: 'block', objectFit: 'cover', objectPosition,
+        background: BR.ink,
+      }}
+    />
+  )
+}
+
 // ─── Ticker — scrolling marquee strip ────────────────────────────────────
 export function Ticker({
   items, accent = false, dir = 'left', speed = 40,
@@ -432,6 +473,36 @@ export function AboutTheStudio() {
             )
           })}
         </div>
+      </div>
+
+      {/* The two real destinations behind this section. Everything above is
+          the joke version; these go to the pages where the bit relaxes.
+          Orange goes to ABOUT — it's the one this section is a teaser for. */}
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', borderTop: `1px solid #333` }}>
+        <Link to="/about" style={{
+          flex: 1, textDecoration: 'none',
+          background: BR.accent, color: '#000',
+          padding: isMobile ? '20px' : '22px 26px',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14,
+          fontFamily: brFont, fontWeight: 900, fontSize: 17,
+          textTransform: 'uppercase', letterSpacing: '0.02em',
+        }}>
+          <span>READ THE FULL FILE</span>
+          <span style={{ fontFamily: brMono, fontSize: 11, letterSpacing: '0.14em', whiteSpace: 'nowrap' }}>ABOUT →</span>
+        </Link>
+        <Link to="/blog" style={{
+          flex: 1, textDecoration: 'none',
+          background: BR.ink, color: BR.bg,
+          borderLeft: isMobile ? 'none' : `1px solid #333`,
+          borderTop: isMobile ? `1px solid #333` : 'none',
+          padding: isMobile ? '20px' : '22px 26px',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14,
+          fontFamily: brFont, fontWeight: 900, fontSize: 17,
+          textTransform: 'uppercase', letterSpacing: '0.02em',
+        }}>
+          <span>HOW THESE GOT MADE</span>
+          <span style={{ fontFamily: brMono, fontSize: 11, letterSpacing: '0.14em', color: '#aaa', whiteSpace: 'nowrap' }}>DEV LOG →</span>
+        </Link>
       </div>
     </section>
   )
