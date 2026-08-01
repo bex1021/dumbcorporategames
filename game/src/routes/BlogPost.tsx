@@ -206,6 +206,27 @@ function Article({ post }: { post: Post }) {
               </div>
             ))}
           </div>
+
+          {/* SOURCE — every incident in this log is traceable to a commit,
+              a design doc, or a measurement. Printing it is the thing that
+              keeps the log honest: if a post can't cite one, it shouldn't
+              exist. See the truth rule at the top of content/posts.ts. */}
+          <div style={{
+            marginTop: 26, paddingTop: 16,
+            borderTop: `1px solid ${BR.dim}`,
+            display: 'grid',
+            gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : '96px minmax(0, 1fr)',
+            gap: isMobile ? 6 : 16,
+          }}>
+            <div style={{
+              fontFamily: brMono, fontSize: 10, fontWeight: 700,
+              textTransform: 'uppercase', letterSpacing: '0.14em', color: BR.muted,
+              paddingTop: 2,
+            }}>SOURCE</div>
+            <div style={{
+              fontFamily: brFont, fontSize: 14, lineHeight: 1.55, color: BR.muted,
+            }}>{post.source}</div>
+          </div>
         </div>
       </article>
 
