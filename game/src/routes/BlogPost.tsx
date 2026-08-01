@@ -125,6 +125,26 @@ function Article({ post }: { post: Post }) {
         background: BR.bg,
       }}>
         <div style={shell}>
+          {/* WHY THIS MATTERS — deliberately BEFORE the story. A reader who
+              stops here should still have gotten the point of the post. */}
+          <div style={{
+            marginBottom: 38,
+            border: `2px solid ${BR.ink}`, background: BR.paper,
+            padding: isMobile ? '18px' : '22px 26px',
+          }}>
+            <div style={{
+              fontFamily: brMono, fontSize: 11, fontWeight: 700,
+              textTransform: 'uppercase', letterSpacing: '0.16em',
+              color: BR.accent, marginBottom: 10,
+            }}>
+              WHY THIS MATTERS
+            </div>
+            <div style={{
+              fontFamily: brFont, fontSize: 'clamp(16px, 1.3vw, 18px)',
+              lineHeight: 1.6, color: '#222',
+            }}>{em(post.soWhat)}</div>
+          </div>
+
           {post.body.map((b, i) => <BlockView key={i} b={b} />)}
 
           {/* Takeaway — the one focal orange element of the article body. */}
@@ -148,6 +168,43 @@ function Article({ post }: { post: Post }) {
             }}>
               {post.takeaway}
             </div>
+          </div>
+
+          {/* TRY THIS — the whole reason someone with no background is
+              reading. Concrete steps, numbered, no "be careful" filler. */}
+          <div style={{
+            marginTop: 28,
+            background: BR.ink, color: BR.bg,
+            padding: isMobile ? '20px' : '26px 28px',
+          }}>
+            <div style={{
+              fontFamily: brMono, fontSize: 11, fontWeight: 700,
+              textTransform: 'uppercase', letterSpacing: '0.16em',
+              color: BR.accent, marginBottom: 6,
+            }}>
+              TRY THIS ON YOUR OWN FIRST GAME
+            </div>
+            <div style={{
+              fontFamily: brMono, fontSize: 11, color: '#888',
+              textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 18,
+            }}>
+              {post.apply.length} THINGS · NO EXPERIENCE REQUIRED
+            </div>
+            {post.apply.map((a, i) => (
+              <div key={i} style={{
+                display: 'grid', gridTemplateColumns: '32px minmax(0, 1fr)',
+                gap: 8, padding: '11px 0',
+                borderTop: i ? '1px dashed #444' : 'none',
+                fontFamily: brFont, fontSize: 'clamp(15px, 1.2vw, 17px)',
+                lineHeight: 1.55, color: '#ddd',
+              }}>
+                <span style={{
+                  fontFamily: brMono, fontSize: 11, fontWeight: 700,
+                  color: BR.accent, paddingTop: 4,
+                }}>{String(i + 1).padStart(2, '0')}</span>
+                <span>{em(a)}</span>
+              </div>
+            ))}
           </div>
         </div>
       </article>
@@ -297,6 +354,36 @@ function BlockView({ b }: { b: Block }) {
             }}>{b.cap}</figcaption>
           )}
         </figure>
+      )
+
+    // Jargon explainer. Visually distinct from <note> — this one is a
+    // dictionary aside, so it gets the paper card and a term heading, and
+    // it always sits immediately after the sentence that used the word.
+    case 'plain':
+      return (
+        <aside style={{
+          margin: '0 0 24px',
+          borderLeft: `4px solid ${BR.ink}`, background: BR.paper,
+          padding: isMobile ? '16px' : '18px 22px',
+        }}>
+          <div style={{
+            display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap',
+            marginBottom: 8,
+          }}>
+            <span style={{
+              fontFamily: brMono, fontSize: 10, fontWeight: 700,
+              textTransform: 'uppercase', letterSpacing: '0.16em',
+              background: BR.ink, color: BR.bg, padding: '3px 7px',
+            }}>IN PLAIN TERMS</span>
+            <span style={{
+              fontFamily: brFont, fontWeight: 900, fontSize: 16,
+              textTransform: 'uppercase', letterSpacing: '-0.01em', color: BR.ink,
+            }}>{b.term}</span>
+          </div>
+          <div style={{
+            fontFamily: brFont, fontSize: 16, lineHeight: 1.6, color: '#222',
+          }}>{em(b.t)}</div>
+        </aside>
       )
 
     case 'note':

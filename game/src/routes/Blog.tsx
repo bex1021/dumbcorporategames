@@ -108,7 +108,12 @@ function Hero() {
         }}>
           I had never made a game, taken a computer science class, or written a line
           of engine code. Then I made several. These are the build notes — what broke,
-          why it broke, and what I would tell someone one week behind me.
+          why it broke, and what you could do differently on your own first attempt.
+          <br />
+          <span style={{ fontSize: '0.7em', color: BR.muted }}>
+            No technical background needed. Every jargon word gets explained where it
+            appears, and every post ends with things you can actually try.
+          </span>
         </p>
         <div style={{
           borderTop: `2px solid ${BR.ink}`, borderBottom: `2px solid ${BR.ink}`,
@@ -116,8 +121,8 @@ function Hero() {
           fontFamily: brMono, fontSize: 11, lineHeight: 1.7,
           textTransform: 'uppercase', letterSpacing: '0.06em',
         }}>
-          <Stat k="POSTS SHIPPED" v={String(POSTS.length)} />
-          <Stat k="IN THE BACKLOG" v={String(BACKLOG.length)} />
+          <Stat k="POSTS" v={String(POSTS.length)} />
+          <Stat k="JARGON EXPLAINED" v={<b style={{ color: BR.green }}>ALL OF IT</b>} />
           <Stat k="MISTAKES HIDDEN" v={<b style={{ color: BR.green }}>0</b>} />
           <Stat k="STATUS" v={<b style={{ color: BR.green }}>● LEARNING</b>} />
         </div>
@@ -251,6 +256,9 @@ function PostRow({ p, i }: { p: Post; i: number }) {
 // ─── Backlog ─────────────────────────────────────────────────────────────
 function Backlog() {
   const isMobile = useIsMobile()
+  // Everything queued here has been written. Render nothing rather than an
+  // empty "0 ITEMS · GROOMED NEVER" header, which would read as a bug.
+  if (BACKLOG.length === 0) return null
   const TONE: Record<BacklogItem['status'], { bg: string; fg: string }> = {
     'NEXT UP':  { bg: BR.accent,  fg: '#000' },
     'DRAFTING': { bg: BR.ink,     fg: BR.accent },
