@@ -301,29 +301,37 @@ class FightMusic {
     }
 
     // ARP — dark 16th cycle (root · b3 · 5 · octave) from tier 1, saw, low in
-    // the mix; doubles an octave up at match point
+    // the mix. It stays LOW at every tier — the top of this style is riffs
+    // and slams, never sparkle.
     const ext = [triad[0], triad[1], triad[2], triad[0] + 12]
-    if (tier >= 1) {
-      this.tone(midi(ext[(sib + 2) % 4]), t, 0.09, 'sawtooth', 0.032)
-      if (tier >= 3) this.tone(midi(ext[(sib + 2) % 4] + 12), t, 0.07, 'sawtooth', 0.018)
-    }
+    if (tier >= 1) this.tone(midi(ext[(sib + 2) % 4]), t, 0.09, 'sawtooth', 0.032)
 
-    // RAVE STAB — saw chord on the off-beats from tier 1
+    // RAVE STAB — saw chord on the off-beats from tier 1; at match point the
+    // answer stab is a bare POWER FIFTH (root+5, no third), not a high chord —
+    // high stabs were the last bright thing left and they floated off the grind
     if (tier >= 1 && (sib === 3 || sib === 11)) this.stab(t, triad, 0.14, 0.07)
-    if (tier >= 3 && (sib === 7 || sib === 15)) this.stab(t, triad.map((n) => n + 12), 0.1, 0.045)
+    if (tier >= 3 && (sib === 7 || sib === 15)) this.stab(t, [triad[0] - 12, triad[0] - 5], 0.11, 0.06)
 
-    // CALL — before the full theme earns its entrance, a sparse two-note
-    // shadow of the motif answers the stabs (bars 2 and 4, tier 1 only)
+    // CALL — before the riff earns its entrance, a sparse two-note shadow of
+    // the motif answers the stabs (bars 2 and 4, tier 1 only)
     if (tier === 1 && (bar === 1 || bar === 3)) {
       if (sib === 6) this.duo(midi(57), t, stepDur * 3, 0.07, 0.04) // A3
       if (sib === 10) this.duo(midi(55), t, stepDur * 4, 0.07, 0.04) // G3
     }
 
-    // LEAD — the motif an octave DOWN, gliding — and PHRYGIAN: its B natural
-    // flattens to Bb in this style only. Same four-note logo, war paint.
+    // THE RIFF — this style's "lead". The first cut played the motif as its
+    // full singable melody here, and it floated over the machinery like a
+    // song from a different game (Rebecca: "doesn't belong with the grind").
+    // MK leads are RIFFS: short percussive cells locked to the pump. So the
+    // motif's intervals (+3, +1, −2 from home — C, Bb, G against A) become a
+    // stabby 16th-note cell that TRANSPOSES with each bar's chord. Same DNA,
+    // zero float: every note is short, low, and lands on the machine's grid.
     if (tier >= 2) {
-      const ld = LEAD[s]
-      if (ld) this.duo(midi((ld.n === 71 ? 70 : ld.n) - 12), t, ld.d * stepDur * 0.9, 0.13, 0.05)
+      const RIFF: Record<number, number> = { 0: 0, 3: 3, 6: 1, 10: -2, 12: 0 } // sib → semitones from bar root
+      const rv = RIFF[sib]
+      if (rv !== undefined) this.duo(midi(root + rv), t, stepDur * 1.6, 0.11, 0.03)
+      // match point: the riff hammers its root on the last 16ths of the bar
+      if (tier >= 3 && (sib === 14 || sib === 15)) this.duo(midi(root - 12), t, stepDur * 0.9, 0.09, 0)
     }
 
     // ORCH HIT — every bar downbeat at match point (MK's slam)
