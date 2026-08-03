@@ -87,6 +87,20 @@ const LEAD: Record<number, { n: number; d: number }> = {
   48: { n: 62, d: 8 }, 56: { n: 67, d: 8 },
 }
 
+// KOMBAT's melodic hook — a composed A-phrygian phrase, motif-derived
+// (bar 1 IS the war-paint motif: A C Bb G). It SINGS — Rebecca's ask — but
+// stays low, minor, and stops at bar 4 so the riff can answer: call and
+// response, the way the actual MK theme trades its hook against the pump.
+//   bar 1  A · C · Bb · G     (the motif, spaced onto the grid)
+//   bar 2  A · Bb · A · G——   (circling the flat second — the sneer)
+//   bar 3  A · C · D · E——    (rising — tension climbs the scale)
+//   bar 4  (rest — the riff answers)
+const KOMBAT_LEAD: Record<number, { n: number; d: number }> = {
+  0: { n: 57, d: 4 }, 6: { n: 60, d: 2 }, 8: { n: 58, d: 4 }, 12: { n: 55, d: 4 },
+  16: { n: 57, d: 4 }, 20: { n: 58, d: 2 }, 22: { n: 57, d: 2 }, 24: { n: 55, d: 8 },
+  32: { n: 57, d: 4 }, 36: { n: 60, d: 4 }, 40: { n: 62, d: 4 }, 44: { n: 64, d: 4 },
+}
+
 // Heat → tier, latched at bar boundaries only.
 const tierFor = (heat: number) => (heat < 0.35 ? 0 : heat < 0.7 ? 1 : heat < 0.88 ? 2 : 3)
 
@@ -319,17 +333,20 @@ class FightMusic {
       if (sib === 10) this.duo(midi(55), t, stepDur * 4, 0.07, 0.04) // G3
     }
 
-    // THE RIFF — this style's "lead". The first cut played the motif as its
-    // full singable melody here, and it floated over the machinery like a
-    // song from a different game (Rebecca: "doesn't belong with the grind").
-    // MK leads are RIFFS: short percussive cells locked to the pump. So the
-    // motif's intervals (+3, +1, −2 from home — C, Bb, G against A) become a
-    // stabby 16th-note cell that TRANSPOSES with each bar's chord. Same DNA,
-    // zero float: every note is short, low, and lands on the machine's grid.
+    // MELODY + RIFF — call and response (the melodic pass, third cut).
+    // Cut 1: the full campaign melody floated over the machinery. Cut 2: riff
+    // only — on-theme but not melodic enough. This cut: KOMBAT_LEAD (a
+    // composed phrygian hook, motif DNA, low register) SINGS bars 1–3, and
+    // the riff — the motif's intervals as a stabby 16th cell — ANSWERS in
+    // bar 4. At match point the riff also runs UNDER the melody: hook on
+    // top, machine underneath, both from the same four notes.
     if (tier >= 2) {
+      const ml = KOMBAT_LEAD[s]
+      if (ml) this.duo(midi(ml.n), t, ml.d * stepDur * 0.92, 0.12, 0.04)
       const RIFF: Record<number, number> = { 0: 0, 3: 3, 6: 1, 10: -2, 12: 0 } // sib → semitones from bar root
       const rv = RIFF[sib]
-      if (rv !== undefined) this.duo(midi(root + rv), t, stepDur * 1.6, 0.11, 0.03)
+      const riffOn = bar === 3 || tier >= 3
+      if (riffOn && rv !== undefined) this.duo(midi(root + rv - (bar === 3 ? 0 : 12)), t, stepDur * 1.6, bar === 3 ? 0.11 : 0.07, 0.03)
       // match point: the riff hammers its root on the last 16ths of the bar
       if (tier >= 3 && (sib === 14 || sib === 15)) this.duo(midi(root - 12), t, stepDur * 0.9, 0.09, 0)
     }
