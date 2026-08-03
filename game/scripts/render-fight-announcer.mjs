@@ -59,22 +59,26 @@ const LINES = [
   { id: 'finishhim', text: 'FINISH HIM!' },
   { id: 'finishher', text: 'FINISH HER!' },
   { id: 'ko', text: 'K.O.!' },
-  // the DAMAGE pool — occasional shouts on big hits
+  // the DAMAGE pool — occasional shouts on big hits. Pure fight language
+  // (Rebecca 2026-08-03: the corporate words came out of the shout pool;
+  // the joke lives in ALIGNED and the dialogue, not the announcer).
   { id: 'damage', text: 'DAMAGE!' },
-  { id: 'pushback', text: 'PUSHBACK!' },
-  { id: 'noted', text: 'NOTED!' },
-  { id: 'escalated', text: 'ESCALATED!' },
-  { id: 'synergy', text: 'SYNERGY!' },
-  // the FINISH HIM — opponent's bar first drops under 25%
-  { id: 'closetheloop', text: 'CLOSE THE LOOP!' },
-  // the fatality card — opponent KO'd
+  { id: 'brutal', text: 'BRUTAL!' },
+  { id: 'savage', text: 'SAVAGE!' },
+  { id: 'devastating', text: 'DEVASTATING!' },
+  { id: 'crushing', text: 'CRUSHING BLOW!' },
+  // moment calls
+  { id: 'firsthit', text: 'FIRST HIT!' }, // the bout's first clean connect
+  { id: 'countered', text: 'COUNTERED!' }, // your throw got teched
+  { id: 'flawless', text: 'FLAWLESS VICTORY.' }, // win at 88%+ health
+  // the fatality card — the opponent is convinced. Deadpan on purpose.
   { id: 'aligned', text: 'ALIGNED.' },
 ]
 
 // THE CHAIN: pitch down ~2 semitones (asetrate trick, atempo restores the
 // duration) → arena slapback → bass weight → compression → hard limit.
 // The pitch-down is what turns a narrator into a god-voice.
-const RATE = 0.89
+const RATE = 0.86 // was 0.89 — deeper still; the god-voice gets more god
 const ANNOUNCER_FILTER =
   `asetrate=44100*${RATE},aresample=44100,atempo=${(1 / RATE).toFixed(6)},` +
   'aecho=0.7:0.72:70|115:0.22|0.13,' +
@@ -97,8 +101,46 @@ async function say(text, out) {
   writeFileSync(out, Buffer.from(await res.arrayBuffer()))
 }
 
-const outDir = join(root, 'public', 'sounds', 'fight', 'announcer')
+// ── AUDITION MODE: --audition renders two signature lines in each deep/
+// menacing candidate on this account, into voice-audition/ for A-B listening.
+const AUDITION = process.argv.includes('--audition')
+const CANDIDATES = [
+  { name: 'clyde', id: '2EiwWnXFnvU5JabPnv8n' }, // war-vet gravel (current)
+  { name: 'callum', id: 'N2lVS1w4EtoT3dr4eOWO' }, // "Husky Trickster" — villain energy
+  { name: 'brian', id: 'nPczCjzI2devNBz1zQrb' }, // "Deep, Resonant"
+  { name: 'adam', id: 'pNInz6obpgDQGcFmaJgB' }, // "Dominant, Firm" (the radio exec)
+]
+
+const outDir = join(root, 'public', 'sounds', 'fight', AUDITION ? 'voice-audition' : 'announcer')
 mkdirSync(outDir, { recursive: true })
+
+if (AUDITION) {
+  console.log('Rendering voice audition — FIGHT! + FINISH HIM! per candidate…\n')
+  for (const v of CANDIDATES) {
+    for (const line of [{ id: 'fight', text: 'FIGHT!' }, { id: 'finishhim', text: 'FINISH HIM!' }]) {
+      const out = join(outDir, `${v.name}-${line.id}.mp3`)
+      const tmp = join(outDir, `${v.name}-${line.id}.src.mp3`)
+      process.stdout.write(`  ${v.name.padEnd(8)} "${line.text}" … `)
+      try {
+        const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${v.id}`, {
+          method: 'POST',
+          headers: { 'xi-api-key': KEY, 'Content-Type': 'application/json', Accept: 'audio/mpeg' },
+          body: JSON.stringify({ text: line.text, model_id: 'eleven_multilingual_v2', voice_settings: VOICE_SETTINGS }),
+        })
+        if (!res.ok) throw new Error(`API ${res.status}`)
+        writeFileSync(tmp, Buffer.from(await res.arrayBuffer()))
+        execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', tmp, '-af', ANNOUNCER_FILTER, '-codec:a', 'libmp3lame', '-qscale:a', '4', out])
+        rmSync(tmp, { force: true })
+        console.log('✓')
+      } catch (err) {
+        rmSync(tmp, { force: true })
+        console.log(`✗ ${err.message}`)
+      }
+    }
+  }
+  console.log(`\n📁 ${outDir}`)
+  process.exit(0)
+}
 
 console.log(`Rendering ${LINES.length} announcer lines — voice ${voiceId}…\n`)
 for (const line of LINES) {

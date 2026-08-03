@@ -4,7 +4,9 @@
 // discipline as the rest of the game's audio. Browser-only: FightWorld feeds
 // this from the sim's event hook; the headless harness never imports it.
 
-import type { FightEvent } from './fighterState'
+// leonard is read (never written) for the FLAWLESS VICTORY health check;
+// fighterState is pure module state, so this costs nothing in the browser.
+import { leonard, type FightEvent } from './fighterState'
 
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
@@ -284,8 +286,24 @@ export function playFightCue(e: FightEvent): void {
       lastShoutAt = Date.now() // suppress a DAMAGE shout stepping on it
       announce(annGender === 'her' ? 'finishher' : 'finishhim')
       break
-    case 'annWin': // opponent KO'd: K.O. already played on 'ko'; the verdict
-      announce('aligned', 1.4) // lands as the result card does
+    case 'annFirstHit': // the bout's opening exchange has a winner
+      lastShoutAt = Date.now()
+      announce('firsthit')
+      break
+    case 'tech': // your throw got BROKEN — call it (occasional)
+      if (Date.now() - lastShoutAt > SHOUT_COOLDOWN_MS && Math.random() < 0.5) {
+        lastShoutAt = Date.now()
+        announce('countered', 0.1)
+      }
+      break
+    case 'annWin': // opponent KO'd: K.O. already played on 'ko'. A dominant
+      // win earns MK's crown jewel first; the verdict always lands last.
+      if (leonard.health >= leonard.maxHealth * 0.88) {
+        announce('flawless', 1.3)
+        announce('aligned', 3.2)
+      } else {
+        announce('aligned', 1.4) // lands as the result card does
+      }
       break
   }
 }
@@ -295,8 +313,9 @@ export function playFightCue(e: FightEvent): void {
 // through the same master/limiter as the cues so the mix stays one system.
 type AnnName =
   | 'fight' | 'ko' | 'finishhim' | 'finishher' | 'aligned'
-  | 'damage' | 'pushback' | 'noted' | 'escalated' | 'synergy' | 'closetheloop'
-const DAMAGE_POOL: AnnName[] = ['damage', 'pushback', 'noted', 'escalated', 'synergy']
+  | 'damage' | 'brutal' | 'savage' | 'devastating' | 'crushing'
+  | 'firsthit' | 'countered' | 'flawless'
+const DAMAGE_POOL: AnnName[] = ['damage', 'brutal', 'savage', 'devastating', 'crushing']
 const SHOUT_COOLDOWN_MS = 7000
 let lastShoutAt = 0
 let annGender: 'him' | 'her' = 'him'
@@ -321,7 +340,7 @@ function loadAnn(name: AnnName): void {
 
 /** Warm the cache at fight mount so the first shout isn't late. */
 export function primeAnnouncer(): void {
-  const all: AnnName[] = ['fight', 'ko', 'finishhim', 'finishher', 'aligned', ...DAMAGE_POOL]
+  const all: AnnName[] = ['fight', 'ko', 'finishhim', 'finishher', 'aligned', 'firsthit', 'countered', 'flawless', ...DAMAGE_POOL]
   for (const n of all) loadAnn(n)
 }
 

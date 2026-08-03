@@ -27,7 +27,7 @@ const PUSH_NORM = 2 / (PUSH_N * (PUSH_N + 1)) // = 1/406 at N = 28
 // will land. Every arcade fighter does this: the swing is unconditional, only
 // the impact is earned. Without it a kick that gets blocked — or that you throw
 // at nothing — is completely silent, which reads as the input being dropped.
-export type FightEvent = 'swing' | 'swingHeavy' | 'whiff' | 'block' | 'hit' | 'hitHeavy' | 'throw' | 'tech' | 'counter' | 'ko' | 'annBigHit' | 'annNearKO' | 'annWin'
+export type FightEvent = 'swing' | 'swingHeavy' | 'whiff' | 'block' | 'hit' | 'hitHeavy' | 'throw' | 'tech' | 'counter' | 'ko' | 'annBigHit' | 'annNearKO' | 'annWin' | 'annFirstHit'
 let onFightEvent: ((e: FightEvent, voice?: number) => void) | null = null
 export function setFightEventHandler(fn: ((e: FightEvent, voice?: number) => void) | null): void {
   onFightEvent = fn
@@ -150,6 +150,7 @@ export const fight = {
   // last connect, for the HUD announcer / debug ("CLARIFY  6")
   lastHit: null as null | { by: 'leonard' | 'opponent'; move: string; dmg: number; kind: string },
   annNearKO: false, // the FINISH HIM shout — once per bout, first time under 25%
+  annFirstHit: false, // the FIRST HIT call — once per bout, on the first clean connect
 }
 
 function makeFighter(
@@ -255,6 +256,7 @@ export function resetFight(opts: ResetOpts = {}): void {
   fight.alpha = 0
   fight.lastHit = null
   fight.annNearKO = false
+  fight.annFirstHit = false
 }
 
 /** Drawn position: eased between the last two sim ticks so motion stays smooth
@@ -675,6 +677,10 @@ function applyCounter(counterer: Fighter, attacker: Fighter): void {
 // arcade framing (Rebecca: "when the opponent suffers a really bad hit").
 function annCheck(def: Fighter, big: boolean): void {
   if (def.id !== 'opponent') return
+  if (!fight.annFirstHit && fight.leoHits >= 1) {
+    fight.annFirstHit = true
+    emit('annFirstHit')
+  }
   if (big) emit('annBigHit')
   if (!fight.annNearKO && def.health > 0 && def.health <= def.maxHealth * 0.25) {
     fight.annNearKO = true

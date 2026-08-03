@@ -1,0 +1,50 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>announcer — voice audition</title>
+<style>
+  body { font: 14px ui-monospace, Menlo, monospace; background: #141210; color: #e8e2d2; padding: 28px; max-width: 680px; margin: 0 auto; }
+  h3 { margin: 0 0 4px; }
+  .sub { color: #8f887a; margin-bottom: 22px; }
+  .voice { border: 1px solid #3a352c; border-radius: 8px; padding: 14px 18px; margin-bottom: 14px; display: flex; align-items: center; gap: 14px; }
+  .name { min-width: 190px; }
+  .name b { font-size: 16px; }
+  .name div { color: #8f887a; font-size: 12px; margin-top: 2px; }
+  button { font: inherit; padding: 9px 16px; background: #26221c; color: #e8e2d2; border: 1px solid #4a4436; border-radius: 6px; cursor: pointer; }
+  button:hover { border-color: #e8c15a; }
+  .hint { color: #8f887a; font-size: 12.5px; line-height: 1.6; margin-top: 18px; }
+  code { color: #b9976a; }
+</style>
+
+<h3>Announcer — voice audition</h3>
+<div class="sub">Four deep voices from your ElevenLabs account, all through the same god-voice chain (pitched down, arena echo). Current default: <b>Clyde</b>.</div>
+
+<div id="list"></div>
+
+<div class="hint">
+  Pick one, then re-render the full 13-line set in it:<br />
+  <code>node game/scripts/render-fight-announcer.mjs &lt;voiceId&gt;</code><br /><br />
+  clyde <code>2EiwWnXFnvU5JabPnv8n</code> · callum <code>N2lVS1w4EtoT3dr4eOWO</code> ·
+  brian <code>nPczCjzI2devNBz1zQrb</code> · adam <code>pNInz6obpgDQGcFmaJgB</code>
+</div>
+
+<script>
+  const VOICES = [
+    { name: 'Clyde', desc: 'war-vet gravel — the current announcer', key: 'clyde' },
+    { name: 'Callum', desc: '"Husky Trickster" — villain energy', key: 'callum' },
+    { name: 'Brian', desc: '"Deep, Resonant" — the biggest chest', key: 'brian' },
+    { name: 'Adam', desc: '"Dominant, Firm" — note: he is also the radio exec', key: 'adam' },
+  ]
+  const list = document.getElementById('list')
+  for (const v of VOICES) {
+    const row = document.createElement('div')
+    row.className = 'voice'
+    row.innerHTML = `<span class="name"><b>${v.name}</b><div>${v.desc}</div></span>`
+    for (const line of ['fight', 'finishhim']) {
+      const b = document.createElement('button')
+      b.textContent = line === 'fight' ? '▶ FIGHT!' : '▶ FINISH HIM!'
+      b.onclick = () => new Audio(`/sounds/fight/voice-audition/${v.key}-${line}.mp3`).play()
+      row.appendChild(b)
+    }
+    list.appendChild(row)
+  }
+</script>
