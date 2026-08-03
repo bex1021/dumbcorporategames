@@ -1030,9 +1030,204 @@ export const POSTS: Post[] = [
     ],
   },
 
-  // ── LOG-014 · summary ──────────────────────────────────────────────────
+  // ── LOG-014 · author's account + commit counts across all four stages ──
   {
     key: 'LOG-014',
+    slug: 'four-stages-four-completely-different-problems',
+    title: 'FOUR STAGES, FOUR COMPLETELY DIFFERENT PROBLEMS',
+    dek: 'Same game, same tools, same year. Each stage broke in a way the others didn’t — and never in the place the genre is named after.',
+    date: '2026-08-03',
+    readMin: 11,
+    tags: ['COMPARISON', 'GENRES', 'CRAFT'],
+    soWhat:
+      'If you\'re picking a first project, the genre decides what you\'ll actually spend your time on far more than the size of it does. A conversation game is an arithmetic problem. A runner is an art problem. An open world is a rules-about-reality problem. A fighting game is a half-second-of-motion problem. Knowing that in advance would have saved me months, because in every single case the hard part was not the thing the genre is named after.',
+    takeaway:
+      'The genre you pick decides what you\'ll spend your time on — and it is never the thing the genre is named after.',
+    apply: [
+      'Pick your genre by what you want to get good at, not by what sounds impressive. You will spend 80% of your time on that genre\'s specific hard part, so make sure you find it interesting.',
+      'Keep your rules and your looks in separate files. I rebuilt an entire stage\'s art without touching its difficulty, because the commit could honestly say "cosmetic only — the rules engine is untouched."',
+      'For anything open-world, write down the placement rules before building: what can never be in the road, what has to be behind buildings, how things enter and leave view. That list is the actual game.',
+      'For anything animated, budget most of your time for wiring rather than for getting the animations. Downloading them is the afternoon. Making them not look wrong is the month.',
+    ],
+    source:
+      'The author\'s own account, cross-checked against the commit history: 25 commits touching Stage I balance and UI, 12 on Stage II, 23 on Stage III, and one very large Stage IV commit whose body documents the animation and timing work.',
+    body: [
+      {
+        k: 'lead',
+        t: 'Blocked is one day at one company, played in four stages, each borrowing a different genre. That was a storytelling decision. It accidentally turned into the most useful thing I did, because it meant building four completely different kinds of game back to back with the same tools.',
+      },
+      {
+        k: 'p',
+        t: 'They broke in completely different places. Here\'s what each one actually demanded, in the order I hit them.',
+      },
+
+      { k: 'h', t: 'STAGE I · A CONVERSATION GAME IS AN ARITHMETIC PROBLEM' },
+      {
+        k: 'p',
+        t: 'You walk around an office and talk to five people. Each conversation has three or four responses. It looks like a writing project. It is a spreadsheet wearing a costume.',
+      },
+      {
+        k: 'p',
+        t: 'Every response moves five numbers at once — the clock, the project\'s status, how annoyed your team is, how full your calendar gets, and how much corporate "alignment" you\'ve generated. So every line of dialogue is really a row of arithmetic, and the arithmetic has to work out to a game that can be won *and* lost, by several different routes.',
+      },
+      {
+        k: 'p',
+        t: 'The only way to check that is to play it repeatedly, deliberately taking different routes, and see which endings and achievements you can actually reach. That is slow, and it\'s the part nobody warns you about.',
+      },
+      {
+        k: 'note',
+        label: 'WHAT THE COMMITS SAY',
+        t: 'This stage has the most commits of any of the four — 25 — and hardly any of them are about writing. They\'re balance passes, reachability fixes and interface repairs. One achievement took three separate commits before it was earnable, and a bug where the meter numbers never appeared turned out to be the whole display being invisible to the mouse.',
+      },
+      {
+        k: 'quote',
+        t: 'I thought Stage I would be the writing. The writing took a week. The arithmetic under the writing took two months.',
+      },
+
+      { k: 'h', t: 'STAGE II · A RUNNER IS AN ART PROBLEM' },
+      {
+        k: 'p',
+        t: 'This is the one that surprised me most, and it\'s good news for anyone starting out: an AI gets the bones of an endless runner almost immediately.',
+      },
+      {
+        k: 'p',
+        t: 'A track, a character that runs along it, obstacles to jump and slide under, collision, speed that ramps up, a score. All of that arrived fast and mostly worked. There is clearly a category of game whose skeleton is well-understood enough that you get it nearly for free.',
+      },
+      {
+        k: 'p',
+        t: 'And then you play it and it\'s dead, because you are jumping over grey boxes and sliding under grey panels in a grey corridor. In a runner, the thing you\'re looking at *is* the game. There\'s no story to hide behind and no decisions to think about — just scenery going past at speed.',
+      },
+      {
+        k: 'p',
+        t: 'So the entire job became making the world mean something. The stage takes place inside Leonard\'s computer, so the towers became giant Jira tickets — the whole building is one issue page — with app windows for skyscrapers and Gantt charts as billboards. The lane markings are streaming ones and zeroes. There\'s a scanline filter over the whole thing like an old monitor. And every obstacle got reskinned into the theme: the jump-blocks are Slack pings, the things you slide under are cookie-consent and [EXTERNAL] email banners, the pits are labelled "scope creep" and "rabbit hole," and the walls you cannot pass say BLOCKED — WAITING ON LEGAL.',
+      },
+      {
+        k: 'note',
+        label: 'THE DISCIPLINE THAT MADE THIS CHEAP',
+        t: 'That whole overhaul is recorded as "cosmetic only — the rules engine and difficulty are untouched." Because the look and the rules lived in separate places, I could replace every visual in the stage without re-testing a single thing about how it plays. If they had been tangled together, that rebuild would have cost a full rebalance.',
+      },
+
+      { k: 'h', t: 'STAGE III · AN OPEN WORLD IS A RULES-ABOUT-REALITY PROBLEM' },
+      {
+        k: 'p',
+        t: 'Hardest of the four by a distance, and it isn\'t close. You drive across a city to pick up lunch. That sentence took 23 commits, including four separate numbered passes over the visuals alone.',
+      },
+      {
+        k: 'p',
+        t: 'The reason is that an AI will build you a city that is technically a city and obviously wrong. Roads meet. Buildings stand up. And it looks like nowhere on earth, because a real city is governed by a hundred rules nobody writes down.',
+      },
+      { k: 'ul', items: [
+        'There are alleys behind buildings. Blocks aren\'t solid lumps.',
+        'Trees and lampposts go beside the road, never in it. This has to be said out loud, and then enforced.',
+        'Cars don\'t materialise in front of you or blink out behind you. They have to arrive from somewhere and leave to somewhere.',
+        'Cars queue at a light. They don\'t merge into each other or drive through the one in front.',
+        'Traffic signals hang at corners, not in the middle of an intersection.',
+        'Storefronts have to sit on a slope properly rather than floating at the angle a flat street assumed.',
+      ] },
+      {
+        k: 'p',
+        t: 'None of that is hard to fix once you\'ve noticed it. Noticing it is the entire job, and you only notice by driving around your own city over and over looking for the thing that feels wrong before you can name it.',
+      },
+      {
+        k: 'plain',
+        term: 'WHY A BOX ISN\'T A BUILDING',
+        t: 'One of the four visual passes was titled "buildings stop being boxes," and the note in it is the single most useful art thing I learned: a dark glass ribbon at every floor level, standing very slightly proud of the wall, is *the* thing that makes a box read as a building. Add stepped setbacks as it rises, a darker ground-floor band for shops, an air-conditioning unit or two on the roof — and a grey cuboid becomes architecture. None of that is skill. It\'s a checklist.',
+      },
+      {
+        k: 'p',
+        t: 'Then there\'s physics, which has its own version of the same problem. A car going over a hill shouldn\'t launch into the air — unless you\'re actually going fast enough, in which case it absolutely should. Getting that boundary right, so the world feels solid but still rewards recklessness, took its own pass.',
+      },
+      {
+        k: 'note',
+        label: 'THE CONSTRAINT NOBODY MENTIONS',
+        t: 'All of this has to run in a browser tab. The city is roughly 1,900 buildings, and they are drawn in a single instruction rather than 1,900 separate ones — otherwise an ordinary laptop cannot keep up. Every piece of detail I added had to fit inside that budget, which is a design constraint disguised as a technical one.',
+      },
+      {
+        k: 'quote',
+        t: 'I thought an open world would be a big level. It isn\'t. It\'s a set of rules about what belongs where, and you are the only one who knows them.',
+      },
+
+      { k: 'h', t: 'STAGE IV · A FIGHTING GAME IS A HALF-SECOND-OF-MOTION PROBLEM' },
+      {
+        k: 'p',
+        t: 'I took the obvious shortcut here and downloaded the fight animations rather than making them. That saved a great deal and it is not the work. The work is everything that happens after.',
+      },
+      {
+        k: 'p',
+        t: 'The first thing that breaks is that your two characters aren\'t the same size. The executive is a much bigger opponent, so a punch thrown straight ahead sails into his chest — or past it. Leonard has to aim upward. The fix is to have his spine lean toward the opponent\'s chest, and to lean harder on the frames where the strike actually lands.',
+      },
+      {
+        k: 'p',
+        t: 'The second thing is reaction. If you land a roundhouse and the other character simply stands there and then is suddenly further away, it reads as teleporting, and it feels awful in a way people notice instantly without being able to say why. So a hit has to pay itself out — the shove from a heavy strike gets spread across roughly half a second of real movement rather than applied in one jump.',
+      },
+      {
+        k: 'p',
+        t: 'The third is that downloaded clips are the wrong shape for a game. A motion-captured punch includes a long wind-up and a long settle, because it was recorded as a performance. A game gives that punch a fixed, short window. Play the whole clip in that window and it runs at several times normal speed, which looks ridiculous. So every clip gets trimmed at load to just wind-up, contact and settle — so strikes play at roughly natural speed instead of being crushed into their slot.',
+      },
+      {
+        k: 'quote',
+        t: 'The animation was the download. The month was spent on the half-second after a punch lands.',
+      },
+      {
+        k: 'h', t: 'AND THE TRADE-OFF THAT HAS NO SOLUTION',
+      },
+      {
+        k: 'p',
+        t: 'There is a genuine, unavoidable tension in a fighting game between how *fluid* it looks and how *responsive* it feels, and you cannot have both at maximum.',
+      },
+      {
+        k: 'p',
+        t: 'Fluid motion takes time. A wind-up sells the weight of a punch. But every frame of wind-up is a frame between the player pressing a button and something happening, and past a certain point the game stops feeling like it\'s listening to you.',
+      },
+      {
+        k: 'p',
+        t: 'The resolution isn\'t a compromise, it\'s a set of specific techniques: run the game logic at a fixed rate and smooth the drawing between those steps, give every move an explicit budget of start-up, active and recovery frames, remember a button press for a few frames so an early input still counts, and freeze both characters briefly on contact so a hit registers as impact without stealing control for long.',
+      },
+      {
+        k: 'note',
+        label: 'THIS IS THE CLEAREST CASE WHERE THE AI CAN\'T HELP',
+        t: 'An AI cannot see that a movement is jerky. It has no eyes and no discomfort. Everything in this section was found by watching, repeatedly, and going "that looks wrong" before I could explain why. If you only take one thing from this whole log: motion is the area where you are not optional.',
+      },
+
+      { k: 'h', t: 'THE FIFTH THING, WHICH I DIDN\'T PLAN FOR AT ALL' },
+      {
+        k: 'p',
+        t: 'Four stages built one at a time feel like four unrelated games, even when they share a character and a story. Fixing that turned out to be a whole category of work I had budgeted exactly zero time for.',
+      },
+      { k: 'ul', items: [
+        'What you said to people in Stage I comes back as messages chasing you in Stage II, quoting you word for word.',
+        'How well the lunch run went in Stage III changes what you can do in the fight in Stage IV.',
+        'The same four-note phrase plays at every handoff between stages, and it\'s the same phrase that opens a full theme later.',
+        'One chat-notification sound across all four stages, instead of each one having its own.',
+        'Every ending, in every stage, win or lose, closes on the identical line.',
+        'The whole day packs into one copyable code, so a cleared browser doesn\'t erase it.',
+      ] },
+      {
+        k: 'p',
+        t: 'None of that is a feature anyone would ask for. All of it is why the four stages feel like a day rather than a menu.',
+      },
+
+      { k: 'h', t: 'THE PATTERN' },
+      {
+        k: 'p',
+        t: 'What strikes me looking back is that in all four cases I misjudged where the work would be, and I misjudged it in the same direction every time — I assumed the hard part would be the thing the genre is named after.',
+      },
+      { k: 'ul', items: [
+        'In the conversation game I thought it would be the conversations. It was the arithmetic underneath them.',
+        'In the runner I thought it would be the running. It was the scenery.',
+        'In the driving game I thought it would be the driving. It was knowing what a street looks like.',
+        'In the fighting game I thought it would be the fighting. It was the half-second after a punch lands.',
+      ] },
+      {
+        k: 'p',
+        t: 'If you\'re choosing a first project, that\'s the thing worth knowing. Pick the genre whose *actual* hard part you find interesting, because that\'s where your time is going — not into the part on the box.',
+      },
+    ],
+  },
+
+  // ── LOG-015 · summary ──────────────────────────────────────────────────
+  {
+    key: 'LOG-015',
     slug: 'what-id-tell-someone-on-day-one',
     title: 'WHAT I’D TELL SOMEONE ON DAY ONE',
     dek: 'Everything above, compressed — minus the parts that only sound wise in retrospect.',

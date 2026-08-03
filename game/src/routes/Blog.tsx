@@ -158,7 +158,11 @@ function Shipped() {
             textTransform: 'uppercase', letterSpacing: '0.16em', marginBottom: 10,
           }}>
             <span style={{ color: BR.accent, marginRight: 8 }}>●</span>
-            SHIPPED · {POSTS.length} POSTS · NEWEST FIRST
+            {/* The array runs LOG-001 → LOG-015 and the label used to claim
+                "NEWEST FIRST", which was simply false. Oldest-first is the
+                right order for this log — 001 introduces it and the last one
+                summarizes — so the label was the thing to fix, not the sort. */}
+            {POSTS.length} POSTS · IN ORDER · START AT THE TOP
           </div>
           <h2 style={{
             margin: 0, fontFamily: brFont, fontWeight: 900,
