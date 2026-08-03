@@ -52,3 +52,33 @@ is a bug:
 9. **Copy pitches the page's subject.** `/blocked` sells Blocked, not the
    studio. The studio pitch lives on `/`. *(Triggered by: both pages
    opening with the same paragraph.)*
+10. **Long-form prose is sentence case, centered, at `SHELL` = 720px; the
+    furniture stays caps and full-bleed.** On the reading pages (`/about`,
+    `/blog/:slug`) eyebrows, meta strips, tickers, and status chips keep
+    the full brutalist all-caps register, and every section border and
+    background still runs edge to edge — but the *reading column* (section
+    title, paragraphs, pull quotes, takeaway) sits in one 720px column
+    centered in the viewport. Two separate reasons:
+    · **Sentence case**, because Helvetica 900 caps is a display face and
+      past roughly a paragraph it stops being a style and starts costing
+      comprehension.
+    · **Centered**, because full-bleed left alignment is right for a poster
+      and wrong for 1,200 words — on a wide monitor it strands the reader
+      in the left third of the screen.
+    Section titles inside the column are sized `clamp(30px, 5vw, 54px)` —
+    keyed to fit `SHELL`, not the viewport, or a vw clamp overflows the
+    column on a wide screen. *(Triggered by: the About page, the site's
+    first writing longer than a blurb, and then by the post pages reading
+    as a left-hand gutter at 1440px.)*
+10b. **Reading pages alternate prose and graphic sections.** `/about` never
+    runs more than one screen of type before something to look at: the
+    stat strip, the calendar grid, the redacted impact-analysis document,
+    the two game figures, the played-games grid. The graphic sections stay
+    full-bleed, which is what makes the centered prose read as deliberate
+    rather than as a narrow page. Anything horizontally wide inside them
+    (the calendar, the document table) scrolls in its own
+    `overflow-x: auto` container so the page body never does — see rule 5.
+11. **Nothing in the editorial layer states the game count in prose.**
+    `/about` derives it from `CAMPAIGN.length`; posts say "a set of short
+    games." *(Triggered by: writing "four browser games" on a branch where
+    only three shipped. Every hard-coded count is a future lie.)*

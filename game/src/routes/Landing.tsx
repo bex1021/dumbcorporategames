@@ -1,12 +1,26 @@
 // src/routes/Landing.tsx — main studio landing (/)
 //
-// The brutalist studio site for Dumb Corporate Games. The Blocked page
-// (routes/Blocked.tsx) is the deep-dive product page; this is the top-level
-// site visitors land on, focused on:
-//   · who the studio is
-//   · what games the studio makes (portfolio of titles)
-//   · the mission
-//   · contact / signup
+// REFRAMED 2026-08: this page used to sell a PORTFOLIO OF SEPARATE GAMES
+// ("OUR GAMES", three cards, a parking-lot slot for a fourth). That was
+// wrong about the product. Blocked is ONE game about ONE day, played in
+// four stages that each borrow a different genre. The page now says so.
+//
+// Section order and what each one is for:
+//   Hero        · what the studio is, one game, one day
+//   TheStory    · WHO Leonard is, the 08:58 message that starts it, the arc
+//   TheStages   · the four stages as a timeline of playable cards
+//   CareerStats · lifetime achievements (unchanged)
+//   Mission     · the in-fiction studio bit (shared kit)
+//   About/etc   · shared kit
+//
+// The old <MorningArc> section is GONE — it was a timeline of the same three
+// games TheStages now lists, which under the reframe became a straight
+// duplicate. Its job (the day is continuous, played in order, one save file)
+// is carried by TheStages' rail and header.
+//
+// Narrative source of truth: /Blocked_Story.md. Copy here should be a
+// compression of that doc, never a new invention. If they disagree, the doc
+// wins — and the doc is itself subordinate to the blueprints.
 
 import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
@@ -21,34 +35,29 @@ import { CareerStats } from '../components/CareerStats'
 export default function Landing() {
   return (
     <PageScroll>
-      <Nav
-        links={NAV_LINKS}
-        badge={<>● 3 GAMES · ALL LIVE</>}
-      />
+      <Nav links={NAV_LINKS} badge={<>● ONE GAME · FOUR STAGES</>} />
       <Hero />
-      {/* "3 games live" already appears in the nav badge AND the index strip
-          visible in the same viewport — a third repetition is noise. */}
       <Ticker
         accent
         items={[
-          'A FULL MORNING · 9 AM TO NOON',
+          'ONE DAY · 9:00 AM TO 4:30 PM',
+          'FOUR STAGES · FOUR GENRES',
           'PLAY IN YOUR BROWSER',
           'NO INSTALL · NO ACCOUNT',
-          'ALL TITLES FREE',
+          'FREE',
           'BUILT BY ONE PERSON',
-          'STATUS · GREEN',
-          'BACK BY LUNCH',
+          'ACTUAL BUSINESS VALUE GENERATED · $0.00',
         ]}
       />
-      <Portfolio />
+      <TheStory />
+      <TheStages />
       <CareerStats />
-      <MorningArc />
       <Ticker
         items={[
           'DO WHATEVER IT TAKES',
           'PER MY LAST EMAIL',
           'CIRCLING BACK',
-          'LET\u2019S TAKE THIS OFFLINE',
+          'LET’S TAKE THIS OFFLINE',
           'I HEAR YOU',
           'CIRCLING BACK',
           'PINGING THE THREAD',
@@ -67,18 +76,16 @@ export default function Landing() {
 }
 
 const NAV_LINKS: NavLink[] = [
-  { label: 'GAMES',   href: '#games' },
-  { label: 'HR FILE', href: '#career' },
-  { label: 'MISSION', href: '#mission' },
-  { label: 'ABOUT',   href: '#about' },
-  { label: 'CONTACT', href: 'mailto:hello@dumbcorporategames.com' },
+  { label: 'THE GAME', href: '#game' },
+  { label: 'STORY',    href: '#story' },
+  { label: 'DEV LOG',  to: '/blog' },
+  { label: 'ABOUT',    to: '/about' },
+  { label: 'CONTACT',  href: 'mailto:hello@dumbcorporategames.com' },
 ]
 
 // ─── Hero ─────────────────────────────────────────────────────────────────
 function Hero() {
   const isMobile = useIsMobile()
-  // The KEEP SCROLLING hint needs a full row of spare width; between 760 and
-  // ~1080px it wrapped into an awkward orphan line under the CTAs.
   const cramped = useIsMobile(1080)
   return (
     <section style={{ borderBottom: `4px solid ${BR.ink}` }}>
@@ -90,12 +97,11 @@ function Hero() {
         fontFamily: brMono, fontSize: 11,
         textTransform: 'uppercase', letterSpacing: '0.14em', color: BR.muted,
       }}>
-        <span><b style={{ color: BR.ink }}>STUDIO INDEX</b> · Q2 · THREE GAMES · ALL LIVE</span>
+        <span><b style={{ color: BR.ink }}>STUDIO INDEX</b> · ONE TITLE · IN PRODUCTION</span>
         <span>HQ · <b style={{ color: BR.ink }}>WHEREVER · ANYWHERE WITH WIFI</b></span>
         <span>STATUS · <b style={{ color: BR.green }}>● OPERATING</b></span>
       </div>
 
-      {/* Mega headline + live studio ops board on the right */}
       <div style={{
         padding: isMobile ? '18px 20px 4px' : '20px 28px 4px',
         display: 'grid',
@@ -115,7 +121,6 @@ function Hero() {
         <StudioOps />
       </div>
 
-      {/* Tagline + studio facts */}
       <div style={{
         padding: isMobile ? '10px 20px 20px' : '10px 28px 20px',
         display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1.6fr) minmax(280px, 1fr)',
@@ -127,10 +132,10 @@ function Hero() {
           lineHeight: 1.25, fontWeight: 500,
           maxWidth: 820, color: BR.ink,
         }}>
-          A SATIRICAL STUDIO OF ONE, MAKING SHORT BROWSER GAMES ABOUT YOUR JOB.
-          EACH RUNS APPROXIMATELY THE LENGTH OF A STATUS MEETING AND IS, PER
-          INTERNAL BENCHMARKS WE WILL NOT BE DISCLOSING,{' '}
-          <u style={{ background: BR.accent, padding: '0 2px' }}>TWICE AS PRODUCTIVE</u>.
+          A SATIRICAL STUDIO OF ONE, MAKING <u style={{ background: BR.accent, padding: '0 2px' }}>ONE GAME</u>{' '}
+          ABOUT ONE DAY AT ONE COMPANY. IT IS CALLED <b>BLOCKED</b>. IT RUNS 9:00 AM
+          TO 4:30 PM, IT IS PLAYED IN FOUR STAGES, AND EACH STAGE IS A DIFFERENT
+          GENRE — BECAUSE THAT IS WHAT THE DAY ACTUALLY FEELS LIKE.
         </p>
 
         <div style={{
@@ -140,30 +145,29 @@ function Hero() {
           fontFamily: brMono, fontSize: 11, lineHeight: 1.7, color: BR.ink,
           textTransform: 'uppercase', letterSpacing: '0.06em',
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: BR.muted }}>GAMES SHIPPED</span><b>3</b></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: BR.muted }}>TITLES</span><b>1</b></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: BR.muted }}>STAGES</span><b>{STAGES.length}</b></div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: BR.muted }}>HEADCOUNT</span><b>1</b></div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: BR.muted }}>FUNDING</span><b>FEELINGS</b></div>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: BR.muted }}>STATUS</span><b style={{ color: BR.green }}>● GREEN</b></div>
         </div>
       </div>
 
-      {/* Actions — PLAY is primary, accent orange, top of funnel */}
       <div style={{
         display: 'flex', borderTop: `4px solid ${BR.ink}`, flexWrap: 'wrap',
         flexDirection: isMobile ? 'column' : 'row',
       }}>
-        <Link to="/play" style={{
-          ...ctaPrimary, background: BR.accent, color: '#000',
-        }}>▶ PLAY — FREE</Link>
-        <a href="#games" style={ctaSecondary}>▼ SEE OUR GAMES</a>
-        <a href="#mission" style={ctaSecondary}>READ THE MISSION</a>
+        <Link to="/play" style={{ ...ctaPrimary, background: BR.accent, color: '#000' }}>
+          ▶ PLAY — FREE
+        </Link>
+        <a href="#story" style={ctaSecondary}>▼ READ THE STORY</a>
+        <a href="#game"  style={ctaSecondary}>THE FOUR STAGES</a>
         {!cramped && (
           <div style={{
             marginLeft: 'auto', alignSelf: 'center', padding: '0 20px',
             fontFamily: brMono, fontSize: 11,
             textTransform: 'uppercase', color: BR.muted, letterSpacing: '0.08em',
           }}>
-            <span style={{ color: BR.accent, fontWeight: 700 }}>▼ KEEP SCROLLING</span> · ALL FREE · BROWSER · NO INSTALL
+            <span style={{ color: BR.accent, fontWeight: 700 }}>▼ KEEP SCROLLING</span> · FREE · BROWSER · NO INSTALL
           </div>
         )}
       </div>
@@ -194,7 +198,7 @@ function StudioOps() {
   const logLines = [
     ['09:14', 'PM ENTERED BULLPEN'],
     ['09:14', 'ENGINEER: "NO BLOCKERS"'],
-    ['09:14', 'CLAIM FILED · FALSE'],
+    ['09:14', 'CLAIM FILED · WITH CAVEAT'],
   ] as const
 
   return (
@@ -207,7 +211,6 @@ function StudioOps() {
       textTransform: 'uppercase',
       letterSpacing: '0.08em',
     }}>
-      {/* Header bar with live clock */}
       <div style={{
         background: BR.ink, color: BR.bg,
         padding: '10px 14px',
@@ -215,7 +218,6 @@ function StudioOps() {
         fontWeight: 700, letterSpacing: '0.14em',
       }}>
         <span><span style={{ color: BR.accent }}>●</span> STUDIO OPS · LIVE</span>
-        {/* nowrap: at tablet widths this used to line-break inside "UTC-5" */}
         <span style={{
           color: '#aaa', display: 'flex', gap: 8, alignItems: 'center', whiteSpace: 'nowrap',
         }}>
@@ -224,7 +226,6 @@ function StudioOps() {
         </span>
       </div>
 
-      {/* Metrics list */}
       <div style={{ padding: '10px 14px' }}>
         {metrics.map((m, i) => (
           <div key={m.k} style={{
@@ -238,7 +239,6 @@ function StudioOps() {
         ))}
       </div>
 
-      {/* Recent ops log */}
       <div style={{
         borderTop: `2px solid ${BR.ink}`,
         background: BR.bg,
@@ -261,245 +261,25 @@ function StudioOps() {
   )
 }
 
-// ─── Portfolio — the main event ───────────────────────────────────────────
-type StatusKind = 'live' | 'wip' | 'idea'
-
-type Game = {
-  n: string
-  title: string
-  sub: string
-  blurb: string
-  tags: string[]
-  status: string
-  statusKind: StatusKind
-  cta: { label: string; to?: string; href?: string }[]
-}
-
-const GAMES: Game[] = [
-  {
-    n: '01',
-    title: 'BLOCKED',
-    // Parallel with cards 02/03: PHASE · TIME · IMPERATIVE. Card 01 used to
-    // break the pattern, which also hid that the three games are one morning.
-    sub: 'PHASE 1 · 9:00 AM · GET ALIGNED',
-    blurb:
-      'An earnest PM at the fictional company ALIGNLY has 75 minutes to extract alignment from five blocked coworkers before the 10:15 standup. The exec wants the Customer Happiness Portal Refresh GREEN by EOD. The coworkers all say "no blockers." They are lying.',
-    tags: ['CORPORATE SATIRE', '5–10 MIN', 'WASD + E', 'BROWSER', 'FREE'],
-    status: 'LIVE',
-    statusKind: 'live',
-    cta: [
-      { label: '▶ PLAY NOW',  to: '/play/blocked' },
-      { label: 'VIEW PAGE →', to: '/blocked' },
-    ],
-  },
-  {
-    n: '02',
-    title: 'JIRA RUN',
-    sub: 'PHASE 2 · 10:45 AM · UPDATE YOUR TICKETS',
-    blurb:
-      'Standup is over. Leonard opens the Jira board to log his four updates. He stares into the backlog. The backlog stares back. An 8-bit auto-runner gauntlet through Kanban gates — deposit 4 updates, dodge the blockers, do not fall behind.',
-    tags: ['8-BIT RUNNER', '~5 MIN', 'A/D + SPACE', 'BROWSER', 'FREE'],
-    status: 'LIVE',
-    statusKind: 'live',
-    cta: [
-      { label: '▶ PLAY NOW',   to: '/play/jira-run' },
-      { label: 'PLAY ALL 3 →', to: '/play' },
-    ],
-  },
-  {
-    n: '03',
-    title: 'LUNCH DASH',
-    sub: 'PHASE 3 · 11:00 AM · BACK BY NOON',
-    blurb:
-      'Walk out of the lobby. Get in your car. Drive across town for lunch and the executive\'s salmon bowl. Back by noon. The bowl is in the cupholder. The bowl is judging.',
-    tags: ['DRIVING', '~5 MIN', 'WASD / ARROWS', 'BROWSER', 'FREE'],
-    status: 'LIVE',
-    statusKind: 'live',
-    cta: [
-      { label: '▶ PLAY NOW',   to: '/play/lunch-dash' },
-      { label: 'PLAY ALL 3 →', to: '/play' },
-    ],
-  },
-]
-
-function StatusBadge({ kind, children }: { kind: StatusKind; children: React.ReactNode }) {
-  const map = {
-    live: { bg: BR.accent, fg: '#000' },
-    wip:  { bg: BR.ink,    fg: BR.accent },
-    idea: { bg: '#e6e3da', fg: BR.muted },
-  } as const
-  const c = map[kind]
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 8,
-      background: c.bg, color: c.fg,
-      fontFamily: brMono, fontSize: 11, fontWeight: 700,
-      padding: '5px 10px', letterSpacing: '0.12em', textTransform: 'uppercase',
-      border: kind === 'idea' ? `1px solid ${BR.ink}` : 'none',
-    }}>● {children}</span>
-  )
-}
-
-function GameCard({ g, i }: { g: Game; i: number }) {
+// ─── The story ───────────────────────────────────────────────────────────
+// The section this page was missing. People decide whether they care about a
+// game from its premise, not its feature list, and the premise was nowhere on
+// the site. Compressed from /Blocked_Story.md — see that doc before editing.
+//
+// Three beats: who Leonard is · the 08:58 message that starts the day · the
+// four-beat arc (quoted from the blueprint's "Player character" section).
+function TheStory() {
   const isMobile = useIsMobile()
-  const live = g.statusKind === 'live'
-  const wip = g.statusKind === 'wip'
-  const idea = g.statusKind === 'idea'
-
-  const bg = live ? BR.ink : wip ? BR.paper : '#eeece7'
-  const fg = live ? BR.bg : BR.ink
-  const numColor = live ? BR.accent : wip ? BR.ink : BR.dim
-  const titleColor = idea ? BR.dim : fg
-
   return (
-    <div style={{
-      background: bg, color: fg,
-      borderLeft: isMobile ? 'none' : (i ? `1px solid ${BR.ink}` : 'none'),
-      borderTop: isMobile && i ? `1px solid ${BR.ink}` : 'none',
-      display: 'flex', flexDirection: 'column',
-      position: 'relative',
-      minHeight: isMobile ? 'auto' : 620,
+    <section id="story" style={{
+      borderBottom: `4px solid ${BR.ink}`, background: BR.ink, color: BR.bg,
     }}>
       <div style={{
-        height: 12,
-        background: live ? BR.accent : wip ? BR.ink : '#cdc7b8',
-        borderBottom: `1px solid ${BR.ink}`,
-      }} />
-
-      <div style={{
-        padding: '24px 26px 8px',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-      }}>
-        <div style={{
-          fontFamily: brFont, fontWeight: 900, fontSize: 96, lineHeight: 0.8,
-          letterSpacing: '-0.06em', color: numColor,
-          fontVariantNumeric: 'tabular-nums',
-        }}>{g.n}</div>
-        <StatusBadge kind={g.statusKind}>{g.status}</StatusBadge>
-      </div>
-
-      <div style={{ padding: '4px 26px 0' }}>
-        <div style={{
-          fontFamily: brMono, fontSize: 10, color: live ? '#aaa' : BR.muted,
-          textTransform: 'uppercase', letterSpacing: '0.14em', marginTop: 14,
-        }}>TITLE {g.n}</div>
-        <h3 style={{
-          margin: '6px 0 0',
-          fontFamily: brFont, fontWeight: 900,
-          fontSize: idea ? 'clamp(32px, 3.6vw, 50px)' : 'clamp(36px, 4vw, 56px)',
-          lineHeight: 0.92, letterSpacing: '-0.04em',
-          textTransform: 'uppercase', color: titleColor,
-          overflowWrap: 'anywhere',
-          hyphens: 'auto',
-        }}>
-          {g.title}{live && <span style={{ color: BR.accent }}>:</span>}
-        </h3>
-        <div style={{
-          marginTop: 6,
-          fontFamily: brFont, fontWeight: 700, fontSize: 16,
-          letterSpacing: '0.04em', textTransform: 'uppercase',
-          color: idea ? BR.dim : (live ? '#ccc' : BR.muted),
-        }}>{g.sub}</div>
-      </div>
-
-      <div style={{ padding: '18px 26px 12px' }}>
-        <p style={{
-          margin: 0,
-          fontFamily: brFont, fontSize: 14, lineHeight: 1.55,
-          color: idea ? BR.muted : (live ? '#ddd' : '#333'),
-        }}>{g.blurb}</p>
-      </div>
-
-      <div style={{ padding: '4px 26px 18px', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        {g.tags.map((t) => (
-          <span key={t} style={{
-            fontFamily: brMono, fontSize: 10, fontWeight: 700,
-            padding: '4px 8px', letterSpacing: '0.1em', textTransform: 'uppercase',
-            border: `1px solid ${live ? BR.bg : BR.ink}`,
-            color: live ? BR.bg : BR.ink,
-          }}>{t}</span>
-        ))}
-      </div>
-
-      <div style={{ marginTop: 'auto', display: 'flex' }}>
-        {g.cta.length === 0 ? (
-          <div style={{
-            flex: 1, padding: '20px 22px',
-            borderTop: `2px solid ${BR.ink}`,
-            background: '#dcd9d0', color: BR.muted,
-            fontFamily: brMono, fontSize: 11, fontWeight: 700,
-            letterSpacing: '0.16em', textTransform: 'uppercase',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          }}>
-            <span>NO PUBLIC INFORMATION YET</span><span>·{g.n}</span>
-          </div>
-        ) : (
-          g.cta.map((c, k) => {
-            const style: React.CSSProperties = {
-              flex: 1,
-              background: k === 0 ? (live ? BR.accent : BR.ink) : (live ? BR.ink : BR.bg),
-              color: k === 0 ? '#000' : (live ? BR.accent : BR.ink),
-              border: 'none',
-              borderTop: `2px solid ${BR.ink}`,
-              borderLeft: k ? `1px solid ${BR.ink}` : 'none',
-              padding: '20px 22px',
-              fontFamily: brFont, fontWeight: 900, fontSize: 16,
-              textTransform: 'uppercase', letterSpacing: '0.04em',
-              cursor: 'pointer',
-              textDecoration: 'none',
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            }
-            if (c.to) {
-              return <Link key={c.label} to={c.to} style={style}>{c.label}</Link>
-            }
-            return <a key={c.label} href={c.href || '#'} style={style}>{c.label}</a>
-          })
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ─── MorningArc — the campaign as one continuous morning ─────────────────
-// Replaced the old "WHAT'S NEXT" roadmap. That section repeated the same
-// three games Portfolio had just finished selling (same titles, near-same
-// blurbs) under a header that promised futures while every card said
-// "already shipped" — and painted all three cards accent-orange, so the
-// page's one highlight color highlighted nothing. This section now carries
-// the ONE fact Portfolio doesn't: the games are a single morning at Alignly,
-// played in order, one save file. Orange is spent only on the timeline rail
-// and the single CTA.
-function MorningArc() {
-  type Stop = { time: string; title: string; hook: string }
-  const STOPS: Stop[] = [
-    {
-      time: '9:00 AM',
-      title: 'BLOCKED',
-      hook: 'EXTRACT ALIGNMENT FROM FIVE LIARS BEFORE THE 10:15 STANDUP.',
-    },
-    {
-      time: '10:45 AM',
-      title: 'JIRA RUN',
-      hook: 'STANDUP SURVIVED. LOG FOUR UPDATES BEFORE THE BACKLOG NOTICES YOU.',
-    },
-    {
-      time: '11:00 AM',
-      title: 'LUNCH DASH',
-      hook: 'ACROSS TOWN AND BACK WITH THE EXEC’S SALMON BOWL. NOON IS A DEADLINE.',
-    },
-    {
-      time: '12:00 PM',
-      title: 'LUNCH',
-      hook: 'YOU ARE BACK. NOTHING WAS ACCOMPLISHED. STATUS: GREEN.',
-    },
-  ]
-  const isMobile = useIsMobile()
-  return (
-    <section style={{ borderBottom: `4px solid ${BR.ink}`, background: BR.ink, color: BR.bg }}>
-      <div style={{
         padding: isMobile ? '24px 20px 18px' : '32px 32px 24px',
-        borderBottom: `1px solid #333`,
-        display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) auto', gap: isMobile ? 14 : 32, alignItems: 'end',
+        borderBottom: '1px solid #333',
+        display: 'grid',
+        gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'minmax(0, 1fr) auto',
+        gap: isMobile ? 14 : 32, alignItems: 'end',
       }}>
         <div>
           <div style={{
@@ -507,97 +287,284 @@ function MorningArc() {
             textTransform: 'uppercase', letterSpacing: '0.16em', marginBottom: 10,
           }}>
             <span style={{ color: BR.accent, marginRight: 8 }}>●</span>
-            THE CAMPAIGN · ONE CONTINUOUS MORNING · ONE SAVE FILE
+            THE STORY · ONE DAY · ONE PROJECT NOBODY UNDERSTANDS
           </div>
           <h2 style={{
             margin: 0, fontFamily: brFont, fontWeight: 900,
-            fontSize: 'clamp(40px, 6vw, 80px)',
-            lineHeight: 0.95, letterSpacing: '-0.03em', textTransform: 'uppercase',
+            fontSize: 'clamp(40px, 7vw, 88px)',
+            lineHeight: 0.92, letterSpacing: '-0.035em', textTransform: 'uppercase',
           }}>
-            THE FULL MORNING<span style={{ color: BR.accent }}>.</span>
+            MEET LEONARD<span style={{ color: BR.accent }}>.</span>
           </h2>
         </div>
         <div style={{
           fontFamily: brMono, fontSize: 11, color: '#aaa',
-          textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: isMobile ? 'left' : 'right',
-          maxWidth: 280, lineHeight: 1.55,
+          textTransform: 'uppercase', letterSpacing: '0.1em',
+          textAlign: isMobile ? 'left' : 'right', maxWidth: 280, lineHeight: 1.55,
         }}>
-          PLAYED IN ORDER · CLEAR A PHASE TO UNLOCK THE NEXT
+          HE IS NOT A HERO · HE IS RESPONSIVE
         </div>
       </div>
 
-      {/* Timeline. Desktop: 4 stops left→right on a shared rail. Mobile: a
-          vertical rail down the left edge. The 12:00 terminus is dimmer —
-          it's the punchline, not a fourth product. */}
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, minmax(0, 1fr))' }}>
-        {STOPS.map((s, i) => {
-          const terminus = i === STOPS.length - 1
-          return (
-            <div key={s.time} style={{
-              padding: isMobile ? '18px 20px 22px 24px' : '22px 24px 30px',
-              borderLeft: isMobile ? `2px solid ${BR.accent}` : 'none',
-              marginLeft: isMobile ? 20 : 0,
-              borderTop: isMobile ? 'none' : `2px solid ${BR.accent}`,
-              position: 'relative',
-            }}>
-              {/* rail node */}
-              <span style={{
-                position: 'absolute',
-                width: 10, height: 10, background: terminus ? BR.ink : BR.accent,
-                border: `2px solid ${BR.accent}`,
-                top: isMobile ? 24 : -7,
-                left: isMobile ? -7 : 24,
-              }} />
+      {/* Prose + personnel card */}
+      <div style={{
+        padding: isMobile ? '24px 20px 8px' : '34px 32px 14px',
+        display: 'grid',
+        gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'minmax(0, 1.5fr) minmax(260px, 1fr)',
+        gap: isMobile ? 24 : 40, alignItems: 'start',
+      }}>
+        <div style={{ maxWidth: 680 }}>
+          <p style={{
+            margin: '0 0 20px', fontFamily: brFont,
+            fontSize: 'clamp(17px, 1.35vw, 20px)', lineHeight: 1.6, color: '#ddd',
+          }}>
+            Leonard P. is a project manager at Alignly, a company whose mission is to
+            help teams align on alignment. He is good at his job in the only way the
+            job allows: he's responsive, he's agreeable, and he writes a clean status
+            update.
+          </p>
+          <p style={{
+            margin: '0 0 20px', fontFamily: brFont,
+            fontSize: 'clamp(17px, 1.35vw, 20px)', lineHeight: 1.6, color: '#ddd',
+          }}>
+            At 9:00 AM he still believes that helping the five people who report to him
+            and protecting the project are the same activity. They are not. The whole
+            game is him finding that out.
+          </p>
+          <p style={{
+            margin: 0, fontFamily: brFont,
+            fontSize: 'clamp(17px, 1.35vw, 20px)', lineHeight: 1.6, color: '#ddd',
+          }}>
+            Nobody corrupts him. He's just handed the same menu over and over — one
+            where the kind option is expensive and the corporate option is free — and
+            a clock that doesn't care which he picks.
+          </p>
+        </div>
+
+        {/* Leonard's personnel card. LP is canonical everywhere (design rule 1). */}
+        <div style={{ border: `2px solid ${BR.bg}`, minWidth: 0 }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            padding: '16px 18px', borderBottom: `1px solid ${BR.bg}`,
+          }}>
+            <span style={{
+              width: 42, height: 42, flexShrink: 0,
+              background: BR.accent, color: '#000',
+              display: 'grid', placeItems: 'center',
+              fontFamily: brFont, fontWeight: 900, fontSize: 17,
+            }}>LP</span>
+            <div style={{ minWidth: 0 }}>
               <div style={{
-                fontFamily: brMono, fontSize: 12, fontWeight: 700,
-                textTransform: 'uppercase', letterSpacing: '0.16em',
-                color: BR.accent, marginTop: isMobile ? 0 : 10,
-                fontVariantNumeric: 'tabular-nums',
-              }}>{s.time}</div>
+                fontFamily: brFont, fontWeight: 900, fontSize: 19,
+                textTransform: 'uppercase', letterSpacing: '-0.01em',
+              }}>LEONARD P.</div>
               <div style={{
-                marginTop: 8, fontFamily: brFont, fontWeight: 900,
-                fontSize: 30, lineHeight: 0.95, letterSpacing: '-0.02em',
-                textTransform: 'uppercase',
-                color: terminus ? '#888' : BR.bg,
-              }}>{s.title}</div>
-              <div style={{
-                marginTop: 10, fontFamily: brFont, fontSize: 14, lineHeight: 1.5,
-                color: terminus ? '#777' : '#ccc',
-                maxWidth: 320,
-              }}>{s.hook}</div>
+                fontFamily: brMono, fontSize: 10, color: '#aaa',
+                textTransform: 'uppercase', letterSpacing: '0.12em', marginTop: 2,
+              }}>PROJECT MANAGER</div>
             </div>
-          )
-        })}
+          </div>
+          {([
+            ['EMPLOYER', 'ALIGNLY'],
+            ['PROJECT', 'CUSTOMER HAPPINESS PORTAL REFRESH'],
+            ['UNDERSTANDS IT', 'NO'],
+            ['SO DOES NOBODY', 'CORRECT'],
+            ['REPORTS TO', '"THE EXEC"'],
+            ['DEADLINE', '4:30 PM'],
+          ] as [string, string][]).map(([k, v], i) => (
+            <div key={k} style={{
+              display: 'flex', justifyContent: 'space-between', gap: 12,
+              padding: '10px 18px',
+              borderTop: i ? '1px dashed #444' : 'none',
+              fontFamily: brMono, fontSize: 10,
+              textTransform: 'uppercase', letterSpacing: '0.1em',
+            }}>
+              <span style={{ color: '#888', flexShrink: 0 }}>{k}</span>
+              <span style={{ textAlign: 'right', minWidth: 0, overflowWrap: 'anywhere' }}>{v}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* One CTA. The old section had three orange slabs and no action. */}
-      <Link to="/play" style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        gap: 16, flexWrap: 'wrap',
-        borderTop: `1px solid #333`,
-        background: BR.accent, color: '#000',
-        padding: '20px 26px', textDecoration: 'none',
-        fontFamily: brFont, fontWeight: 900, fontSize: 18,
-        textTransform: 'uppercase', letterSpacing: '0.04em',
-      }}>
-        <span>▶ CLOCK IN AT 9:00 AM — PLAY THE MORNING</span>
-        <span style={{
-          fontFamily: brMono, fontSize: 11, fontWeight: 700, letterSpacing: '0.14em',
-        }}>FREE · BROWSER · BACK BY LUNCH</span>
-      </Link>
+      {/* The inciting incident, as the artifact it actually is. */}
+      <div style={{ padding: isMobile ? '16px 20px 28px' : '22px 32px 36px' }}>
+        <div style={{
+          fontFamily: brMono, fontSize: 11, color: BR.accent, fontWeight: 700,
+          textTransform: 'uppercase', letterSpacing: '0.16em', marginBottom: 14,
+        }}>
+          08:58 AM · TWO MINUTES BEFORE THE GAME STARTS
+        </div>
+        <div style={{
+          background: BR.paper, color: BR.ink,
+          border: `2px solid ${BR.bg}`,
+          maxWidth: 720,
+        }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '11px 16px', borderBottom: `1px solid ${BR.ink}`,
+            fontFamily: brMono, fontSize: 10, fontWeight: 700,
+            textTransform: 'uppercase', letterSpacing: '0.14em', color: BR.muted,
+          }}>
+            <span style={{
+              width: 18, height: 18, background: '#5e4db2', color: '#fff',
+              display: 'grid', placeItems: 'center', fontSize: 10, fontWeight: 700,
+            }}>A</span>
+            <span>EXEC → YOU</span>
+            <span style={{ marginLeft: 'auto', color: BR.dim }}>DIRECT MESSAGE</span>
+          </div>
+          <div style={{ padding: isMobile ? '16px' : '20px 22px' }}>
+            <p style={{
+              margin: 0, fontFamily: brFont, fontSize: 'clamp(19px, 2.1vw, 25px)',
+              lineHeight: 1.35, fontWeight: 700, color: BR.ink,
+            }}>
+              need CHP green by EOD. do whatever it takes.
+            </p>
+            <p style={{
+              margin: '14px 0 0', fontFamily: brFont,
+              fontSize: 'clamp(17px, 1.8vw, 21px)', lineHeight: 1.35,
+              fontWeight: 500, color: '#444',
+            }}>
+              ↑ this is between us
+            </p>
+          </div>
+        </div>
+        <p style={{
+          margin: '18px 0 0', maxWidth: 720,
+          fontFamily: brFont, fontSize: 'clamp(16px, 1.3vw, 19px)',
+          lineHeight: 1.55, color: '#bbb',
+        }}>
+          An impossible instruction and a request for deniability, in lowercase,
+          before Leonard has taken his coat off. That's the whole setup. Everything
+          after it is him trying to make those two sentences true.
+        </p>
+      </div>
+
+      {/* The arc — four beats, one per stage. Quoted from the blueprint. */}
+      <div style={{ borderTop: '1px solid #333' }}>
+        <div style={{
+          padding: isMobile ? '20px 20px 6px' : '24px 32px 8px',
+          fontFamily: brMono, fontSize: 11, color: '#aaa',
+          textTransform: 'uppercase', letterSpacing: '0.16em',
+        }}>
+          <span style={{ color: BR.accent, marginRight: 8 }}>●</span>
+          THE ARC · AN EARNEST PM SLOWLY BECOMING DEAD-INSIDE
+        </div>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'repeat(4, minmax(0, 1fr))',
+          padding: isMobile ? '10px 20px 28px' : '14px 32px 34px',
+          gap: isMobile ? 0 : 24,
+        }}>
+          {ARC.map((a) => (
+            <div key={a.beat} style={{
+              paddingTop: 18,
+              paddingBottom: isMobile ? 18 : 0,
+              borderTop: isMobile ? 'none' : `2px solid ${BR.accent}`,
+              borderLeft: isMobile ? `2px solid ${BR.accent}` : 'none',
+              paddingLeft: isMobile ? 18 : 0,
+            }}>
+              <div style={{
+                fontFamily: brMono, fontSize: 11, fontWeight: 700,
+                letterSpacing: '0.16em', color: BR.accent,
+              }}>{a.stage}</div>
+              <div style={{
+                marginTop: 8, fontFamily: brFont, fontWeight: 700,
+                fontSize: 'clamp(16px, 1.5vw, 19px)', lineHeight: 1.35, color: BR.bg,
+              }}>{a.beat}</div>
+            </div>
+          ))}
+        </div>
+      </div>
     </section>
   )
 }
 
-function Portfolio() {
+const ARC = [
+  { stage: 'STAGE I',   beat: 'He starts the day genuinely trying to help.' },
+  { stage: 'STAGE II',  beat: 'He learns that every solution creates another meeting.' },
+  { stage: 'STAGE III', beat: 'He starts using corporate language defensively.' },
+  { stage: 'STAGE IV',  beat: 'By 4:30 he either survives the review, or he doesn’t.' },
+] as const
+
+// ─── The four stages ─────────────────────────────────────────────────────
+// Was <Portfolio> — "OUR GAMES", three sibling products. Now one game's
+// stages, in clock order, with the genre shift stated because the genre
+// shift IS the pitch.
+//
+// `route: null` means built-but-not-shipped-here, and renders as the locked
+// finale rather than a playable card. Do NOT hard-code a stage count in
+// prose anywhere — read STAGES.length (see Design_Language.md rule 11).
+
+type Stage = {
+  n: string
+  title: string
+  time: string
+  genre: string
+  logline: string
+  detail: string
+  tags: string[]
+  route: string | null
+}
+
+const STAGES: Stage[] = [
+  {
+    n: 'I',
+    title: 'PRE-STANDUP ALIGNMENT',
+    time: '9:00 – 10:15 AM',
+    genre: 'THIRD-PERSON WALKING SIM',
+    logline: 'Walk the floor. Answer five people. Watch what it costs.',
+    detail:
+      'Everyone has already posted "no blockers," and then described the blocker in the same message. Nobody is lying — that’s just the format. Each problem has three or four responses and all of them work: clarify it, ticket it, book a sync, or wave it through. The game shows you the price before you pay it. You are never tricked. You just watch yourself take the cheap answer, because standup is in forty minutes.',
+    tags: ['5–10 MIN', 'WASD + E', 'FREE'],
+    route: '/play/blocked',
+  },
+  {
+    n: 'II',
+    title: 'JIRA RUN',
+    time: '10:45 – 11:00 AM',
+    genre: '8-BIT ENDLESS RUNNER',
+    logline: 'Log four updates. Fall into your own monitor.',
+    detail:
+      'Standup survived. Leonard sits down to update the board, looks into the backlog, and the backlog looks back. The Kanban columns become a side-scrolling gauntlet — unjumpable dependency walls, gates that only open for the right ticket. The Slack pings chasing him down the track quote, word for word, what he told each person an hour ago. The day has started keeping receipts.',
+    tags: ['~5 MIN', 'WASD', 'FREE'],
+    route: '/play/jira-run',
+  },
+  {
+    n: 'III',
+    title: 'LUNCH DASH',
+    time: '11:00 AM – 12:00 PM',
+    genre: 'OPEN-WORLD DRIVING',
+    logline: 'One free hour. It already has an owner.',
+    detail:
+      'The first time all day he’s alone. Out through the lobby, into a beige Camry, and for about nine seconds it feels like escape — then the errand: his lunch, the exec’s salmon bowl, back by noon. The bowl rides in the cupholder, on camera, judging his driving. How he arrives back is graded composed, functional, or disheveled, and that grade is not cosmetic. It carries into the finale.',
+    tags: ['~5 MIN', 'WASD / ARROWS', 'FREE'],
+    route: '/play/lunch-dash',
+  },
+  {
+    n: 'IV',
+    title: 'PERFORMANCE REVIEW',
+    time: '4:30 PM',
+    genre: 'ONE-ON-ONE FIGHTING GAME',
+    logline: 'The meeting every stage has dreaded. Finally, literally, a fight.',
+    detail:
+      'A normal conference room. The Exec sits, then stands, and the camera drops to a side-on fighting framing while he calmly asks where we are on the portal refresh. Nobody acknowledges the genre. Your health bar is CREDIBILITY; his is SKEPTICISM — you aren’t hurting him, you’re wearing down his objections. "Pushback:" is a heavy. Blocking is called Active Listening. Every corporate conversation was always a fighting game; this is the one where the HUD admits it.',
+    tags: ['THE FINALE', 'KEYBOARD', 'IN PRODUCTION'],
+    route: null,
+  },
+]
+
+function TheStages() {
   const isMobile = useIsMobile()
+  const live = STAGES.filter((s) => s.route).length
   return (
-    <section id="games" style={{ borderBottom: `4px solid ${BR.ink}` }}>
+    <section id="game" style={{ borderBottom: `4px solid ${BR.ink}` }}>
       <div style={{
         borderTop: `4px solid ${BR.ink}`,
         borderBottom: `1px solid ${BR.ink}`,
         background: BR.bg, padding: isMobile ? '24px 20px 18px' : '32px 32px 24px',
-        display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr auto', gap: isMobile ? 14 : 32, alignItems: 'end',
+        display: 'grid',
+        gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'minmax(0, 1fr) auto',
+        gap: isMobile ? 14 : 32, alignItems: 'end',
       }}>
         <div>
           <div style={{
@@ -605,50 +572,149 @@ function Portfolio() {
             textTransform: 'uppercase', letterSpacing: '0.16em', marginBottom: 10,
           }}>
             <span style={{ color: BR.accent, marginRight: 8 }}>●</span>
-            PORTFOLIO · 3 SHIPPED · 0 PENDING
+            ONE GAME · {STAGES.length} STAGES · {live} PLAYABLE NOW
           </div>
           <h2 style={{
             margin: 0, fontFamily: brFont, fontWeight: 900,
-            fontSize: 'clamp(48px, 7vw, 96px)',
+            fontSize: 'clamp(44px, 7vw, 92px)',
             lineHeight: 0.92, letterSpacing: '-0.035em', textTransform: 'uppercase',
           }}>
-            OUR GAMES<span style={{ color: BR.accent }}>.</span>
+            BLOCKED<span style={{ color: BR.accent }}>.</span>
           </h2>
         </div>
         <div style={{
           fontFamily: brMono, fontSize: 11, color: BR.muted,
-          textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: 'right',
-          maxWidth: 320, lineHeight: 1.55,
+          textTransform: 'uppercase', letterSpacing: '0.1em',
+          textAlign: isMobile ? 'left' : 'right',
+          maxWidth: 340, lineHeight: 1.55,
         }}>
-          ALL TITLES ARE FREE TO PLAY · IN THE BROWSER · ROUGHLY THE LENGTH OF A MEETING THAT COULD HAVE BEEN AN EMAIL
+          PLAYED IN ORDER · ONE SAVE FILE · WHAT YOU DID AT 9 AM IS STILL IN THE ROOM AT 4:30
         </div>
       </div>
 
-      {/* 3-up grid, hard-cut, no rounded corners ever */}
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))' }}>
-        {GAMES.map((g, i) => <GameCard key={g.n} g={g} i={i} />)}
-      </div>
+      {STAGES.map((s, i) => <StageRow key={s.n} s={s} i={i} />)}
 
-      {/* Slot for a 4th game (parking-lot style call-to-suggest) */}
       <div style={{
         borderTop: `1px solid ${BR.ink}`,
-        padding: '18px 28px', background: BR.paper,
+        padding: isMobile ? '18px 20px' : '18px 28px', background: BR.paper,
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         gap: 24, flexWrap: 'wrap',
       }}>
         <div style={{
-          fontFamily: brFont, fontWeight: 900, fontSize: 22,
+          fontFamily: brFont, fontWeight: 900, fontSize: 20,
           textTransform: 'uppercase', letterSpacing: '-0.005em',
         }}>
-          ☐ NEXT GAME · TBD · IDEAS WELCOME, ESPECIALLY ABOUT MEETINGS.
+          ☐ EVERY ENDING · ACTUAL BUSINESS VALUE GENERATED: $0.00
         </div>
-        <a href="mailto:hello@dumbcorporategames.com" style={{
+        <Link to="/play" style={{
           background: BR.ink, color: BR.bg, border: 'none',
           padding: '12px 18px', cursor: 'pointer', textDecoration: 'none',
           fontFamily: brMono, fontWeight: 700, fontSize: 12,
           letterSpacing: '0.16em', textTransform: 'uppercase',
-        }}>SUGGEST A GAME →</a>
+        }}>START AT 9:00 AM →</Link>
       </div>
     </section>
+  )
+}
+
+// One stage. Alternates ink/paper down the page so the four read as a
+// sequence rather than a grid of products.
+function StageRow({ s, i }: { s: Stage; i: number }) {
+  const isMobile = useIsMobile()
+  const locked = !s.route
+  const dark = i % 2 === 0 && !locked
+  const bg = locked ? '#e6e3da' : dark ? BR.ink : BR.bg
+  const fg = locked ? BR.muted : dark ? BR.bg : BR.ink
+  const strong = locked ? BR.dim : dark ? BR.bg : BR.ink
+
+  return (
+    <div style={{
+      background: bg, color: fg,
+      borderTop: i ? `1px solid ${BR.ink}` : 'none',
+      display: 'grid',
+      // 172px, not 150: "11:00 AM – 12:00 PM" at the tracking below needs
+      // ~160px and was orphaning "PM" onto its own line.
+      gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : '172px minmax(0, 1fr)',
+      gap: isMobile ? 0 : 28,
+      padding: isMobile ? '24px 20px 26px' : '30px 32px 34px',
+    }}>
+      {/* Stage numeral + clock */}
+      <div>
+        <div style={{
+          fontFamily: brFont, fontWeight: 900,
+          fontSize: isMobile ? 56 : 78, lineHeight: 0.8,
+          letterSpacing: '-0.05em',
+          color: locked ? BR.dim : BR.accent,
+        }}>{s.n}</div>
+        <div style={{
+          marginTop: 10, fontFamily: brMono, fontSize: 11, fontWeight: 700,
+          textTransform: 'uppercase', letterSpacing: '0.06em',
+          color: locked ? BR.dim : (dark ? '#aaa' : BR.muted),
+          fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
+        }}>{s.time}</div>
+      </div>
+
+      <div style={{ minWidth: 0, marginTop: isMobile ? 16 : 0 }}>
+        <div style={{
+          fontFamily: brMono, fontSize: 10, fontWeight: 700,
+          textTransform: 'uppercase', letterSpacing: '0.16em',
+          color: locked ? BR.dim : BR.accent, marginBottom: 8,
+        }}>{s.genre}</div>
+
+        <h3 style={{
+          margin: 0, fontFamily: brFont, fontWeight: 900,
+          fontSize: 'clamp(28px, 4vw, 50px)', lineHeight: 0.95,
+          letterSpacing: '-0.035em', textTransform: 'uppercase',
+          color: strong, overflowWrap: 'anywhere', hyphens: 'auto',
+        }}>{s.title}</h3>
+
+        <p style={{
+          margin: '12px 0 0', fontFamily: brFont, fontWeight: 700,
+          fontSize: 'clamp(17px, 1.7vw, 21px)', lineHeight: 1.35,
+          color: locked ? BR.muted : (dark ? '#ddd' : '#111'),
+          maxWidth: 620,
+        }}>{s.logline}</p>
+
+        <p style={{
+          margin: '14px 0 0', fontFamily: brFont,
+          fontSize: 15, lineHeight: 1.6,
+          color: locked ? BR.muted : (dark ? '#bbb' : '#333'),
+          maxWidth: 760,
+        }}>{s.detail}</p>
+
+        <div style={{
+          marginTop: 18, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center',
+        }}>
+          {s.tags.map((t) => (
+            <span key={t} style={{
+              fontFamily: brMono, fontSize: 10, fontWeight: 700,
+              padding: '4px 8px', letterSpacing: '0.1em', textTransform: 'uppercase',
+              border: `1px solid ${locked ? BR.dim : (dark ? BR.bg : BR.ink)}`,
+              color: locked ? BR.muted : (dark ? BR.bg : BR.ink),
+            }}>{t}</span>
+          ))}
+
+          {s.route ? (
+            <Link to={s.route} style={{
+              marginLeft: isMobile ? 0 : 8,
+              background: dark ? BR.accent : BR.ink,
+              color: dark ? '#000' : BR.bg,
+              padding: '11px 18px', textDecoration: 'none',
+              fontFamily: brFont, fontWeight: 900, fontSize: 15,
+              textTransform: 'uppercase', letterSpacing: '0.03em',
+            }}>▶ PLAY STAGE {s.n}</Link>
+          ) : (
+            // Genuinely dead, not a link that goes nowhere (design rule 4).
+            <span style={{
+              marginLeft: isMobile ? 0 : 8,
+              border: `1px dashed ${BR.dim}`, color: BR.muted,
+              padding: '10px 17px',
+              fontFamily: brMono, fontWeight: 700, fontSize: 11,
+              textTransform: 'uppercase', letterSpacing: '0.14em',
+            }}>▓ NOT YET · THE FINALE IS BEING BUILT</span>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }
