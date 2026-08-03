@@ -102,8 +102,10 @@ export const PRIYA_AI: AIProfile = {
   riseBlock: [8, 14], // barely guards — she'd rather keep talking
   reactBlock: 0.25,
   heavyBlock: 0.45, // the Storm would rather trade than guard
-  reactCounter: 0.26, // Love That Energy — mash into the Storm at your peril
-  heavyCounter: 0.45,
+  reactCounter: 0.12, // Love That Energy — a spice, not a wall (0.26 made
+  // her feel harder than the Exec: his parry is phase-gated to the endgame,
+  // hers is on from the first exchange, so it must stay rare)
+  heavyCounter: 0.22,
   reactEvade: 0.15, // slippery instead of sturdy
   throwStuff: 0.2,
   throwEvade: 0.35,

@@ -377,7 +377,7 @@ PRIYA_MOVES.loveThatEnergy = {
   name: 'Love That Energy',
   line: 'Love that energy — however.',
   kind: 'counter',
-  damage: 11,
+  damage: 8, // was 11 — a slap on the wrist, not a combo-ender
   startup: 8,
   active: 22,
   recovery: 16,
