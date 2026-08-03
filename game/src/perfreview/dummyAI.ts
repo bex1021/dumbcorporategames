@@ -1,3 +1,4 @@
+import { scaleReach } from './fightConfig'
 // GRAYBOX OPPONENT AI — one proven reactive core (human reaction delay,
 // rise-blocking, mash gauge, whiff-punish) driving THREE personalities via
 // profiles (blueprint: THE THREE BOUTS):
@@ -59,12 +60,12 @@ export const EXEC_AI: AIProfile = {
   riseBlock: [18, 28],
   reactBlock: 0.68,
   heavyBlock: 0.7,
-  reactCounter: 0.12,
-  heavyCounter: 0.6,
+  reactCounter: 0.2,
+  heavyCounter: 0.72,
   reactEvade: 0.05,
   throwStuff: 0.15,
   throwEvade: 0.6,
-  punish: 0.85,
+  punish: 0.9,
   offense: { jab: 0.5, heavy: 0.2, third: 0, pipMix: 0.08 },
   grabTurtle: 0.7,
   antiAir: 0.6, // reads jump-ins well — the exam
@@ -73,8 +74,8 @@ export const EXEC_AI: AIProfile = {
 
 export const BRENT_AI: AIProfile = {
   name: 'brent',
-  moves: { jab: 'wellActually', heavy: 'scopeConcern' }, // no grab, no parry — a wall, not a hunter
-  cooldown: [46, 78], // slow, deliberate
+  moves: { jab: 'wellActually', heavy: 'scopeConcern', grab: 'hardStop' }, // no grab, no parry — a wall, not a hunter
+  cooldown: [34, 58], // deliberate, but he answers
   approach: 0.3, // mostly holds ground — Backlog Regen makes YOU come to HIM
   farDash: 0,
   riseBlock: [16, 26],
@@ -85,30 +86,30 @@ export const BRENT_AI: AIProfile = {
   reactEvade: 0.06,
   throwStuff: 0.12,
   throwEvade: 0.3, // throws work on him — that's the lesson of Bout 1
-  punish: 0.55,
-  offense: { jab: 0.3, heavy: 0.18, third: 0, pipMix: 0 }, // rest = turtle: he'd rather block
-  grabTurtle: 0,
+  punish: 0.75,
+  offense: { jab: 0.34, heavy: 0.26, third: 0, pipMix: 0 }, // rest = turtle: he'd rather block
+  grabTurtle: 0.5, // the Wall now peels a turtle off its shell
   antiAir: 0.45, // solid but beatable — a jump-in is a fair opener on the wall
   phaseGated: false,
 }
 
 export const PRIYA_AI: AIProfile = {
   name: 'priya',
-  moves: { jab: 'tinyThought', heavy: 'quickAdd', third: 'circleBack' },
-  cooldown: [7, 17], // rushdown: decisions come FAST — the string is the danger
+  moves: { jab: 'tinyThought', heavy: 'quickAdd', third: 'circleBack', grab: 'parkThat', parry: 'loveThatEnergy' },
+  cooldown: [5, 12], // rushdown: decisions come FAST — the string is the danger
   approach: 1,
   farDash: 0.3,
   riseBlock: [8, 14], // barely guards — she'd rather keep talking
   reactBlock: 0.25,
   heavyBlock: 0.45, // the Storm would rather trade than guard
-  reactCounter: 0,
-  heavyCounter: 0,
+  reactCounter: 0.26, // Love That Energy — mash into the Storm at your peril
+  heavyCounter: 0.45,
   reactEvade: 0.15, // slippery instead of sturdy
   throwStuff: 0.2,
   throwEvade: 0.35,
-  punish: 0.75,
-  offense: { jab: 0.55, heavy: 0.22, third: 0.12, pipMix: 0 }, // rest = a rare breath
-  grabTurtle: 0,
+  punish: 0.9,
+  offense: { jab: 0.6, heavy: 0.24, third: 0.13, pipMix: 0 }, // rest = a rare breath
+  grabTurtle: 0.65,
   antiAir: 0.3, // heads-down rushdown — jump-ins are her weakness (variety!)
   phaseGated: false,
 }
@@ -179,7 +180,7 @@ export function readDummyIntent(): Intent {
   const dist = Math.abs(o.x - leonard.x)
   // A 1.28× body swings a 1.28× arm: the AI's spacing decisions scale with it,
   // or the giant walks IN to normal-body range and punches through the chest.
-  const SR = STRIKE_RANGE * o.heightScale
+  const SR = STRIKE_RANGE * scaleReach(o.heightScale)
   const toward: -1 | 1 = leonard.x < o.x ? -1 : 1
 
   const leoAttacking = leonard.state === 'startup' || leonard.state === 'active'
@@ -208,6 +209,17 @@ export function readDummyIntent(): Intent {
   if (o.state !== 'idle' && o.state !== 'walk') {
     prevSelfState = o.state
     return NO_INTENT
+  }
+  // BLOCK-PUNISH: a blocked jab leaves the ATTACKER at −4 — the whole point
+  // of blocking is hitting back inside that window, and no profile ever did.
+  // This is the readable, fair answer to mash pressure (measured: constant
+  // jabs kept Brent at 4.4 attacks per round, 47% of them stuffed — the AI
+  // never got a turn). A punished masher learns; a strobing AI would not be.
+  if (prevSelfState === 'blockstun' && (o.state === 'idle' || o.state === 'walk')) {
+    prevSelfState = o.state
+    if (rng() < profile.punish && dist < STRIKE_RANGE * scaleReach(o.heightScale) * 1.1) {
+      return act(profile.moves.jab)
+    }
   }
   // Rise-blocking: come out of hitstun/knockdown guarding (kills stun-locks).
   if (prevSelfState === 'hitstun' || prevSelfState === 'knockdown') {
@@ -273,6 +285,23 @@ export function readDummyIntent(): Intent {
     cooldown = randInt(12, 22)
     if (profile.moves.grab && dist <= GRAB_RANGE && rng() < 0.3) return act(profile.moves.grab)
     return act(profile.moves.jab)
+  }
+
+  // ── MIX-UP: throw the turtle ──────────────────────────────────────────────
+  // The human bots (and human players) answer everything with reactive block —
+  // and blocking walled the whole roster to ~100% wins because no AI ever
+  // threw a BLOCKING target. The triangle's third edge: guard up, in range,
+  // grab available → grab often. Readable (grabs have 16–20f startup) and
+  // counterable (dash the i-frames, or just don't hold block).
+  if (
+    leonard.blocking &&
+    profile.moves.grab &&
+    dist <= GRAB_RANGE * scaleReach(o.heightScale) &&
+    cooldown <= 0 &&
+    rng() < 0.55
+  ) {
+    cooldown = randInt(14, 26)
+    return act(profile.moves.grab)
   }
 
   // ── OFFENSE cadence ────────────────────────────────────────────────────────

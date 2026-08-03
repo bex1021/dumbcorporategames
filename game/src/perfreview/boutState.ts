@@ -45,7 +45,7 @@ export const BOUTS: BoutConfig[] = [
     voice: 'brent',
     moves: BRENT_MOVES,
     ai: 'turtle',
-    regenPerSec: 0.8, // Backlog Regen — pauses ~2s after any damage (tuned: 2 was a 90s slog)
+    regenPerSec: 1.3, // Backlog Regen — pauses ~2s after any damage; the tax on slow play
     startHP: 80, // the warm-up bar — Bout 1 is the tutorial, not the siege
     oppScale: 1.0,
     koLine: '…yeah, okay. That’ll work.',
@@ -71,7 +71,10 @@ export const BOUTS: BoutConfig[] = [
     moves: PRIYA_MOVES,
     ai: 'rushdown',
     regenPerSec: 0,
-    startHP: 95,
+    // 145 (was 95): the smooth mid-boss difficulty lever. Humans were racing
+    // her down in ~26s before her string pressure could accumulate — every
+    // AI-side knob moved win rates ~3 points, the pool moves them ~15 per +25.
+    startHP: 145,
     oppScale: 1.0,
     koLine: 'Okay. I’m aligned.',
     lossLine: 'PRODUCT UNCONVINCED — scope stands. The Exec has heard.',

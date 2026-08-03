@@ -204,7 +204,7 @@ export const OPP_MOVES: Record<string, MoveDef> = {
     name: 'Quick Question',
     line: 'Quick question.',
     kind: 'strike',
-    damage: 5,
+    damage: 7,
     startup: 15, // 250ms — still quick, no longer inhuman
     active: 3,
     recovery: 14,
@@ -217,7 +217,7 @@ export const OPP_MOVES: Record<string, MoveDef> = {
     name: "Let's Double-Click",
     line: "Let's double-click on that.",
     kind: 'strike',
-    damage: 12,
+    damage: 16,
     startup: 30, // 500ms — a true Punch-Out telegraph; the read the game teaches
     active: 4,
     recovery: 26,
@@ -231,7 +231,7 @@ export const OPP_MOVES: Record<string, MoveDef> = {
     name: 'Circle Back',
     line: "Let's circle back offline.",
     kind: 'throw',
-    damage: 11,
+    damage: 14,
     startup: 20, // 333ms — reactable if you're watching for it
     active: 2,
     recovery: 24,
@@ -248,7 +248,7 @@ export const OPP_MOVES: Record<string, MoveDef> = {
     name: 'Threaten PIP',
     line: 'Let’s talk about your growth areas.',
     kind: 'throw',
-    damage: 25,
+    damage: 28,
     startup: 40, // 667ms — the steeple. You are MEANT to see this coming.
     active: 2,
     recovery: 32, // interrupted or whiffed, he's wide open — the risk is real
@@ -265,7 +265,7 @@ export const OPP_MOVES: Record<string, MoveDef> = {
     name: 'Actually, Great Point',
     line: 'Actually — great point.',
     kind: 'counter',
-    damage: 13,
+    damage: 16,
     startup: 7,
     active: 16,
     recovery: 15,
@@ -284,7 +284,7 @@ export const BRENT_MOVES: Record<string, MoveDef> = {
     name: 'Well, Actually',
     line: 'Well, actually—',
     kind: 'strike',
-    damage: 5,
+    damage: 10,
     startup: 16, // 267ms — deliberate, readable
     active: 3,
     recovery: 16,
@@ -297,7 +297,7 @@ export const BRENT_MOVES: Record<string, MoveDef> = {
     name: 'Scope Concern',
     line: 'That’s a bigger lift than it sounds.',
     kind: 'strike',
-    damage: 12,
+    damage: 20,
     startup: 34, // 567ms — crosses arms, inhales through teeth; a gift to read
     active: 4,
     recovery: 28,
@@ -308,6 +308,21 @@ export const BRENT_MOVES: Record<string, MoveDef> = {
   },
 }
 
+// Brent's grab — the Wall's answer to being rushed or turtled.
+BRENT_MOVES.hardStop = {
+  id: 'hardStop',
+  name: 'Hard Stop',
+  line: 'I’m going to stop you right there.',
+  kind: 'throw',
+  damage: 13,
+  startup: 18,
+  active: 3,
+  recovery: 24,
+  reach: 0.95,
+  blockable: false,
+  meterCost: 0,
+}
+
 // ── BOUT 2 — PRIYA (The Storm). Rushdown: chaining pokes, the Scope-stack
 // debuff, and the campaign's first hostile-UI beat (Derail key-swap). ────────
 export const PRIYA_MOVES: Record<string, MoveDef> = {
@@ -316,7 +331,7 @@ export const PRIYA_MOVES: Record<string, MoveDef> = {
     name: 'Tiny Thought',
     line: 'Tiny thought—',
     kind: 'strike',
-    damage: 4,
+    damage: 9,
     startup: 13, // 217ms — quick, meant to arrive in strings, not alone
     active: 3,
     recovery: 9, // short recovery = she can chain; block the STRING
@@ -329,7 +344,7 @@ export const PRIYA_MOVES: Record<string, MoveDef> = {
     name: 'Quick Add',
     line: '…and while we’re in here—',
     kind: 'strike',
-    damage: 6,
+    damage: 12,
     startup: 19, // 317ms
     active: 3,
     recovery: 18,
@@ -343,7 +358,7 @@ export const PRIYA_MOVES: Record<string, MoveDef> = {
     name: 'Circle Back to This',
     line: 'Let’s zoom out.',
     kind: 'strike',
-    damage: 8,
+    damage: 14,
     startup: 26, // 433ms — the lazy hand-rotate; block it or your keys swap
     active: 3,
     recovery: 22,
@@ -352,6 +367,38 @@ export const PRIYA_MOVES: Record<string, MoveDef> = {
     meterCost: 0,
     derail: true, // hostile UI: J/K swap 3s on clean hit (🔀 shown)
   },
+}
+
+// Priya's counter — the anti-mash tool. Mash jabs into the Storm and she
+// turns your own momentum back on you (same kind:'counter' path as the
+// Exec's parry; throws still beat it). Milder numbers: she's the mid-boss.
+PRIYA_MOVES.loveThatEnergy = {
+  id: 'loveThatEnergy',
+  name: 'Love That Energy',
+  line: 'Love that energy — however.',
+  kind: 'counter',
+  damage: 11,
+  startup: 8,
+  active: 22,
+  recovery: 16,
+  reach: 1.2,
+  blockable: false,
+  meterCost: 0,
+}
+
+// Priya's grab — parking the conversation, and your posture.
+PRIYA_MOVES.parkThat = {
+  id: 'parkThat',
+  name: 'Let’s Park That',
+  line: 'Let’s park that — permanently.',
+  kind: 'throw',
+  damage: 12,
+  startup: 16,
+  active: 3,
+  recovery: 22,
+  reach: 0.95,
+  blockable: false,
+  meterCost: 0,
 }
 
 // Dialogue lives in fightScript.ts (tiered, sequential — the conversation

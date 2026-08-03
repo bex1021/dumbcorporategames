@@ -7,7 +7,7 @@
 // Module-global mutable state, read by FightWorld (rendering) and FightHud
 // (bars) — NOT React state, so nothing here triggers a 60fps re-render.
 
-import { ARENA, BODY, MOVE, JUMP, VITALS, FEEL, STUN, ROUND, FRAME } from './fightConfig'
+import { ARENA, BODY, MOVE, JUMP, VITALS, FEEL, STUN, ROUND, FRAME, scaleReach } from './fightConfig'
 import { LEONARD_MOVES, OPP_MOVES, type MoveDef } from './frameData'
 import { tierFor, nextLine, resetScript, type Tier } from './fightScript'
 
@@ -542,7 +542,7 @@ function tryConnect(att: Fighter, def: Fighter): void {
   // connect from proportionally further, where the fist visually lands ON the
   // target. Both rules together are the genre contract for giants: easier to
   // hit, and longer arms.
-  const reachScaled = m.reach * att.heightScale
+  const reachScaled = m.reach * scaleReach(att.heightScale)
   if (dist > reachScaled + Math.max(0, hurtBonus)) return
   // ── Vertical reach: ASYMMETRIC, and it scales with the fighter ────────────
   // Striking DOWN out of a jump covers the whole arc; reaching UP from the

@@ -188,7 +188,17 @@ console.log('\n=== PHASE 4 — the gauntlet · per-bout balance battery (300 see
 for (const bout of BOUTS) {
   const setup: BoutSetup = {
     profile: PROFILE_FOR[bout.ai],
-    reset: { oppMoves: bout.moves, oppHP: bout.startHP, regenPerSec: bout.regenPerSec, voice: bout.voice },
+    // oppScale was MISSING here for the battery's whole life — every Exec row
+    // tested a phantom 1.0× opponent with none of his size mechanics (arm
+    // reach, hurtbox, AI spacing). Single-source-of-truth means passing ALL of
+    // the bout's parameters, not most of them.
+    reset: {
+      oppMoves: bout.moves,
+      oppHP: bout.startHP,
+      oppScale: bout.oppScale,
+      regenPerSec: bout.regenPerSec,
+      voice: bout.voice,
+    },
   }
   console.log(`\n── ${bout.cardTitle} · vs ${bout.name} ──`)
   run('mash Jab', masher('clarify'), setup)

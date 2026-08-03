@@ -85,6 +85,18 @@ export const JUMP = {
   diveFrames: 7, // how many end-of-startup frames the plunge covers (the swing)
 }
 
+// A giant's arm advantage, as a REACH MULTIPLIER from body scale. 0.6 blend:
+// full 1.28× arms gave the Exec a 0.17m dead zone where he could poke humans
+// who could not answer at all — measured 0–10% human win rates against a
+// 40–50% target while the perfect bot stayed at 100% (fair, but hopeless).
+// At 0.6 the zone shrinks to a manageable edge. USED BY BOTH the sim's connect
+// check and the AI's spacing — they must agree, or the AI stands outside its
+// own fists.
+// 0.78, found by iteration (0.75 ↔ 0.8 brackets the target): 1.0 → a 0.17m no-answer zone, humans 0–10%;
+// 0.6 → zone gone, humans back to 100%. The Exec's difficulty IS this zone's
+// width; 0.8 leaves ~0.10m — poking range he must work, humans can contest.
+export const scaleReach = (bodyScale: number): number => 1 + (bodyScale - 1) * 0.79
+
 // ── Health / meter ──────────────────────────────────────────────────────────
 export const VITALS = {
   leonardMaxCredibility: 100,
