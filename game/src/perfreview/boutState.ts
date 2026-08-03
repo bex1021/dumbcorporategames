@@ -22,6 +22,7 @@ export type BoutConfig = {
   moves: Record<string, MoveDef>
   ai: AIStyle
   regenPerSec: number // Brent's Backlog Regen; 0 elsewhere
+  throwTech: number // 0..1 — how well this opponent BREAKS repeated throws (fighterState tech)
   startHP: number // opponent bar size — the difficulty ramp up the org chart
   oppScale: number // body scale — the Exec looms larger-than-life (final-boss size)
   koLine: string // what they say when convinced (their bar hits 0)
@@ -46,6 +47,7 @@ export const BOUTS: BoutConfig[] = [
     moves: BRENT_MOVES,
     ai: 'turtle',
     regenPerSec: 1.3, // Backlog Regen — pauses ~2s after any damage; the tax on slow play
+    throwTech: 0.5, // the Wall learns your grab habit — but throws still teach Bout 1
     startHP: 80, // the warm-up bar — Bout 1 is the tutorial, not the siege
     oppScale: 1.0,
     koLine: '…yeah, okay. That’ll work.',
@@ -71,6 +73,7 @@ export const BOUTS: BoutConfig[] = [
     moves: PRIYA_MOVES,
     ai: 'rushdown',
     regenPerSec: 0,
+    throwTech: 0.2, // she'd rather jab you out of the grab — tech is a light touch (spam already loses to her jabs)
     // 145 (was 95): the smooth mid-boss difficulty lever. Humans were racing
     // her down in ~26s before her string pressure could accumulate — every
     // AI-side knob moved win rates ~3 points, the pool moves them ~15 per +25.
@@ -104,7 +107,13 @@ export const BOUTS: BoutConfig[] = [
     moves: OPP_MOVES,
     ai: 'boss',
     regenPerSec: 0,
-    startHP: 100,
+    throwTech: 0.85, // the Exam: chain-throwing him was a measured free win (100%)
+    // 85 (was 100): the throw tech extends every fight (throws now sometimes
+    // break), which handed his offense ~10 extra seconds of exposure per run
+    // and sank the human rows ~20pts below target. A smaller pool gives the
+    // time back to mixing players; the spam bot's damage is tech-starved
+    // either way, so this barely helps the cheese.
+    startHP: 85,
     oppScale: 1.28, // larger-than-life — final-boss energy. Was 1.4, which put
     // his head through the top of the frame even after the camera learned to
     // fit the taller fighter. 1.28 still towers (a head and shoulders over

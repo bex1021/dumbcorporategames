@@ -253,6 +253,11 @@ export function playFightCue(e: FightEvent): void {
       tone('square', 220, 330, 0.06, 0.28, 0.09)
       tone('sine', 120, 50, 0.12, 0.6, 0.13)
       break
+    case 'tech': // throw BROKEN — a shove-off: two hands slapping apart
+      noise(0.06, 1800, 0.5) // the grip slap
+      tone('sine', 200, 120, 0.09, 0.5, 0.02) // bodies shoving apart
+      noise(0.1, 700, 0.3, 0.05) // the disengage scuff
+      break
     case 'counter': // record scratch — "Actually, great point."
       // The reflect DAMAGES the attacker, so it gets an impact too — a scratch
       // with nothing under it read as a UI error, not as being hit.

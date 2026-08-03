@@ -1,5 +1,5 @@
 // Why does spam-throw still beat the Exec? Tally every channel.
-import { fight, leonard, opponent, resetFight, stepFight, NO_INTENT, type Intent } from '../../src/perfreview/fighterState'
+import { fight, leonard, opponent, resetFight, stepFight, setSimRng, NO_INTENT, type Intent } from '../../src/perfreview/fighterState'
 import { readDummyIntent, resetDummy, setOpponentProfile, setDummyRng, EXEC_AI } from '../../src/perfreview/dummyAI'
 import { OPP_MOVES } from '../../src/perfreview/frameData'
 import { BOUTS } from '../../src/perfreview/boutState'
@@ -18,7 +18,8 @@ let wins = 0
 for (let seed = 1; seed <= 40; seed++) {
   const rng = mulberry(seed * 7919)
   setDummyRng(rng)
-  resetFight({ oppMoves: exec.moves, oppHP: exec.startHP, oppScale: exec.oppScale, regenPerSec: exec.regenPerSec })
+  setSimRng(rng)
+  resetFight({ oppMoves: exec.moves, oppHP: exec.startHP, oppScale: exec.oppScale, regenPerSec: exec.regenPerSec, oppTech: exec.throwTech })
   setOpponentProfile(EXEC_AI)
   resetDummy()
   fight.started = true

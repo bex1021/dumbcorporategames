@@ -154,6 +154,7 @@ export default function PerformanceReview() {
           regenPerSec: bout.regenPerSec,
           voice: bout.voice,
           oppScale: bout.oppScale,
+          oppTech: bout.throwTech,
         })
         resetDummy()
         fight.started = true
@@ -209,7 +210,8 @@ export default function PerformanceReview() {
       oppHP: bout.startHP, // the ramp up the org chart
       regenPerSec: bout.regenPerSec,
       voice: bout.voice,
-      oppScale: bout.oppScale, // the Exec's size is a gameplay fact, not just art
+      oppScale: bout.oppScale,
+          oppTech: bout.throwTech, // the Exec's size is a gameplay fact, not just art
     })
     resetDummy()
     fight.started = true

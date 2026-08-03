@@ -27,13 +27,20 @@ const PUSH_NORM = 2 / (PUSH_N * (PUSH_N + 1)) // = 1/406 at N = 28
 // will land. Every arcade fighter does this: the swing is unconditional, only
 // the impact is earned. Without it a kick that gets blocked — or that you throw
 // at nothing — is completely silent, which reads as the input being dropped.
-export type FightEvent = 'swing' | 'swingHeavy' | 'whiff' | 'block' | 'hit' | 'hitHeavy' | 'throw' | 'counter' | 'ko' | 'annBigHit' | 'annNearKO' | 'annWin'
+export type FightEvent = 'swing' | 'swingHeavy' | 'whiff' | 'block' | 'hit' | 'hitHeavy' | 'throw' | 'tech' | 'counter' | 'ko' | 'annBigHit' | 'annNearKO' | 'annWin'
 let onFightEvent: ((e: FightEvent, voice?: number) => void) | null = null
 export function setFightEventHandler(fn: ((e: FightEvent, voice?: number) => void) | null): void {
   onFightEvent = fn
 }
 function emit(e: FightEvent, voice?: number): void {
   onFightEvent?.(e, voice)
+}
+
+// The sim's ONE random roll (the throw tech). Injectable so the seeded
+// playtest harness stays reproducible — same pattern as dummyAI.setDummyRng.
+let simRng: () => number = Math.random
+export function setSimRng(fn: () => number): void {
+  simRng = fn
 }
 
 
@@ -93,6 +100,8 @@ export type Fighter = {
   callout: string // the line currently floating above them ('' = none)
   calloutT: number // frames left on the callout
   scopeStacks: number // Priya's Scope Creep (0–3): +startup per stack; throw to descope
+  techSkill: number // 0..1 — this fighter's ability to BREAK a repeated throw (bout-configured)
+  thrStreak: number // consecutive throws this fighter CONNECTED with, no strike contact between
   hurtHeavy: boolean // was the CURRENT hitstun caused by a heavy? (routes the reaction clip)
   hurtSeq: number // increments on EVERY connect — the renderer re-jolts the reaction clip on change
   armorLeft: number // super-armor hits remaining on the current move
@@ -172,6 +181,8 @@ function makeFighter(
     callout: '',
     calloutT: 0,
     scopeStacks: 0,
+    techSkill: 0,
+    thrStreak: 0,
     hurtHeavy: false,
     hurtSeq: 0,
     armorLeft: 0,
@@ -210,6 +221,7 @@ export type ResetOpts = {
   regenPerSec?: number // Brent's Backlog Regen
   voice?: string // fightScript side for the opponent
   oppScale?: number // body size (the Exec looms) — drives vertical reach too
+  oppTech?: number // 0..1 — the opponent's throw-tech skill (see connectMove)
 }
 
 /** Full reset — fresh bout / rematch. No opts = the standalone Exec sandbag
@@ -224,6 +236,9 @@ export function resetFight(opts: ResetOpts = {}): void {
     opponent.health = opts.oppHP
   }
   opponent.heightScale = opts.oppScale ?? 1
+  opponent.techSkill = opts.oppTech ?? 0
+  leonard.thrStreak = 0
+  opponent.thrStreak = 0
   fightMods.regenPerSec = opts.regenPerSec ?? 0
   fightMods.voice = opts.voice ?? 'exec'
   resetScript()
@@ -381,7 +396,15 @@ function advanceFighter(f: Fighter, intent: Intent): void {
           break
         case 'active':
           // The swing found only air → the whiff cue (counters have no hitbox).
-          if (!f.moveHit && f.move && f.move.kind !== 'counter') emit('whiff')
+          if (!f.moveHit && f.move && f.move.kind !== 'counter') {
+            emit('whiff')
+            // A WHIFFED throw still shows the habit — it feeds the tech streak.
+            // This is what finally separates the spam bot from a human's timed
+            // wake-up grab: spam whiffs ~17 throws/run into knockdown immunity
+            // (streak pinned at the ramp's steep end), a human throws when it
+            // can actually connect (streak stays shallow).
+            if (f.move.kind === 'throw') f.thrStreak++
+          }
           f.state = 'recovery'
           f.timer = f.move ? f.move.recovery : 1
           break
@@ -579,6 +602,35 @@ function tryConnect(att: Fighter, def: Fighter): void {
     // rule is also what stops jump from being grab-immune-and-safe: you must
     // land, and landing lag is your risk.)
     if (def.state === 'knockdown' || def.state === 'hitstun' || def.y > JUMP.groundedY) return
+    // THROW TECH — the answer to chain-throwing, third attempt and the one
+    // that ships. Damage staling and an AI habit-read both failed the same
+    // way: they bled into HONEST play, because vs a heavy blocker repeated
+    // throws are correct (measured: Priya's human-avg row fell 70→35%).
+    // A tech is different: your FIRST throw always lands, the second is
+    // half-breakable, the third+ fully — and one strike CONTACT (clean or
+    // blocked, see applyHit/applyBlock) re-arms the throw completely. So
+    // mix-ups keep their guaranteed grab; only grab-grab-grab pays a tax.
+    // The tax is TEMPO, not damage: a tech is a shove-off, nobody is hurt —
+    // which is why this can't gut anyone's damage channel the way staling
+    // did. Chain-throw the Exec (techSkill 0.8, was a measured 100% free
+    // win) and he breaks the loop; mix, and he never gets the chance.
+    // Ramp by streak DEPTH: honest wake-up re-grabs sit at streak 1-2 and pay
+    // a mild tax; only the grab-grab-grab machine reaches the steep end.
+    const RAMP = [0, 0.05, 0.15, 0.4, 0.85]
+    const techScale = RAMP[Math.min(att.thrStreak, RAMP.length - 1)]
+    att.thrStreak++
+    if (def.techSkill * techScale > 0 && simRng() < def.techSkill * techScale) {
+      att.moveHit = true // the grab is consumed — no re-roll on later active frames
+      const dir = def.x < att.x ? -1 : 1
+      def.pushDist = dir * 0.55
+      def.pushT = 12
+      att.pushDist = -dir * 0.55
+      att.pushT = 12
+      def.flash = 4
+      fight.hitstop = Math.max(fight.hitstop, FEEL.blockHitstop)
+      emit('tech')
+      return
+    }
     // A throw that reached `active` uninterrupted grabs — ignores block.
     // (STRIKE-beats-THROW is emergent: a strike landing during the throw's
     // startup would have put the thrower in hitstun and dropped it.)
@@ -661,6 +713,7 @@ function applyHit(att: Fighter, def: Fighter, m: MoveDef): void {
   def.move = null
   def.moveHit = false
   def.flash = 6
+  att.thrStreak = 0 // strike contact proves mixing — the throw re-arms (see tech)
   annCheck(def, m.heavy === true || m.floors === true || m.damage >= 12)
   if (m.applyScope) def.scopeStacks = Math.min(3, def.scopeStacks + 1) // the ask grows
   if (m.derail) def.keySwapT = DERAIL_FRAMES // hostile UI: your keys stop meaning what they meant
@@ -762,6 +815,7 @@ function applyHit(att: Fighter, def: Fighter, m: MoveDef): void {
 
 function applyBlock(att: Fighter, def: Fighter, m: MoveDef): void {
   const chip = Math.max(1, Math.round(m.damage * 0.08)) // "listening costs something"
+  att.thrStreak = 0 // even a BLOCKED strike proves mixing — the throw re-arms
   // Chip is NON-LETHAL — you can't be chipped to death through a block. This is
   // what stops mash-into-block from slowly winning; you must land clean / throw.
   def.health = Math.max(1, def.health - chip)

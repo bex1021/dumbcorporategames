@@ -73,7 +73,15 @@ function triangleDecide(rng: () => number, jabReady: boolean): Intent {
   // out the wakeup at spacing instead of whiffing into their rise.
   if (o.state === 'hitstun' || o.state === 'knockdown' || o.invuln > 0)
     return d > 1.08 ? walk(dir) : NO_INTENT
-  if ((kind === 'counter' && threat) || o.blocking) return d <= 0.9 ? act('offline') : walk(dir)
+  // TECH-AWARE (the throw-tech patch made this necessary): a human who has
+  // grabbed twice without landing a strike NOTICES the breaks and mixes a jab
+  // in — which resets the sim's tech streak and re-arms the grab. Without
+  // this the bots chain-ground into a 0.85 break rate and the exec rows
+  // measured the bots' stubbornness, not the game's difficulty.
+  if ((kind === 'counter' && threat) || o.blocking) {
+    if (leonard.thrStreak >= 1 && d <= 1.0) return act('clarify')
+    return d <= 0.9 ? act('offline') : walk(dir)
+  }
   if (kind === 'throw' && threat && d < 1.2) return act('clarify')
   if (threat && (kind === 'strike' || kind === 'special') && d < 1.32) return block()
   if (o.state === 'recovery' && d <= 1.14) return act('pushback')
@@ -195,6 +203,7 @@ for (const bout of BOUTS) {
     reset: {
       oppMoves: bout.moves,
       oppHP: bout.startHP,
+      oppTech: bout.throwTech,
       oppScale: bout.oppScale,
       regenPerSec: bout.regenPerSec,
       voice: bout.voice,

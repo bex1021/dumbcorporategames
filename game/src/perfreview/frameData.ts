@@ -204,7 +204,7 @@ export const OPP_MOVES: Record<string, MoveDef> = {
     name: 'Quick Question',
     line: 'Quick question.',
     kind: 'strike',
-    damage: 7,
+    damage: 6,
     startup: 15, // 250ms — still quick, no longer inhuman
     active: 3,
     recovery: 14,
@@ -217,7 +217,7 @@ export const OPP_MOVES: Record<string, MoveDef> = {
     name: "Let's Double-Click",
     line: "Let's double-click on that.",
     kind: 'strike',
-    damage: 16,
+    damage: 14,
     startup: 30, // 500ms — a true Punch-Out telegraph; the read the game teaches
     active: 4,
     recovery: 26,
@@ -231,7 +231,7 @@ export const OPP_MOVES: Record<string, MoveDef> = {
     name: 'Circle Back',
     line: "Let's circle back offline.",
     kind: 'throw',
-    damage: 14,
+    damage: 12,
     startup: 20, // 333ms — reactable if you're watching for it
     active: 2,
     recovery: 24,
@@ -248,7 +248,7 @@ export const OPP_MOVES: Record<string, MoveDef> = {
     name: 'Threaten PIP',
     line: 'Let’s talk about your growth areas.',
     kind: 'throw',
-    damage: 28,
+    damage: 26,
     startup: 40, // 667ms — the steeple. You are MEANT to see this coming.
     active: 2,
     recovery: 32, // interrupted or whiffed, he's wide open — the risk is real
@@ -265,7 +265,7 @@ export const OPP_MOVES: Record<string, MoveDef> = {
     name: 'Actually, Great Point',
     line: 'Actually — great point.',
     kind: 'counter',
-    damage: 16,
+    damage: 14,
     startup: 7,
     active: 16,
     recovery: 15,
