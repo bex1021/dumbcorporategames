@@ -30,7 +30,7 @@ const NAV_LINKS: NavLink[] = [
 export default function Blocked() {
   return (
     <PageScroll>
-      <Nav links={NAV_LINKS} badge={<>● 3 OF 4 STAGES LIVE</>} />
+      <Nav links={NAV_LINKS} badge={<>● 4 OF 4 STAGES LIVE</>} />
       <Hero />
       <Ticker accent items={[
         'PROJECT STATUS · GREEN',
@@ -434,7 +434,7 @@ function TheRestOfTheDay() {
     {
       n: 'IV', time: '4:30 PM', title: 'PERFORMANCE REVIEW', genre: 'ONE-ON-ONE FIGHTING GAME',
       hook: 'The meeting every stage has dreaded. Your health bar is CREDIBILITY.',
-      to: null,
+      to: '/play/performance-review',
     },
   ]
   return (
@@ -887,7 +887,7 @@ const FAQS: { q: string; a: string }[] = [
     a: 'THE FIRST LOAD FETCHES ~15 MB OF ASSETS. AFTER THAT, YOUR BROWSER CACHES IT — POOR WIFI IS FINE ONCE YOU’RE IN.',
   },
   {
-    q: 'IS THE WHOLE THING FREE, INCLUDING THE STAGES THAT AREN’T OUT YET?',
+    q: 'IS THE WHOLE THING FREE — ALL FOUR STAGES?',
     a: 'YES. ALL OF IT, FOREVER. SUPPORT IS APPRECIATED VIA THE EMAIL SIGNUP AND BY SHARING THE LINK IN A SLACK CHANNEL WHERE IT WILL NOT BE READ.',
   },
 ]

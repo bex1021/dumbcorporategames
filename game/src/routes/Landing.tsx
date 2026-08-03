@@ -548,8 +548,8 @@ const STAGES: Stage[] = [
     logline: 'The meeting every stage has dreaded. Finally, literally, a fight.',
     detail:
       'A normal conference room. The Exec sits, then stands, and the camera drops to a side-on fighting framing while he calmly asks where we are on the portal refresh. Nobody acknowledges the genre. Your health bar is CREDIBILITY; his is SKEPTICISM — you aren’t hurting him, you’re wearing down his objections. "Pushback:" is a heavy. Blocking is called Active Listening. Every corporate conversation was always a fighting game; this is the one where the HUD admits it.',
-    tags: ['THE FINALE', 'KEYBOARD', 'IN PRODUCTION'],
-    route: null,
+    tags: ['THE FINALE', 'KEYBOARD', 'PLAYABLE'],
+    route: '/play/performance-review',
   },
 ]
 

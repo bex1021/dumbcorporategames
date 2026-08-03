@@ -60,7 +60,7 @@ export const BOUTS: BoutConfig[] = [
     // between the layers — too tight and the mid skyline simply vanishes.
     stage: { bg: '#04101d', fog: '#062036', fogNear: 8, fogFar: 26, light: 1.1 }, // the Grid
     // Grid minutes are relative to 12:00 PM (lunch ends at 1 — the meetings start right after).
-    cal: { title: 'Architecture Sync', time: '1:00 – 1:30 PM', organizer: 'Brent K. · Engineering', color: '#7986cb', startMin: 60, endMin: 90 },
+    cal: { title: 'Architecture Sync', time: '1:00 – 2:00 PM', organizer: 'Brent K. · Engineering', color: '#7986cb', startMin: 60, endMin: 120 },
   },
   {
     key: 'priya',
@@ -94,7 +94,7 @@ export const BOUTS: BoutConfig[] = [
     // fogFar 52 (was 34): the stage now has real geometry out to −34 and a
     // canvas floor running to −72. The fog IS the aerial perspective on those
     // ranges, so it has to bracket them — at 34 the far range simply vanished.
-    cal: { title: 'Product Review', time: '2:00 – 2:30 PM', organizer: 'Priya S. · Product', color: '#33b679', startMin: 120, endMin: 150 },
+    cal: { title: 'Product Review', time: '2:00 – 3:00 PM', organizer: 'Priya S. · Product', color: '#33b679', startMin: 120, endMin: 180 },
   },
   {
     key: 'exec',
@@ -126,7 +126,11 @@ export const BOUTS: BoutConfig[] = [
     // near towers stay sharp, the far shore takes real haze on top of its
     // painted aerial perspective. The sky layer ignores fog entirely.
     stage: { bg: '#221129', fog: '#3a2145', fogNear: 9, fogFar: 30, light: 1.4 }, // dusk — golden hour
-    cal: { title: 'Exec 1:1', time: '3:00 – 3:30 PM', organizer: '“The Exec”', color: '#d50000', startMin: 180, endMin: 210 },
+    // 4:30 PM: the slot Lunch Dash's Slack tease puts on your calendar, and
+    // the time the marketing site has always advertised. The 3:00–4:30 gap is
+    // "focus time" — the day's one attempt at real work — drawn in
+    // CalendarScreen.
+    cal: { title: 'Executive Review', time: '4:30 – 5:30 PM', organizer: '“The Exec”', color: '#d50000', startMin: 270, endMin: 330 },
   },
 ]
 

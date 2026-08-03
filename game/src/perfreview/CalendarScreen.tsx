@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react'
 import { BOUTS, gauntlet, chainNote, leonardStartHP, type BoutConfig } from './boutState'
 
 const PX_PER_MIN = 2 // grid: 12 PM top, 120px per hour
-const GRID_HOURS = ['12 PM', '1 PM', '2 PM', '3 PM', '4 PM']
+const GRID_HOURS = ['12 PM', '1 PM', '2 PM', '3 PM', '4 PM', '5 PM']
 
 export function CalendarScreen({ onJoin }: { onJoin: () => void }) {
   const [invite, setInvite] = useState<BoutConfig | null>(null)
@@ -59,10 +59,12 @@ export function CalendarScreen({ onJoin }: { onJoin: () => void }) {
             <div style={{ fontSize: 10 }}>the salmon bowl made it. mostly.</div>
           </div>
 
-          {/* flavor block — the day's one attempt at real work (1:30–2:00) */}
-          <div style={{ ...event, top: 90 * PX_PER_MIN, height: 30 * PX_PER_MIN - 4, background: '#f1f3f4', borderLeft: '4px solid #dadce0', color: '#9aa0a6' }}>
+          {/* flavor block — the day's one attempt at real work (3:00–4:30),
+              and the hour the lunch you drove across town for at NOON finally
+              gets eaten. The gap between the two back-to-backs and the Exec. */}
+          <div style={{ ...event, top: 180 * PX_PER_MIN, height: 90 * PX_PER_MIN - 4, background: '#f1f3f4', borderLeft: '4px solid #dadce0', color: '#9aa0a6' }}>
             <div style={{ fontSize: 12, textDecoration: 'line-through' }}>Focus time</div>
-            <div style={{ fontSize: 10 }}>declined by 6 people</div>
+            <div style={{ fontSize: 10 }}>declined by 6 people · you finally eat your own lunch</div>
           </div>
 
           {BOUTS.map((b, i) => {
@@ -89,7 +91,14 @@ export function CalendarScreen({ onJoin }: { onJoin: () => void }) {
                   {state === 'done' && (
                     <span style={{ fontSize: 11 }}>{result?.won ? '✓ signed off' : '✗ unconvinced'}</span>
                   )}
-                  {state === 'future' && <span style={{ fontSize: 11, color: '#9aa0a6' }}>🔒 back-to-backs</span>}
+                  {state === 'future' && (
+                    <span style={{ fontSize: 11, color: '#9aa0a6' }}>
+                      {/* "back-to-backs" is only true when the previous meeting
+                          ends exactly as this one starts. The Exec sits after a
+                          90-minute gap, so it gets its own line. */}
+                      {i > 0 && BOUTS[i - 1].cal.endMin === b.cal.startMin ? '🔒 back-to-backs' : '🔒 later today'}
+                    </span>
+                  )}
                 </div>
                 <div style={{ fontSize: 11, marginTop: 2 }}>{b.cal.time} · {b.cal.organizer}</div>
               </div>
@@ -338,7 +347,7 @@ const logoDot: React.CSSProperties = {
 const gridOuter: React.CSSProperties = { flex: 1, overflowY: 'auto', padding: '18px 0' }
 const gridInner: React.CSSProperties = {
   position: 'relative',
-  height: 4.2 * 60 * PX_PER_MIN, // 12 PM → just past 4 PM
+  height: 5.7 * 60 * PX_PER_MIN, // 12 PM → past the 5:30 end of the Executive Review
   maxWidth: 760,
   margin: '0 auto',
 }

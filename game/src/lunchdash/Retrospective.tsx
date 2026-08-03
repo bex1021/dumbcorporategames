@@ -371,14 +371,14 @@ function ExecPhone() {
                 <span style={{ fontSize: 10.5, color: '#8d8d8d' }}>12:01 PM</span>
               </div>
               <div style={{ fontSize: 13.5, lineHeight: 1.42, color: '#1d1c1d', marginTop: 2 }}>
-                food received, thank you 🙂 last thing today — let's do a quick sync on the status of the portal refresh. popped 30 min on your calendar later today.
+                food received, thank you 🙂 last thing today — let's do a quick sync on the status of the portal refresh. popped an hour on your calendar later today.
               </div>
               {/* calendar event unfurl — the 4:30 tease */}
               <div style={{ marginTop: 8, border: '1px solid #e2e2e2', borderLeft: '3px solid #616061', borderRadius: 6, padding: '7px 9px', background: '#fafafa' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: '#1d1c1d' }}>
                   <span>📅</span> Executive Review
                 </div>
-                <div style={{ fontSize: 11, color: '#616061', marginTop: 2 }}>Today · 4:30 PM · coming soon</div>
+                <div style={{ fontSize: 11, color: '#616061', marginTop: 2 }}>Today · 4:30 – 5:30 PM · accepted on your behalf</div>
               </div>
             </div>
           </div>
