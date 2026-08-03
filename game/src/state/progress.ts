@@ -8,7 +8,7 @@
 // Play.tsx) reads this to gate locked phases; the two games write to it when
 // the player wins.
 
-export type PhaseId = 'phase1' | 'phase2' | 'phase3'
+export type PhaseId = 'phase1' | 'phase2' | 'phase3' | 'phase4'
 
 export type CampaignPhase = {
   id: PhaseId
@@ -66,6 +66,19 @@ export const CAMPAIGN: CampaignPhase[] = [
     requires: 'phase2',
     minutes: '2–4 MIN',
     controls: 'WASD',
+  },
+  {
+    id: 'phase4',
+    n: 4,
+    label: 'PHASE 4',
+    title: 'The Performance Review',
+    sub: 'CONVINCE THE ORG CHART',
+    blurb:
+      "1:00 PM. Three meetings up the org chart — Engineering, Product, then the Exec himself — and every one of them is secretly a fighting game. Win the afternoon, or leave with a PIP and a handshake.",
+    route: '/play/performance-review',
+    requires: 'phase3',
+    minutes: '5–10 MIN',
+    controls: 'WASD + J/K/L',
   },
 ]
 

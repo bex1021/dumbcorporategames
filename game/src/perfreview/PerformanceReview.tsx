@@ -73,6 +73,7 @@ import {
   PRIYA_AI,
   type AIProfile,
 } from './dummyAI'
+import { markBeaten } from '../state/progress'
 
 type Phase = 'calendar' | 'briefing' | 'fighting' | 'boutEnd' | 'over'
 
@@ -167,6 +168,10 @@ export default function PerformanceReview() {
       if (fight.over && fight.hitstop <= 0) {
         const won = fight.winner === 'leonard'
         recordBout(won, won ? leonard.health / leonard.maxHealth : 0)
+        // CAMPAIGN: the day is BEATEN when the gauntlet ends on a convinced
+        // Exec — the final bout's result, not a 3-0 sweep, because the chain
+        // deliberately lets a lost morning bout carry forward as a handicap.
+        if (gauntletOver() && won) markBeaten('phase4')
         setPhase('boutEnd')
       } else raf = requestAnimationFrame(loop)
     }

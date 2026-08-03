@@ -183,6 +183,31 @@ export function Retrospective() {
             </div>
 
             <div style={{ marginTop: 16, display: 'flex', gap: 10, alignItems: 'center' }}>
+              {/* Progression hand-off (same pattern as Jira Run's win screen):
+                  a delivered run continues straight into the afternoon — the
+                  1:00 Architecture Sync IS Phase 4's first calendar block. */}
+              {final.delivered && (
+                <Link
+                  to="/play/performance-review"
+                  style={{
+                    flex: 1.4,
+                    padding: '10px 14px',
+                    borderRadius: 7,
+                    border: '1px solid rgba(217,211,196,0.3)',
+                    background: tier.color,
+                    color: '#15171a',
+                    fontFamily: SANS,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    letterSpacing: '0.04em',
+                    textDecoration: 'none',
+                    textAlign: 'center',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  1:00 PM — Architecture Sync →
+                </Link>
+              )}
               <button
                 onClick={() => resetRun()}
                 style={{
@@ -190,8 +215,8 @@ export function Retrospective() {
                   padding: '10px 14px',
                   borderRadius: 7,
                   border: '1px solid rgba(217,211,196,0.3)',
-                  background: tier.color,
-                  color: '#15171a',
+                  background: final.delivered ? 'rgba(255,255,255,0.04)' : tier.color,
+                  color: final.delivered ? '#d9d3c4' : '#15171a',
                   fontFamily: SANS,
                   fontSize: 13,
                   fontWeight: 600,

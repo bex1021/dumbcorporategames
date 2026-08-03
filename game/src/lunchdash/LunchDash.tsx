@@ -30,7 +30,7 @@ import { useLunchStore } from './lunchStore'
 import { resetRun } from './runReset'
 import { Retrospective } from './Retrospective'
 import { DriveIntro } from './DriveIntro'
-import { startRadio, stopAll } from './driveAudio'
+import { startRadio, stopAll, getRadioState } from './driveAudio'
 
 export default function LunchDash() {
   // Start rendering immediately — even if this tab happens to load hidden (a
@@ -84,6 +84,16 @@ export default function LunchDash() {
     // dev-only teleport hook for auditing the city: __lunch.go(x, z, facingRad)
     if (import.meta.env.DEV) {
       ;(window as unknown as { __lunch?: unknown }).__lunch = {
+        // radio controls, for diagnosing start-up problems without having to
+        // drive (the dial is the only other way in)
+        radioOn: () => startRadio(),
+        radioState: () => getRadioState(),
+        // end-of-run door: completes every remaining stop, so the
+        // Retrospective (and its Phase 4 hand-off CTA) can be inspected
+        // without driving the route. Capped: advance() no-ops once done.
+        finish: () => {
+          for (let i = 0; i < 8 && !useLunchStore.getState().done; i++) useLunchStore.getState().advance()
+        },
         go: (x: number, z: number, fy = 0) => {
           carPosition.set(x, 0, z)
           carFacing.y = fy
