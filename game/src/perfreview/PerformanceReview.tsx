@@ -75,6 +75,7 @@ import {
 } from './dummyAI'
 import { markBeaten } from '../state/progress'
 import { setAnnouncerGender, announce, primeAnnouncer } from './fightAudio'
+import { fightMusic } from './fightMusic'
 
 type Phase = 'calendar' | 'briefing' | 'fighting' | 'boutEnd' | 'over'
 
@@ -156,6 +157,10 @@ export default function PerformanceReview() {
         })
         resetDummy()
         fight.started = true
+        // the door skips beginBout, so start the score here too — captures
+        // and probes should hear what the player hears
+        setAnnouncerGender(bout.key === 'priya' ? 'her' : 'him')
+        fightMusic.start(bout.key, 'kombat', 0)
       }
     }
     // Photomode doors move gauntlet.index above; re-assert the latched stage.
@@ -193,6 +198,10 @@ export default function PerformanceReview() {
     setAnnouncerGender(bout.key === 'priya' ? 'her' : 'him')
     primeAnnouncer()
     announce('fight', 0.25)
+    // THE SCORE — Corporate Kombat (Rebecca's pick, 2026-08-03). Starts cold
+    // with each bout's own arrangement; FightWorld feeds it heat from the
+    // health bars every frame and cuts it dead at the KO.
+    fightMusic.start(bout.key, 'kombat', 0)
     setOpponentProfile(PROFILES[bout.ai])
     resetFight({
       oppMoves: bout.moves,

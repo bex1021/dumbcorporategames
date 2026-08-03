@@ -18,6 +18,8 @@ import { leonard, opponent, fight, stepFight, setFightEventHandler, renderX, ren
 import { readLeonardIntent, disposeFightInput, initFightInput } from './fightInput'
 import { readDummyIntent, resetDummy } from './dummyAI'
 import { playFightCue, disposeFightAudio, audioDebug, measurePeak } from './fightAudio'
+import { fightMusic } from './fightMusic'
+import { ROUND } from './fightConfig'
 import { currentBout } from './boutState'
 import { EngineeringStage } from './stages/EngineeringStage'
 import { ProductStage } from './stages/ProductStage'
@@ -122,11 +124,13 @@ export function FightWorld({
     setFightEventHandler(playFightCue) // sim events → synth cues (browser only)
     if (import.meta.env.DEV) {
       ;(window as unknown as { __audio?: unknown }).__audio = { playFightCue, audioDebug, measurePeak }
+      ;(window as unknown as { __music?: unknown }).__music = fightMusic
     }
     return () => {
       disposeFightInput()
       setFightEventHandler(null)
       disposeFightAudio()
+      fightMusic.stop()
     }
   }, [])
 
@@ -142,6 +146,19 @@ export function FightWorld({
     // independent guard against the KO strobe (see the snapshot note in
     // stepFight). If alpha can't vary, no frame-to-frame blend can occur.
     fight.alpha = fight.hitstop > 0 || fight.over ? 1 : Math.min(1, acc.current / FRAME)
+
+    // MUSIC HEAT — the score rides the fight. Whoever is closest to a KO sets
+    // the temperature (layers gate in at bar boundaries, see fightMusic), and
+    // a slow clock floor means even a Brent turtle-stall escalates by minute
+    // two. Cut dead the moment the fight ends: the KO freeze owns the room —
+    // only the announcer speaks over it.
+    if (fight.over) {
+      if (fightMusic.isPlaying()) fightMusic.stop()
+    } else if (fight.started) {
+      const minFrac = Math.min(leonard.health / leonard.maxHealth, opponent.health / opponent.maxHealth)
+      const timeFloor = ((ROUND.seconds - fight.time) / ROUND.seconds) * 0.5
+      fightMusic.setHeat(Math.max(1 - minFrac, timeFloor))
+    }
     if (!USE_MODELS) {
       applyFighter(leoRig.current, leonard)
       applyFighter(oppRig.current, opponent)

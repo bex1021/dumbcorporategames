@@ -6,7 +6,10 @@
 // stabs (the SF2 signature), toms, and a per-BOUT arrangement instead of
 // per-sprint.
 //
-// TWO STYLES ship in this file while Rebecca auditions (music-audition.html):
+// THE PICK (2026-08-03): 'kombat' ships in the fight (wired via
+// PerformanceReview.beginBout + FightWorld's heat loop). 'arcade' and
+// 'orchestra' stay for the audition booth and future reuse (menus, trailer).
+// THREE STYLES live in this file (music-audition.html auditions them):
 //   'arcade' — direction D: SNES fight-game energy, Jira Run's exact chord
 //              language a generation later (Priya's bout IS the Jira Run
 //              progression, faster — the leitmotif continuity is the point).
