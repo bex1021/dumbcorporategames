@@ -1,0 +1,30 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>fight audio — peak meter</title>
+<style>body{font:14px ui-monospace,Menlo,monospace;background:#141210;color:#e8e2d2;padding:24px}
+td{padding:3px 14px 3px 0}.bad{color:#e86a5a}.ok{color:#7bbf7b}button{font:inherit;padding:8px 16px;margin-bottom:16px}</style>
+<h3>Fight audio — measured peak at the master bus</h3>
+<p>Web Audio needs a gesture, and the game's render loop is irrelevant here — this
+page imports fightAudio directly, so it works even when the tab is backgrounded.</p>
+<button id="go">Run all cues</button>
+<table id="out"></table>
+<script type="module">
+import { playFightCue, measurePeak, audioDebug } from '/src/perfreview/fightAudio.ts'
+const CUES = ['swing','swingHeavy','whiff','block','hit','hitHeavy','throw','counter','ko']
+document.getElementById('go').onclick = async () => {
+  const t = document.getElementById('out'); t.innerHTML = ''
+  // WARM-UP: the first cue after the context is created reads ~20dB low because
+  // resume() has not completed when the sound is scheduled. Burn one.
+  await measurePeak(() => playFightCue('hit'), 400); await new Promise(r=>setTimeout(r,200))
+  for (const cue of CUES) {
+    const peak = await measurePeak(() => playFightCue(cue), 700)
+    const db = peak > 0 ? (20*Math.log10(peak)).toFixed(1) : -Infinity
+    const audible = peak > 0.02
+    t.insertAdjacentHTML('beforeend',
+      `<tr><td>${cue}</td><td>${peak.toFixed(4)}</td><td>${db} dBFS</td>
+       <td class="${audible?'ok':'bad'}">${audible?'audible':'INAUDIBLE'}</td></tr>`)
+    await new Promise(r=>setTimeout(r,150))
+  }
+  t.insertAdjacentHTML('beforeend', `<tr><td colspan=4>ctx: ${JSON.stringify(audioDebug())}</td></tr>`)
+}
+</script>

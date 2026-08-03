@@ -14,10 +14,10 @@ import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 import { ARENA, BODY, FRAME, COLORS } from './fightConfig'
-import { leonard, opponent, fight, stepFight, setFightEventHandler, type Fighter } from './fighterState'
+import { leonard, opponent, fight, stepFight, setFightEventHandler, renderX, renderY, type Fighter } from './fighterState'
 import { readLeonardIntent, disposeFightInput, initFightInput } from './fightInput'
 import { readDummyIntent, resetDummy } from './dummyAI'
-import { playFightCue, disposeFightAudio } from './fightAudio'
+import { playFightCue, disposeFightAudio, audioDebug, measurePeak } from './fightAudio'
 import { currentBout } from './boutState'
 import { EngineeringStage } from './stages/EngineeringStage'
 import { ProductStage } from './stages/ProductStage'
@@ -120,6 +120,9 @@ export function FightWorld({
     initFightInput()
     resetDummy()
     setFightEventHandler(playFightCue) // sim events → synth cues (browser only)
+    if (import.meta.env.DEV) {
+      ;(window as unknown as { __audio?: unknown }).__audio = { playFightCue, audioDebug, measurePeak }
+    }
     return () => {
       disposeFightInput()
       setFightEventHandler(null)
@@ -157,6 +160,68 @@ export function FightWorld({
     }
   })
 
+// ── HIT SPARK ───────────────────────────────────────────────────────────────
+// The genre's answer to interpenetration: there is no physics stopping a
+// sweeping leg from crossing the victim's torso volume for a few frames, so a
+// burst of light OWNS the contact point and the eye reads "impact" instead of
+// "clip-through". One-shot per connect, ~8 frames, scale-out fade.
+// PHOTOSENSITIVITY: small, local, fires once per hit (player-caused rhythm
+// only), no loop, no full-screen luminance change.
+function HitSpark() {
+  const group = useRef<THREE.Group>(null)
+  const mat = useRef<THREE.MeshBasicMaterial>(null)
+  const life = useRef(0)
+  const lastSeen = useRef<typeof fight.lastHit>(null)
+  useFrame(() => {
+    if (fight.lastHit && fight.lastHit !== lastSeen.current) {
+      lastSeen.current = fight.lastHit
+      if (fight.lastHit.kind !== 'counter') {
+        life.current = 8
+        const att = fight.lastHit.by === 'leonard' ? leonard : opponent
+        const def = fight.lastHit.by === 'leonard' ? opponent : leonard
+        if (group.current) {
+          // between the two bodies, at chest height, biased toward the victim
+          group.current.position.set(
+            renderX(def) * 0.65 + renderX(att) * 0.35,
+            BODY.height * 0.62 + renderY(def),
+            0.15,
+          )
+          group.current.rotation.z = ((renderX(att) * 997) % 1) * Math.PI // deterministic variety
+        }
+      }
+    }
+    if (!group.current || !mat.current) return
+    if (life.current > 0) {
+      // freeze with the world during hitstop — the spark holds on the impact
+      if (fight.hitstop <= 0) life.current--
+      const t = life.current / 8
+      group.current.visible = true
+      group.current.scale.setScalar(0.55 + (1 - t) * 0.5)
+      mat.current.opacity = 0.85 * t
+    } else {
+      group.current.visible = false
+    }
+  })
+  return (
+    <group ref={group} visible={false}>
+      {[0, 1, 2, 3].map((i) => (
+        <mesh key={i} rotation={[0, 0, (i * Math.PI) / 4]}>
+          <planeGeometry args={[0.62, 0.07]} />
+          <meshBasicMaterial
+            ref={i === 0 ? mat : undefined}
+            color="#fff3d0"
+            transparent
+            opacity={0.85}
+            depthWrite={false}
+            blending={THREE.AdditiveBlending}
+            toneMapped={false}
+          />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
   return (
     <group ref={shakeGroup}>
       {/* AMBIENT IS OWNED BY THE STAGE. This global fill used to STACK with each
@@ -167,6 +232,7 @@ export function FightWorld({
       {/* per-bout key light: golden hour → narrowing blinds → the dark dolly-in */}
       <directionalLight position={[4, 8, 6]} intensity={keyLight} color="#ffe6b0" castShadow shadow-mapSize={[1024, 1024]} />
       {!StageSet && <directionalLight position={[-6, 4, -4]} intensity={0.35} color="#8fa6c0" />}
+      <HitSpark />
 
       {/* Per-bout stage SET (stages/*): each provides its own floor + backdrop.
           The plain planes below remain the fallback for unknown keys. */}
@@ -274,16 +340,43 @@ function Callout({ text, tint }: { text: string; tint: string }) {
     // when the camera sat much further back; after the close-quarters rescale
     // the same value rendered the bubbles enormous.
     <Html center distanceFactor={3.6} zIndexRange={[5, 0]} style={{ pointerEvents: 'none' }}>
-      <div
-        style={{
-          fontFamily: '"IBM Plex Mono", ui-monospace, Menlo, monospace',
-          fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap',
-          color: '#1a1712', background: '#f2ead6',
-          border: `2px solid ${tint}`, borderRadius: 6, padding: '4px 10px',
-          boxShadow: '0 3px 10px rgba(0,0,0,0.35)',
-        }}
-      >
-        {text}
+      {/* Speech, not terminal output. The mono font + hard border read as a
+          code editor, which is exactly the "vibe-coded" look we're avoiding —
+          this matches the Slack/Alignly chrome used everywhere else in the
+          game: system sans, white bubble, soft shadow, a tail, and only a thin
+          tinted spine to say who is talking. */}
+      <div style={{ position: 'relative', filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.28))' }}>
+        <div
+          style={{
+            fontFamily:
+              '-apple-system, BlinkMacSystemFont, "Helvetica Neue", "Segoe UI", Arial, sans-serif',
+            fontSize: 13,
+            fontWeight: 500,
+            lineHeight: 1.35,
+            letterSpacing: '0.005em',
+            whiteSpace: 'nowrap',
+            color: '#172b4d',
+            background: '#ffffff',
+            borderLeft: `3px solid ${tint}`,
+            borderRadius: 10,
+            padding: '7px 13px 7px 11px',
+          }}
+        >
+          {text}
+        </div>
+        {/* tail — anchors the line to the speaker */}
+        <div
+          style={{
+            position: 'absolute',
+            left: 18,
+            bottom: -5,
+            width: 10,
+            height: 10,
+            background: '#ffffff',
+            transform: 'rotate(45deg)',
+            borderRadius: 2,
+          }}
+        />
       </div>
     </Html>
   )

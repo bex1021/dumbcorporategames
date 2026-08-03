@@ -118,7 +118,7 @@ export function CalendarScreen({ onJoin }: { onJoin: () => void }) {
             )}
             <button style={joinBtn} onClick={join}>▶ JOIN MEETING</button>
             <div style={{ fontSize: 11, color: '#9aa0a6', marginTop: 10, textAlign: 'center' }}>
-              prep: A/D move · J jab · K heavy · L throw · hold S block · I special
+              prep: A/D move · J jab · K heavy · L kick · O throw · hold S block · I special
             </div>
           </div>
         </div>
@@ -166,9 +166,23 @@ export function MeetingLobby({
         opacity: shown && !leaving ? 1 : 0, transition: 'opacity 300ms ease',
       }}
     >
-      <div style={{ display: 'flex', gap: 40, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center', maxWidth: 1040 }}>
-        {/* ── camera preview tile, mic/cam toggles under it ── */}
-        <div>
+      {/* GOOGLE MEET's green room is ASYMMETRIC: a big camera preview on the
+          left, a narrow join column on the right. Two equal columns read as a
+          generic split screen, which is what looked wrong. The controls live
+          under the preview because that whole left side is "your setup"; the
+          right side does one job — join. */}
+      <div
+        style={{
+          display: 'flex',
+          gap: 44,
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          justifyContent: 'center',
+          maxWidth: PREVIEW_W + JOIN_W + 44,
+        }}
+      >
+        {/* ── LEFT: camera preview + everything about your setup ── */}
+        <div style={{ width: PREVIEW_W, maxWidth: '92vw' }}>
           <div style={camBox}>
             <div style={camAvatar}>LP</div>
             <div style={{ color: '#e8eaed', fontSize: 15, marginTop: 14 }}>
@@ -186,35 +200,50 @@ export function MeetingLobby({
           <div style={{ textAlign: 'center', color: '#9aa0a6', fontSize: 12, marginTop: 10 }}>
             {mic ? 'Your mic is live. Everything counts.' : 'Muted. Nobody will notice either way.'}
           </div>
-        </div>
-
-        {/* ── join panel ── */}
-        <div style={{ width: 400, maxWidth: '92vw', textAlign: 'center', color: '#e8eaed' }}>
-          <div style={{ fontSize: 26, fontWeight: 400, marginBottom: 4 }}>Ready to join?</div>
-          <div style={{ fontSize: 15, color: '#e8eaed', marginBottom: 4 }}>{title}</div>
-          <div style={{ fontSize: 14, color: '#9aa0a6' }}>{organizer} is already in this call</div>
-
-          <button style={joinNowBtn} onClick={enter}>Join now</button>
 
           <div style={controlsPanel}>
-            <div style={{ fontSize: 11, letterSpacing: '0.1em', color: '#9aa0a6', marginBottom: 10 }}>
+            <div style={{ fontSize: 11, letterSpacing: '0.1em', color: '#9aa0a6', marginBottom: 12 }}>
               MEETING CONTROLS
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '7px 14px', fontSize: 13, textAlign: 'left', color: '#e8eaed' }}>
-              <Key>A / D</Key><span>move · <b>double-tap A</b> dodges back</span>
-              <Key>W</Key><span><b>Jumping In</b> — hop; J/K in the air strikes down</span>
+            {/* Two columns of keys — the list is wide now, and a single column
+                left a lot of dead space beside it. */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'auto 1fr auto 1fr',
+                gap: '9px 12px',
+                fontSize: 13,
+                textAlign: 'left',
+                color: '#e8eaed',
+                alignItems: 'center',
+              }}
+            >
+              <Key>A / D</Key><span>move · <b>double-tap A</b> dodges</span>
               <Key>J</Key><span><b>Clarify</b> — quick jab</span>
-              <Key>K</Key><span><b>Pushback</b> — heavy; slow wind-up, floors them</span>
-              <Key>L</Key><span><b>Take This Offline</b> — throw; beats blocking</span>
+              <Key>W</Key><span><b>Jumping In</b> — hop, then J/K</span>
+              <Key>K</Key><span><b>Pushback</b> — heavy, floors them</span>
               <Key>S</Key><span><b>Active Listening</b> — hold to block</span>
-              <Key>I</Key><span><b>Phased Approach</b> — special (needs 3 bars)</span>
+              <Key>L</Key><span><b>Circling Back Hard</b> — spinning kick</span>
+              <Key>O</Key><span><b>Take This Offline</b> — throw (unblockable)</span>
+              <Key>I</Key><span><b>Phased Approach</b> — special</span>
+              <span /><span />
             </div>
+            {/* The colour-telegraph legend lived here. The tint itself is gone
+                (too distracting), so this now describes the read that actually
+                exists: the wind-up ANIMATION. */}
             <div style={readLegend}>
-              Read their wind-up: <b style={{ color: '#f9c846' }}>yellow</b> strike → block ·{' '}
-              <b style={{ color: '#c9a0ff' }}>purple</b> grab → dodge or hit ·{' '}
-              <b style={{ color: '#5fd4e4' }}>cyan</b> counter → throw
+              Watch their wind-up — the bigger the swing, the longer it takes.
+              Block a heavy, throw them out of a block.
             </div>
           </div>
+        </div>
+
+        {/* ── RIGHT: the join column. One job. ── */}
+        <div style={{ width: JOIN_W, maxWidth: '92vw', textAlign: 'center', color: '#e8eaed' }}>
+          <div style={{ fontSize: 28, fontWeight: 400, marginBottom: 10 }}>Ready to join?</div>
+          <div style={{ fontSize: 15, color: '#e8eaed', marginBottom: 4 }}>{title}</div>
+          <div style={{ fontSize: 14, color: '#9aa0a6' }}>{organizer} is already in this call</div>
+          <button style={joinNowBtn} onClick={enter}>Join now</button>
         </div>
       </div>
     </div>
@@ -249,8 +278,11 @@ function Key({ children }: { children: React.ReactNode }) {
   )
 }
 
+// Meet's green room is asymmetric — a wide preview, a narrow join column.
+const PREVIEW_W = 620
+const JOIN_W = 320
 const camBox: React.CSSProperties = {
-  position: 'relative', width: 460, maxWidth: '92vw', height: 300, background: '#3c4043',
+  position: 'relative', width: '100%', height: 336, background: '#3c4043',
   borderRadius: 12, display: 'flex', flexDirection: 'column', alignItems: 'center',
   justifyContent: 'center', overflow: 'hidden',
 }

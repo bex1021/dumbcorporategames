@@ -9,6 +9,7 @@ import { Lights } from '../scene/Lights'
 import { ProximityDetector } from '../scene/ProximityDetector'
 import { CAMERA, PLAYER } from '../config/constants'
 import { useGameStore } from '../state/gameStore'
+import { playerPosition } from '../state/playerState'
 import { audio } from '../audio/AudioManager'
 import { useInteractKey } from '../hooks/useInteractKey'
 import { useSlackTicker } from '../hooks/useSlackTicker'
@@ -64,6 +65,16 @@ export default function Game() {
     if (import.meta.env.DEV) {
       const w = window as unknown as { __BLOCKED__?: unknown }
       w.__BLOCKED__ = useGameStore
+      // Photomode doors (press-kit capture): skip the intro and spawn beside
+      // the subject. ?photomode=printer | phyllis | office
+      const door = new URLSearchParams(window.location.search).get('photomode')
+      if (door === 'printer' || door === 'phyllis' || door === 'office') {
+        useGameStore.getState().startGame()
+        // Spawns must land inside ProximityDetector's 2.8 m interact range —
+        // the capture choreography presses E blind, with no walk-up.
+        if (door === 'printer') playerPosition.set(1.6, 0, 2.4)
+        if (door === 'phyllis') playerPosition.set(12, 0, 10.8)
+      }
     }
   }, [])
 

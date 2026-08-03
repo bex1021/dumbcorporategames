@@ -31,14 +31,21 @@ import {
 import { FloatingPosters, type PosterPlacement } from './OfficeProps'
 
 // Office posters drifting outside the fight band — eng-flavoured for this bout.
-// Placed LOW and WIDE: high posters collided with the HUD bars, and anything
-// near centre would sit behind the fight.
+// Placed LOW, WIDE, and — critically — BEHIND the pylons. The pylons stand at
+// x = ±(halfWidth + 2.4) = ±6.1, z = -4.2; posters used to sit at x = -6.3,
+// z = -4.2, i.e. 20cm away on the SAME plane, so a pylon's emissive bar cut
+// straight through the artwork. Everything here is past z = -6 and outside
+// x = ±7, which clears them in both axes.
 const GRID_POSTERS: readonly PosterPlacement[] = [
-  { variant: 'shipit', pos: [-6.3, 1.5, -4.2], rotY: 0.55, scale: 1.35, period: 11 },
-  { variant: 'velocity', pos: [6.5, 1.7, -4.8], rotY: -0.5, scale: 1.4, period: 13, phase: 2 },
-  { variant: 'ownership', pos: [-7.6, 1.1, -6.6], rotY: 0.38, scale: 1.2, period: 9.5, phase: 4 },
-  { variant: 'synergy', pos: [7.9, 1.2, -6.9], rotY: -0.34, scale: 1.2, period: 12, phase: 5 },
+  { variant: 'shipit', pos: [-5.9, 1.6, -6.0], rotY: 0.5, scale: 1.4, period: 11 },
+  { variant: 'velocity', pos: [6.1, 1.8, -6.4], rotY: -0.46, scale: 1.45, period: 13, phase: 2 },
+  { variant: 'ownership', pos: [-7.4, 1.2, -8.0], rotY: 0.36, scale: 1.25, period: 9.5, phase: 4 },
+  { variant: 'synergy', pos: [7.6, 1.3, -8.4], rotY: -0.32, scale: 1.25, period: 12, phase: 5 },
 ]
+// The flanking pylons are pushed OUT to here so they frame the posters rather
+// than skewering them. Moving the pylons (decoration) beats moving the posters
+// (content) out past the frame edge, which is what cropped them.
+const PYLON_X = 9.0
 
 const W = 1024
 const H = 512
@@ -465,13 +472,13 @@ function Escalation() {
   const wallW = ARENA.halfWidth * 2 + 10
   return (
     <group ref={group}>
-      {[-(ARENA.halfWidth + 2.4), ARENA.halfWidth + 2.4].map((x) => (
-        <mesh key={x} position={[x, 1.9, -4.2]} ref={mark(2.6)}>
+      {[-PYLON_X, PYLON_X].map((x) => (
+        <mesh key={x} position={[x, 1.9, -4.2]} ref={mark(1.9)}>
           <boxGeometry args={[0.12, 3.8, 0.12]} />
           <meshStandardMaterial
             color="#0a2742"
             emissive="#3fc9f0"
-            emissiveIntensity={2.6}
+            emissiveIntensity={1.9}
             toneMapped={false}
             roughness={0.4}
           />
@@ -482,24 +489,24 @@ function Escalation() {
           turn the reflective floor into the wet-street Tron payoff. */}
       {[-2.4, 2.4].map((z) =>
         [-(ARENA.halfWidth + 1.2), ARENA.halfWidth + 1.2].map((x) => (
-          <mesh key={`${x}:${z}`} position={[x, 0.06, z]} ref={mark(3.2)}>
+          <mesh key={`${x}:${z}`} position={[x, 0.06, z]} ref={mark(2.1)}>
             <boxGeometry args={[0.5, 0.05, 3.4]} />
             <meshStandardMaterial
               color="#0d3a5c"
               emissive="#5fd8ff"
-              emissiveIntensity={3.2}
+              emissiveIntensity={2.1}
               toneMapped={false}
               roughness={0.3}
             />
           </mesh>
         )),
       )}
-      <mesh position={[0, 0.05, -6.1]} ref={mark(3.6)}>
+      <mesh position={[0, 0.05, -6.1]} ref={mark(2.3)}>
         <boxGeometry args={[wallW * 0.9, 0.05, 0.16]} />
         <meshStandardMaterial
           color="#0d3a5c"
           emissive="#9beeff"
-          emissiveIntensity={3.6}
+          emissiveIntensity={2.3}
           toneMapped={false}
           roughness={0.3}
         />

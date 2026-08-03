@@ -32,7 +32,8 @@ const now = () => performance.now() / 1000
 const KEY: Record<string, string> = {
   KeyJ: 'clarify',
   KeyK: 'pushback',
-  KeyL: 'offline',
+  KeyL: 'hurricane', // was 'offline' — L is a real strike now
+  KeyO: 'offline', // …and the throw moved here, one key up-right of L
   KeyI: 'phased',
 }
 

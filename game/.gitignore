@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# press-kit shoots (generated media — regenerate with scripts/press/shoot.mjs)
+press/
+playtest-captures/

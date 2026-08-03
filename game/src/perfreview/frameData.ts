@@ -18,9 +18,35 @@ export type MoveDef = {
   blockable: boolean // throws are not
   meterCost: number // bars; 0 for normals
   heavy?: boolean // routes hitstop/shake to the heavy budget
+  /** Does a clean hit put them on the floor? Defaults to `heavy`. Split out so a
+   *  move can hit with heavy WEIGHT (hitstop, shake, the big impact sound)
+   *  without also flooring — a kick that staggers the body reads very
+   *  differently from one that dumps them on the ground, and having every heavy
+   *  do the same knockdown made K and L interchangeable. */
+  floors?: boolean
   applyScope?: boolean // Priya: clean hit adds a Scope Creep stack (the ask grows)
   derail?: boolean // hostile UI: clean hit swaps the victim's J/K keys for 3s
   air?: boolean // performed airborne — ignores the ground counter/throw, hits downward
+  /** SUPER ARMOR: how many incoming STRIKES this move absorbs during its
+   *  startup/active without being interrupted (damage still lands). The genre's
+   *  standard answer for a slow heavy vs rushdown — measured live, Priya's
+   *  7–17f attack cadence stuffed the kick's 20f wind-up on essentially every
+   *  raw attempt, so its rib-fold payoff was never seen. Throws ignore armor. */
+  armor?: number
+  /** Metres carried FORWARD across startup+active. Travelling strikes (the
+   *  hurricane kick) come out of Mixamo with that travel baked into the clip's
+   *  root motion; we strip it so the sim stays authoritative, which means the
+   *  sim has to put it back or the strike visibly swings short of the opponent. */
+  lunge?: number
+  /** MULTI-HIT: how many times this move's hitbox can connect in one activation
+   *  (default 1). A flurry re-arms between hits — see reArm. */
+  hits?: number
+  reArm?: number // frames between hits of a multi-hit move
+  /** Per-hit gaps, when a clip's strikes are NOT evenly spaced. A single reArm
+   *  cannot follow a real combination — this clip's contacts sit 14, 42 and 35
+   *  frames apart — and forcing one is how the damage ends up landing where no
+   *  strike is happening. Falls back to `reArm` when absent. */
+  reArmSeq?: number[]
 }
 
 // ── Leonard's v1 kit (deliberately small — blueprint) ───────────────────────
@@ -51,6 +77,38 @@ export const LEONARD_MOVES: Record<string, MoveDef> = {
     blockable: true,
     meterCost: 0,
     heavy: true,
+  },
+  // L — THE HURRICANE KICK. Was the throw; promoted to a real strike because a
+  // grab that looks like a spinning kick breaks the genre's most basic
+  // readability rule (throws are unblockable, so they must never read as
+  // strikes). The throw moved to O and kept its own grab animation.
+  hurricane: {
+    id: 'hurricane',
+    name: 'Circling Back Hard',
+    line: 'Let me circle back on that — hard.',
+    kind: 'strike',
+    damage: 15,
+    // Timed to the crescent clip's arc ([16,76] @2.2): the measured foot-speed
+    // peak (clip f40) lands at game frame 22. 367ms — a readable heavy, but not
+    // the 483ms that let the AI guard 70% of them.
+    startup: 22,
+    active: 6,
+    recovery: 27, // the clip's own landing + rise fills it exactly
+    // 1.28. It was 1.62, which combined with the 0.55m lunge registered hits
+    // from 2.1m apart — the damage landed while the foot was still visibly short
+    // of the opponent. A spinning leg reaches further than a grab (1.04) but not
+    // half a body-length further; the lunge is what closes the gap, not the
+    // hitbox.
+    reach: 1.28,
+    blockable: true,
+    meterCost: 0,
+    heavy: true,
+    armor: 1, // spin THROUGH her Tiny Thought — the kick must function vs rushdown
+    // STAGGERS, doesn't floor. A spinning kick into the midsection folds someone
+    // forward — they take it in the stomach and stumble. K already floors, and
+    // two knockdown buttons made the pair read as the same move.
+    floors: false,
+    lunge: 0.55, // the travel the clip used to carry itself, given back
   },
   offline: {
     id: 'offline',
@@ -95,19 +153,42 @@ export const LEONARD_MOVES: Record<string, MoveDef> = {
   },
   // Build-C stub for the meter economy: a fast, long-reach strike that costs
   // meter, so spending Alignment has feel before the real projectile (Build F).
+  // THE SUPER. A five-hit flurry: four fast rebuttals then a finisher. Each
+  // hit is small, but the sequence out-damages a heavy and — crucially — reads
+  // as a COMBO rather than one more kick. active is long because the hitbox
+  // must stay live across the whole flurry (see hits / reArm).
   phased: {
     id: 'phased',
     name: 'Phased Approach',
     line: 'We’re derisking via a phased approach.',
     kind: 'special',
-    damage: 16,
-    startup: 12,
-    active: 5,
-    recovery: 20,
-    reach: 2.16,
+    // SYNCED TO THE ANIMATION. Fitting the clip to the old 14/46/26 window left
+    // the sim damaging 14–33 frames BEFORE the animation's contacts — Leonard
+    // was still winding up, or mid-backflip, while the opponent took hits. That
+    // is what read as "no contact".
+    // Measured: at timeScale 1.22 the clip's four contacts land on game frames
+    // 33, 52, 67 and 89, so startup IS the first contact and reArm is their mean
+    // spacing. Every hit now coincides with a visible strike.
+    damage: 9, // 4 × 9 = 36, holding the old 5 × 7 = 35 total
+    startup: 14, // = the first strike's measured game-frame, exactly
+    active: 104, // last contact is at frame 113 = startup + 99; +5 for its active window
+    recovery: 26,
+    // 1.15, was 2.16 — a relic of this move's projectile-stub past. As a fist
+    // combination, 2.16 meant punches VISIBLY landed from across the arena
+    // (Rebecca: "Leonard can be on the far left end and it still makes
+    // contact"). Honest melee reach + the lunge below: he advances INTO the
+    // combination, and bad spacing whiffs the early rebuttals instead of being
+    // forgiven.
+    reach: 1.15,
+    lunge: 0.9, // carried across startup+active — he walks the combo forward
     blockable: true,
     meterCost: 3,
     heavy: true,
+    hits: 4, // the clip has four strikes in it, not five
+    reArm: 30, // fallback only
+    // MEASURED contact frames of trim [24,145] @1.7×: 14, 28, 78, 113 — the two
+    // uppercuts are the last two, and a uniform reArm cannot reach them.
+    reArmSeq: [14, 50, 35],
   },
 }
 

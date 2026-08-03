@@ -30,6 +30,13 @@ export type AIProfile = {
   farDash: number // chance to dash in from way out
   riseBlock: [number, number] // guard frames after getting up / out of hitstun
   reactBlock: number // main defence vs fast strikes
+  /** Chance a REACTED-TO heavy gets blocked. This used to be hardwired to 1.0 —
+   *  every heavy the AI saw coming was guarded, no roll — which made the
+   *  hurricane kick's whole payoff (the gut-fold) statistically invisible:
+   *  measured over 200 trials it landed 19–25%, all of them only because she
+   *  happened to be mid-attack. A wall blocks heavies; a rushdown would rather
+   *  keep swinging. */
+  heavyBlock: number
   reactCounter: number // parry chance vs fast strikes (needs parry)
   heavyCounter: number // parry chance vs a telegraphed heavy (needs parry)
   reactEvade: number // back-dash chance vs strikes
@@ -51,6 +58,7 @@ export const EXEC_AI: AIProfile = {
   farDash: 0.2,
   riseBlock: [18, 28],
   reactBlock: 0.68,
+  heavyBlock: 0.7,
   reactCounter: 0.12,
   heavyCounter: 0.6,
   reactEvade: 0.05,
@@ -71,6 +79,7 @@ export const BRENT_AI: AIProfile = {
   farDash: 0,
   riseBlock: [16, 26],
   reactBlock: 0.6, // blocks plenty, but reads get through — he's the tutorial
+  heavyBlock: 0.85, // The Wall: blocking the big obvious thing IS his identity
   reactCounter: 0,
   heavyCounter: 0,
   reactEvade: 0.06,
@@ -91,6 +100,7 @@ export const PRIYA_AI: AIProfile = {
   farDash: 0.3,
   riseBlock: [8, 14], // barely guards — she'd rather keep talking
   reactBlock: 0.25,
+  heavyBlock: 0.45, // the Storm would rather trade than guard
   reactCounter: 0,
   heavyCounter: 0,
   reactEvade: 0.15, // slippery instead of sturdy
@@ -157,8 +167,19 @@ const parryAllowed = () => !!profile.moves.parry && (!profile.phaseGated || hpFr
 const desperate = () => profile.phaseGated && hpFrac() < 0.2
 
 export function readDummyIntent(): Intent {
+  // TRAINING SANDBAG: the capture harness needs the opponent to stand still
+  // and take the hit, or every frame sequence is polluted by the AI fighting
+  // back mid-measurement. Plain global check — an import.meta.env guard here
+  // CRASHED the headless harness (tsx has no Vite env), and the flag is inert
+  // unless something sets it anyway.
+  if ((globalThis as { __sandbag?: boolean }).__sandbag) {
+    return { walk: 0, dash: 0, block: false, move: null }
+  }
   const o = opponent
   const dist = Math.abs(o.x - leonard.x)
+  // A 1.28× body swings a 1.28× arm: the AI's spacing decisions scale with it,
+  // or the giant walks IN to normal-body range and punches through the chest.
+  const SR = STRIKE_RANGE * o.heightScale
   const toward: -1 | 1 = leonard.x < o.x ? -1 : 1
 
   const leoAttacking = leonard.state === 'startup' || leonard.state === 'active'
@@ -225,8 +246,11 @@ export function readDummyIntent(): Intent {
     const r = rng()
     if (leonard.move?.heavy) {
       if (parryAllowed() && r < profile.heavyCounter) return act(profile.moves.parry!)
-      blockFrames = randInt(24, 34)
-      return block()
+      if (r < profile.heavyCounter + profile.heavyBlock) {
+        blockFrames = randInt(24, 34)
+        return block()
+      }
+      return NO_INTENT // she committed to her own read — the heavy comes through
     }
     if (r < profile.reactBlock) {
       blockFrames = randInt(24, 36)
@@ -260,7 +284,7 @@ export function readDummyIntent(): Intent {
     // glitching character. The roll is divided by the run length, so the
     // expected share of time spent advancing (and therefore spacing, and
     // therefore balance) is unchanged — it's the same movement, in blocks.
-    if (walkRun > 0 && dist > STRIKE_RANGE) {
+    if (walkRun > 0 && dist > SR) {
       walkRun--
       return { walk: toward, dash: 0, block: false, move: null }
     }
@@ -270,7 +294,7 @@ export function readDummyIntent(): Intent {
     // target fraction f gives p = f / ((1-f)·L) — without this the AI advanced
     // ~33% of frames instead of ~50%, fights dragged, and Brent timed out.
     const f = Math.min(0.95, profile.approach)
-    if (dist > STRIKE_RANGE && rng() < f / ((1 - f) * APPROACH_RUN)) {
+    if (dist > SR && rng() < f / ((1 - f) * APPROACH_RUN)) {
       walkRun = APPROACH_RUN - 1
       return { walk: toward, dash: 0, block: false, move: null }
     }
@@ -282,7 +306,7 @@ export function readDummyIntent(): Intent {
   cooldown = Math.round(randInt(cdMin, cdMax) * speed)
   const r = rng()
 
-  if (dist > STRIKE_RANGE) {
+  if (dist > SR) {
     if (dist > 1.8 && r < profile.farDash) return { walk: 0, dash: toward, block: false, move: null }
     if (rng() < profile.approach) return { walk: toward, dash: 0, block: false, move: null }
     return NO_INTENT // Brent holds his ground and lets the backlog re-compile

@@ -27,6 +27,14 @@ const LEONARD: ScriptSide = {
     ['That’s a hard no from me.', 'Respectfully — absolutely not.'],
     ['Over my dead body.', 'We are NOT doing that.'],
   ],
+  // L's kick reuses the throw's escalation ladder — same intent ("we are
+  // settling this"), delivered with a foot.
+  hurricane: [
+    ['Let me circle back on that — hard.', 'Circling back. Hard.'],
+    ['I’m going to have to insist.', 'We are past discussing this.'],
+    ['This is me escalating.', 'Consider this escalated.'],
+    ['I have looped in your manager.', 'Your manager is now on this thread.'],
+  ],
   offline: [
     ['Let’s take this offline.', 'I’ll grab time with you.'],
     ['Let’s set up a working session.', 'This needs its own meeting.'],
@@ -47,9 +55,31 @@ const LEONARD: ScriptSide = {
   ],
   dodge: [
     ['Noted.', 'I’ll take that as an action item.'],
-    ['Noted.', 'I’ll take that as an action item.'],
+    ['Sidebar — let me come back to that.', 'Flagging for later.'],
     ['Let me not speak out of turn.', 'I’ll circle back on that.'],
-    ['Let me not speak out of turn.', 'I’ll circle back on that.'],
+    ['I’m not answering that here.', 'Not in this meeting.'],
+  ],
+  // ── REACTIONS ────────────────────────────────────────────────────────────
+  // What you say when a point LANDS on you. Nobody used to react to being hit;
+  // the exchange was all offence and no consequence. `hurt` fires on taking a
+  // hit, `floored` on a knockdown, `up` on getting back up.
+  hurt: [
+    ['…sorry, say that again?', 'Hm — okay.', 'Sure, sure.'],
+    ['I—', 'Right, but—', 'Hold on—'],
+    ['That’s not— okay.', 'Wow. Okay.', 'Noted.'],
+    ['…', 'Fine.'],
+  ],
+  floored: [
+    ['Let’s take five.'],
+    ['Sorry — can we pause?'],
+    ['I need a minute.'],
+    ['…I hear you.'],
+  ],
+  up: [
+    ['Okay. Where were we?'],
+    ['Right. Moving on.'],
+    ['Let me try that again.'],
+    ['I’m still here.'],
   ],
 }
 
@@ -76,9 +106,9 @@ const EXEC: ScriptSide = {
   ],
   parry: [
     ['Actually — great point.', 'You know what? You’re right.'],
-    ['Actually — great point.', 'You know what? You’re right.'],
+    ['Good. Say more.', 'That’s the first useful thing.'],
     ['Say that again. I want to write it down.', 'Interesting. I’ll remember that.'],
-    ['Say that again. I want to write it down.', 'Interesting. I’ll remember that.'],
+    ['I’m writing this down.', 'That’s going in the doc.'],
   ],
   block: [
     ['Go on.', 'Sure.'],
@@ -88,9 +118,27 @@ const EXEC: ScriptSide = {
   ],
   dodge: [
     ['Hm.', 'Let’s park that.'],
-    ['Hm.', 'Let’s park that.'],
+    ['Let’s not go down that path.', 'Separate conversation.'],
     ['Let’s stay on track.', 'Park it.'],
-    ['Let’s stay on track.', 'Park it.'],
+    ['That’s not what I asked.', 'Answer the question.'],
+  ],
+  hurt: [
+    ['Hm.', 'Interesting.'],
+    ['Okay.', 'Go on.'],
+    ['…noted.', 'I see.'],
+    ['…', 'Mm.'],
+  ],
+  floored: [
+    ['Well. Alright then.'],
+    ['That’s… a fair point.'],
+    ['Hm. I’ll think on it.'],
+    ['…you’ve made your case.'],
+  ],
+  up: [
+    ['Let’s keep going.'],
+    ['One more thing.'],
+    ['I’m not finished.'],
+    ['Sit down. We’re not done.'],
   ],
 }
 
@@ -116,9 +164,27 @@ const BRENT: ScriptSide = {
   ],
   dodge: [
     ['Out of scope.', 'Not my ticket.'],
-    ['Out of scope.', 'Not my ticket.'],
+    ['That’s a different workstream.', 'Wrong team.'],
     ['Take it to architecture review.', 'Let’s not rathole.'],
-    ['Take it to architecture review.', 'Let’s not rathole.'],
+    ['I’m not the owner. Find the owner.', 'Escalate it, then.'],
+  ],
+  hurt: [
+    ['Hm. Fair.', 'Okay, noted.'],
+    ['That’s… a point.', 'Hm.'],
+    ['I’ll have to check.', 'That may be right.'],
+    ['…fine.', 'Whatever.'],
+  ],
+  floored: [
+    ['I’ll file a ticket.'],
+    ['Fine. I’ll unblock it.'],
+    ['You can have the merge.'],
+    ['…approved.'],
+  ],
+  up: [
+    ['One more thing though—'],
+    ['I’m not done.'],
+    ['Actually, one concern—'],
+    ['This is still wrong.'],
   ],
 }
 
@@ -150,9 +216,27 @@ const PRIYA: ScriptSide = {
   ],
   dodge: [
     ['Parking that.', 'Noted for the roadmap.'],
-    ['Parking that.', 'Noted for the roadmap.'],
+    ['That’s a next-quarter conversation.', 'Later.'],
     ['Backlog. Next.', 'Roadmap item.'],
-    ['Backlog. Next.', 'Roadmap item.'],
+    ['That’s not the priority right now.', 'Deprioritised.'],
+  ],
+  hurt: [
+    ['Oh — interesting.', 'Hm, okay.'],
+    ['I hadn’t considered that.', 'Say more?'],
+    ['That’s… a good flag.', 'Hm.'],
+    ['…okay.', 'Right.'],
+  ],
+  floored: [
+    ['Okay — descoping.'],
+    ['Fine. It’s a fast follow.'],
+    ['We’ll cut it from v1.'],
+    ['…out of scope. For now.'],
+  ],
+  up: [
+    ['Small thing though—'],
+    ['One more flow and I’m done—'],
+    ['While we’re here—'],
+    ['This still isn’t shippable.'],
   ],
 }
 

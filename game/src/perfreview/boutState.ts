@@ -79,7 +79,15 @@ export const BOUTS: BoutConfig[] = [
     // into the haze before you can read it.
     // Light stage: fog stays FAR out. Haze on a pale set is exactly the white
     // cloudiness we just removed — depth here comes from value, not atmosphere.
-    stage: { bg: '#e9f1fa', fog: '#dce9f7', fogNear: 16, fogFar: 34, light: 1.35 }, // product studio
+    // Warm-graded to match the canvas (see ProductStage): the cool blue-white
+    // bg was fighting the new cream/lilac grade at the frame edges.
+    // light 1.35 → 1.9, and both bg and fog warmed off the lilac: the set read
+    // dim and slightly cold. This key is the SHARED shadow-casting light in
+    // FightWorld, so raising it lifts the fighters, not just the backdrop.
+    stage: { bg: '#f6efe9', fog: '#f3eae6', fogNear: 18, fogFar: 52, light: 1.9 }, // product studio
+    // fogFar 52 (was 34): the stage now has real geometry out to −34 and a
+    // canvas floor running to −72. The fog IS the aerial perspective on those
+    // ranges, so it has to bracket them — at 34 the far range simply vanished.
     cal: { title: 'Product Review', time: '2:00 – 2:30 PM', organizer: 'Priya S. · Product', color: '#33b679', startMin: 120, endMin: 150 },
   },
   {

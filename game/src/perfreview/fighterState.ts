@@ -7,7 +7,7 @@
 // Module-global mutable state, read by FightWorld (rendering) and FightHud
 // (bars) — NOT React state, so nothing here triggers a 60fps re-render.
 
-import { ARENA, MOVE, JUMP, VITALS, FEEL, STUN, ROUND, FRAME } from './fightConfig'
+import { ARENA, BODY, MOVE, JUMP, VITALS, FEEL, STUN, ROUND, FRAME } from './fightConfig'
 import { LEONARD_MOVES, OPP_MOVES, type MoveDef } from './frameData'
 import { tierFor, nextLine, resetScript, type Tier } from './fightScript'
 
@@ -23,17 +23,24 @@ const PUSH_NORM = 2 / (PUSH_N * (PUSH_N + 1)) // = 1/406 at N = 28
 // ── Event hook (audio/FX) ────────────────────────────────────────────────────
 // The sim is headless (the playtest harness runs it in Node), so it never
 // touches Web Audio directly — FightWorld registers a handler in the browser.
-export type FightEvent = 'whiff' | 'block' | 'hit' | 'hitHeavy' | 'throw' | 'counter' | 'ko'
-let onFightEvent: ((e: FightEvent) => void) | null = null
-export function setFightEventHandler(fn: ((e: FightEvent) => void) | null): void {
+// 'swing' fires the moment an attack STARTS, before anyone knows whether it
+// will land. Every arcade fighter does this: the swing is unconditional, only
+// the impact is earned. Without it a kick that gets blocked — or that you throw
+// at nothing — is completely silent, which reads as the input being dropped.
+export type FightEvent = 'swing' | 'swingHeavy' | 'whiff' | 'block' | 'hit' | 'hitHeavy' | 'throw' | 'counter' | 'ko'
+let onFightEvent: ((e: FightEvent, voice?: number) => void) | null = null
+export function setFightEventHandler(fn: ((e: FightEvent, voice?: number) => void) | null): void {
   onFightEvent = fn
 }
-function emit(e: FightEvent): void {
-  onFightEvent?.(e)
+function emit(e: FightEvent, voice?: number): void {
+  onFightEvent?.(e, voice)
 }
+
 
 // ── Conversation tier (ratchet-up only: meetings don't get friendlier) ──────
 let maxTier: Tier = 1
+// Alternates the "hurt" reaction so light hits don't produce a wall of talk.
+let hurtBeat = 0
 function currentTier(): Tier {
   const minFrac = Math.min(leonard.health / leonard.maxHealth, opponent.health / opponent.maxHealth)
   const t = tierFor(minFrac, fight.time)
@@ -74,6 +81,8 @@ export type Fighter = {
   timer: number // frames left in the current sub-phase
   move: MoveDef | null
   moveHit: boolean // current active move already connected?
+  hitsDone: number // connects so far this activation (multi-hit flurries)
+  reArmT: number // frames until a multi-hit move's box goes live again
   health: number
   maxHealth: number
   meter: number // Alignment (bars) — Leonard spends it; both can build it
@@ -84,12 +93,16 @@ export type Fighter = {
   callout: string // the line currently floating above them ('' = none)
   calloutT: number // frames left on the callout
   scopeStacks: number // Priya's Scope Creep (0–3): +startup per stack; throw to descope
+  hurtHeavy: boolean // was the CURRENT hitstun caused by a heavy? (routes the reaction clip)
+  hurtSeq: number // increments on EVERY connect — the renderer re-jolts the reaction clip on change
+  armorLeft: number // super-armor hits remaining on the current move
   keySwapT: number // frames left on the Derail J/K swap (hostile UI, 🔀)
   sinceDamage: number // frames since last damage taken (drives Backlog Regen)
   y: number // height above the floor (0 = grounded)
   vy: number // vertical velocity (jump)
   airborne: boolean
   airVX: number // horizontal drift while airborne
+  meterDeniedT: number // frames left on the 'not enough Alignment' HUD nudge
   pushDist: number // signed metres still owed by a shove ramp
   pushT: number // ticks left in the ramp (0 = not sliding)
   airAttackUsed: boolean // one Jumping-In per hop
@@ -120,6 +133,11 @@ export const fight = {
   // How far we are between the last sim tick and the next, 0..1. Set by the
   // render loop; used only to interpolate drawn positions (see stepFight).
   alpha: 0,
+  // Clean connects this bout, per side. The round-end card is a fighting-game
+  // result screen and needs something to actually REPORT — a verdict with no
+  // numbers under it is the thing that reads as unfinished.
+  leoHits: 0,
+  oppHits: 0,
   // last connect, for the HUD announcer / debug ("CLARIFY  6")
   lastHit: null as null | { by: 'leonard' | 'opponent'; move: string; dmg: number; kind: string },
 }
@@ -141,6 +159,8 @@ function makeFighter(
     timer: 0,
     move: null,
     moveHit: false,
+    hitsDone: 0,
+    reArmT: 0,
     health: id === 'leonard' ? VITALS.leonardMaxCredibility : VITALS.oppMaxResistance,
     maxHealth: id === 'leonard' ? VITALS.leonardMaxCredibility : VITALS.oppMaxResistance,
     meter: 0,
@@ -151,12 +171,16 @@ function makeFighter(
     callout: '',
     calloutT: 0,
     scopeStacks: 0,
+    hurtHeavy: false,
+    hurtSeq: 0,
+    armorLeft: 0,
     keySwapT: 0,
     sinceDamage: 9999,
     y: 0,
     vy: 0,
     airborne: false,
     airVX: 0,
+    meterDeniedT: 0,
     pushDist: 0,
     pushT: 0,
     airAttackUsed: false,
@@ -208,6 +232,8 @@ export function resetFight(opts: ResetOpts = {}): void {
   fight.winner = null
   fight.time = ROUND.seconds
   fight.hitstop = 0
+  fight.leoHits = 0
+  fight.oppHits = 0
   fight.shake = 0
   fight.round = 1
   fight.alpha = 0
@@ -279,6 +305,12 @@ function advanceFighter(f: Fighter, intent: Intent): void {
   if (f.flash > 0) f.flash--
   if (f.invuln > 0) f.invuln--
   if (f.keySwapT > 0) f.keySwapT--
+  if (f.meterDeniedT > 0) f.meterDeniedT--
+  if (f.reArmT > 0) {
+    f.reArmT--
+    // Flurry: the hitbox comes back for the next rebuttal.
+    if (f.reArmT === 0 && f.state === 'active') f.moveHit = false
+  }
   f.sinceDamage++
   if (f.calloutT > 0 && --f.calloutT === 0) f.callout = ''
 
@@ -314,6 +346,26 @@ function advanceFighter(f: Fighter, intent: Intent): void {
     // fall already faster than the dive is left alone; re-applying per frame is
     // idempotent. A too-low press just lands early → landing lag (committal,
     // and landFighter cleanly cancels the move).
+    // ── THE LUNGE ─────────────────────────────────────────────────────────
+    // A travelling strike has to actually travel. Mixamo bakes that travel into
+    // the clip's root motion; scripts/mixamo/strip-horizontal.mjs removes it so
+    // the sim stays the single source of world position — which means the sim
+    // owes the distance back, or the animation swings at a spot the body never
+    // reaches. That is exactly why the hurricane kick was missing.
+    //
+    // Paid out evenly across startup+active (never recovery — you commit to the
+    // approach, you don't drift during the whiff), clamped to the arena, and
+    // stopped short of the opponent so a lunge can never push through them.
+    if (f.move?.lunge && (f.state === 'startup' || f.state === 'active')) {
+      const span = f.move.startup + f.move.active
+      const step = (f.move.lunge / span) * f.facing
+      const foe = f === leonard ? opponent : leonard
+      const next = clamp(f.x + step, -ARENA.halfWidth, ARENA.halfWidth)
+      // keep at least minGap between centres, same rule the walk uses
+      if (Math.abs(next - foe.x) >= ARENA.minGap || Math.abs(next - foe.x) > Math.abs(f.x - foe.x)) {
+        f.x = next
+      }
+    }
     if (f.state === 'startup' && f.move?.air && f.airborne && f.timer <= JUMP.diveFrames) {
       f.vy = Math.min(f.vy, -JUMP.diveFall)
       f.airVX = f.facing * JUMP.diveForward
@@ -336,6 +388,8 @@ function advanceFighter(f: Fighter, intent: Intent): void {
           f.move = null
           f.moveHit = false
           f.invuln = MOVE.wakeupInvuln // rise with brief i-frames — no meaty re-throw loop
+          // Getting up is the comeback beat — they pick the argument back up.
+          if (!fight.over) say(f, 'up')
           break
         case 'recovery':
         case 'dash':
@@ -387,6 +441,10 @@ function advanceFighter(f: Fighter, intent: Intent): void {
       startMove(f, def)
       return
     }
+    // NOT ENOUGH METER. This used to fail SILENTLY, which is why pressing I
+    // read as "that key does nothing" — the special costs 3 bars of Alignment
+    // and you have to land 3 hits first. Flag it so the HUD can say so.
+    if (def.meterCost > 0) f.meterDeniedT = 48
   }
 
   if (intent.walk !== 0) {
@@ -405,10 +463,15 @@ function advanceFighter(f: Fighter, intent: Intent): void {
 function startMove(f: Fighter, def: MoveDef): void {
   f.meter -= def.meterCost
   f.state = 'startup'
+  f.armorLeft = def.armor ?? 0
+  // You hear the effort the moment it is committed, win or lose.
+  emit(def.heavy ? 'swingHeavy' : 'swing')
   f.move = def
   // SCOPE CREEP: each stack slows your wind-up — the ask keeps growing.
   f.timer = def.startup + f.scopeStacks * SCOPE_STARTUP_PENALTY
   f.moveHit = false
+  f.hitsDone = 0
+  f.reArmT = 0
   say(f, def.id, def.line) // the move announces itself, at the meeting's temperature
 }
 
@@ -448,10 +511,11 @@ function startDash(f: Fighter, dir: -1 | 1): void {
 function separate(): void {
   leonard.x = clamp(leonard.x, -ARENA.halfWidth, ARENA.halfWidth)
   opponent.x = clamp(opponent.x, -ARENA.halfWidth, ARENA.halfWidth)
-  if (opponent.x - leonard.x < ARENA.minGap) {
+  const minGap = ARENA.minGap * ((leonard.heightScale + opponent.heightScale) / 2)
+  if (opponent.x - leonard.x < minGap) {
     const mid = (leonard.x + opponent.x) / 2
-    leonard.x = mid - ARENA.minGap / 2
-    opponent.x = mid + ARENA.minGap / 2
+    leonard.x = mid - minGap / 2
+    opponent.x = mid + minGap / 2
   }
 }
 
@@ -466,7 +530,20 @@ function tryConnect(att: Fighter, def: Fighter): void {
   const m = att.move
   if (m.kind === 'counter') return // a counter-stance has no offensive hitbox
   const dist = Math.abs(att.x - def.x)
-  if (dist > m.reach) return
+  // A BIGGER BODY IS A BIGGER TARGET. The Exec at 1.28× has a visually wider
+  // torso, but the connect check treated him as normal-sized — so at the range
+  // where a jab LOOKS in range against his bulk (1.0–1.3m), it whiffed.
+  // Measured: exec_sweep showed identical connect windows at both scales, which
+  // is the bug, not a feature. Genre rule: giants trade power for hittability.
+  const hurtBonus = (def.heightScale - 1) * BODY.radius
+  // …and a bigger ATTACKER swings a longer arm. Without this the 1.28× Exec
+  // closed to normal-body distance before his (scale-blind) reach connected —
+  // and his oversized fist ended up INSIDE Leonard's chest. His strikes now
+  // connect from proportionally further, where the fist visually lands ON the
+  // target. Both rules together are the genre contract for giants: easier to
+  // hit, and longer arms.
+  const reachScaled = m.reach * att.heightScale
+  if (dist > reachScaled + Math.max(0, hurtBonus)) return
   // ── Vertical reach: ASYMMETRIC, and it scales with the fighter ────────────
   // Striking DOWN out of a jump covers the whole arc; reaching UP from the
   // ground stops around head height. A big opponent (the Exec) both reaches
@@ -475,7 +552,12 @@ function tryConnect(att: Fighter, def: Fighter): void {
   const up = JUMP.vReach * att.heightScale // attacker swinging upward
   const down = JUMP.airStrikeReach * att.heightScale // attacker falling onto them
   if (dy > 0 ? dy > (m.air ? down : up) : -dy > up) return
-  att.moveHit = true // one connect per active window
+  att.moveHit = true // one connect per active window…
+  att.hitsDone++
+  // …unless this is a MULTI-HIT flurry with rebuttals left, in which case the
+  // box re-arms after reArm frames (see MoveDef.hits).
+  const maxHits = m.hits ?? 1
+  if (att.hitsDone < maxHits) att.reArmT = m.reArmSeq?.[att.hitsDone - 1] ?? m.reArm ?? 8
 
   // Defender dodged (dash i-frames) → clean whiff, no effect.
   if (def.invuln > 0) return
@@ -534,7 +616,30 @@ function applyCounter(counterer: Fighter, attacker: Fighter): void {
 }
 
 function applyHit(att: Fighter, def: Fighter, m: MoveDef): void {
+  // SUPER ARMOR: a strike into an armored wind-up deals damage but does NOT
+  // interrupt — the armored fighter powers through. Throws and counters ignore
+  // armor (the triangle stays intact: throw beats armor beats strike).
+  if (
+    def.armorLeft > 0 &&
+    def.move &&
+    (def.state === 'startup' || def.state === 'active') &&
+    m.kind === 'strike'
+  ) {
+    def.armorLeft--
+    def.health = Math.max(0, def.health - m.damage)
+    def.flash = 6
+    def.sinceDamage = 0
+    if (att.id === 'leonard') fight.leoHits++
+    else fight.oppHits++
+    fight.hitstop = Math.max(fight.hitstop, FEEL.hitstopLight)
+    emit('hit')
+    record(att, m)
+    checkKO(att, def)
+    return
+  }
   def.health = Math.max(0, def.health - m.damage)
+  if (att.id === 'leonard') fight.leoHits++
+  else fight.oppHits++
   def.sinceDamage = 0
   def.blocking = false
   def.move = null
@@ -559,7 +664,14 @@ function applyHit(att: Fighter, def: Fighter, m: MoveDef): void {
     checkKO(att, def)
     return
   }
-  if (m.heavy) {
+  // MULTI-HIT: only the LAST rebuttal floors. Every hit of the 5-hit super was
+  // treated as a clean heavy, so hit 1 knocked the victim down AND shoved them
+  // 0.72m — out of range of hits 2-5, which then whiffed. Measured: the super
+  // landed 1 of 5 at 1.9m and 4 of 5 point-blank, while flinging the opponent
+  // 1.87m away. Standard genre rule: intermediate hits stagger, the finisher
+  // knocks down.
+  const finalHit = att.hitsDone >= (m.hits ?? 1)
+  if ((m.floors ?? m.heavy) && finalHit) {
     // A clean heavy FLOORS them (audit P0-1) — the payoff for the hard read.
     // Knockdown + shove; wakeup i-frames prevent any loop.
     def.state = 'knockdown'
@@ -572,9 +684,40 @@ function applyHit(att: Fighter, def: Fighter, m: MoveDef): void {
     def.pushDist = dir * ARENA.knockdownPushback
     def.pushT = PUSH_N
     att.scopeStacks = 0 // flooring them clears the pile of asks — a descope
+    // Getting floored is a CONCESSION, and it should sound like one.
+    say(def, 'floored')
   } else {
+    // …including the non-final hits of a flurry, which stagger in place so the
+    // rest of the combination can actually reach.
     def.state = 'hitstun'
-    def.timer = STUN.hitLight // 22f: a landed jab leaves the attacker "plus"
+    def.hurtHeavy = !!m.heavy
+    def.hurtSeq++
+    // Heavy-weight hits that don't floor (the hurricane kick, a flurry's
+    // intermediate rebuttals) get the longer stagger — the body has to visibly
+    // absorb it, or a 15-damage kick flinches no harder than a 3-damage jab.
+    // Gut-hit staggers (heavy, non-flooring) hold longest — the doubled-over
+    // pose IS the payoff, and it needs screen time to read.
+    def.timer = m.heavy ? ((m.floors ?? true) === false ? STUN.gutHit : STUN.hitHeavy) : STUN.hitLight
+    // COMBO-STRINGING: intermediate hits of a multi-hit hold the victim in
+    // hitstun until the NEXT hit arrives. The flurry's measured gaps are
+    // 14/50/35 frames against a 30-frame stagger — without this the victim
+    // recovered inside the 50-frame gap and BLOCKED rebuttals 3 and 4, which is
+    // why the 4-hit super produced two punch sounds and two thuds. Once hit 1
+    // of a combo lands clean, the rest of the string connects; that is the
+    // genre contract, and the meter/damage economy already assumes it.
+    if ((m.hits ?? 1) > 1 && att.hitsDone < (m.hits ?? 1)) {
+      const gapToNext = m.reArmSeq?.[att.hitsDone - 1] ?? m.reArm ?? 0
+      def.timer = Math.max(def.timer, gapToNext + 6)
+    }
+    if (m.heavy && !(m.floors ?? m.heavy)) {
+      // …and a SHOVE, through the same ramp a knockdown uses. Without it the
+      // spinning leg sweeps through the exact space the victim's torso still
+      // occupies — no physics stops the interpenetration, so the victim moving
+      // OUT of the arc is what sells the contact.
+      const dir = def.x < att.x ? -1 : 1
+      def.pushDist = dir * 0.5
+      def.pushT = PUSH_N
+    }
     // NOTE: ARENA.hitPushback is 0 by design — the visible recoil is rendered,
     // not simulated (see fightConfig). Left wired so it can be dialled up if
     // the spacing maths ever changes.
@@ -582,8 +725,16 @@ function applyHit(att: Fighter, def: Fighter, m: MoveDef): void {
       const dir = def.x < att.x ? -1 : 1
       def.x = clamp(def.x + dir * ARENA.hitPushback, -ARENA.halfWidth, ARENA.halfWidth)
     }
+    // A point landing on you gets a reaction. Every OTHER light hit, and only
+    // when they aren't already mid-line — a fast exchange otherwise turns into
+    // two people talking over each other without pause.
+    hurtBeat++
+    if (def.calloutT <= 0 && hurtBeat % 2 === 0) say(def, 'hurt')
   }
-  gainMeter(att, VITALS.meterOnHit)
+  // SPECIALS BUILD NO METER. Standard fighting-game rule, and load-bearing
+  // here: the 5-hit super would otherwise refund 5 bars for a 3-bar cost and be
+  // infinitely repeatable (measured — meter came back to full mid-super).
+  if (m.kind !== 'special') gainMeter(att, VITALS.meterOnHit)
   fight.hitstop = m.heavy ? FEEL.hitstopHeavy : FEEL.hitstopLight
   fight.shake = Math.max(fight.shake, m.heavy ? FEEL.shakeHeavy : FEEL.shakeLight)
   emit(m.heavy ? 'hitHeavy' : 'hit')
@@ -614,6 +765,8 @@ function applyBlock(att: Fighter, def: Fighter, m: MoveDef): void {
 
 function applyThrow(att: Fighter, def: Fighter, m: MoveDef): void {
   def.health = Math.max(0, def.health - m.damage)
+  if (att.id === 'leonard') fight.leoHits++
+  else fight.oppHits++
   def.sinceDamage = 0
   att.scopeStacks = 0 // taking it offline DESCOPES — the pile of asks clears
   def.state = 'knockdown'

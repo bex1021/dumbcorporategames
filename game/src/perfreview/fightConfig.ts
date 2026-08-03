@@ -76,8 +76,12 @@ export const JUMP = {
   // Tuned by sweep: harder than 3.0/3.4 and an early press (rising, frame ~4)
   // lands BEFORE the hit frame — the attack silently whiffs into landing lag.
   // This is the hardest dive that keeps every press timing connectable.
-  diveFall: 3.0, // m/s downward, applied as -diveFall
-  diveForward: 3.4, // m/s toward the opponent during the plunge
+  diveFall: 3.3, // m/s downward, applied as -diveFall
+  // 5.0, was 3.4. MEASURED (air_sweep.ts): at 3.4 the strike connected only at
+  // 0.8–1.4m — but a jump-in is a RANGED approach; players leap from 1.5–2.2m,
+  // where every press whiffed. "Noise but no contact" was the swing/whiff cues
+  // doing their job on a strike whose plunge couldn't reach.
+  diveForward: 5.0, // m/s toward the opponent during the plunge
   diveFrames: 7, // how many end-of-startup frames the plunge covers (the swing)
 }
 
@@ -120,6 +124,11 @@ export const STUN = {
   blockHeavy: 14, // blockstun vs heavies — blocked heavy is punishable (−13), not −18
   hitLight: 22,
   hitHeavy: 30, // (kept for non-heavy "heavy-class" hits, e.g. specials)
+  // The non-flooring heavy (the hurricane kick): longer than hitHeavy because
+  // its whole payoff is SEEING the victim doubled over — 11 of these frames are
+  // spent frozen in hitstop before the reaction even plays. The kick is a
+  // 333ms-telegraph hard read; a fat stagger is the reward that justifies it.
+  gutHit: 42,
   knockdown: 34, // throws & clean heavies put you on the floor
 }
 

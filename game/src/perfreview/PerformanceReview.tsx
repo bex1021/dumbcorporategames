@@ -13,6 +13,19 @@ import { PerformanceMonitor } from '@react-three/drei'
 import { EffectComposer, Bloom, Vignette, ToneMapping } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
 
+// TONE MAPPING IS PER STAGE, and this is the single biggest reason Priya's set
+// read dim no matter how much light went into it. AgX is a FILMIC curve: it
+// deliberately compresses midtones and desaturates on the way to a soft
+// highlight rolloff, which is exactly right for Brent's dark neon and the Exec's
+// blown-out sunset, and exactly wrong for a bright pastel studio — it was
+// eating the light faster than the rig could add it. Khronos PBR Neutral keeps
+// midtone brightness and saturation and only rolls off the very top end.
+const TONEMAP: Record<string, number> = {
+  brent: ToneMappingMode.AGX,
+  priya: ToneMappingMode.NEUTRAL,
+  exec: ToneMappingMode.AGX,
+}
+
 // Per-stage bloom. The Grid is dark neon and WANTS glow; the Product studio is
 // pale, so anything but a near-1 threshold blooms the whole frame into white
 // fog; the boardroom sits between (its city windows and sun should glow, the
@@ -22,8 +35,15 @@ import { ToneMappingMode } from 'postprocessing'
 // stage light bars) means only genuine emitters glow — which is what makes neon
 // read as light rather than as bright paint.
 const BLOOM: Record<string, { intensity: number; threshold: number; vignette: number }> = {
-  brent: { intensity: 1.2, threshold: 0.86, vignette: 0.6 },
-  priya: { intensity: 0.25, threshold: 0.97, vignette: 0.32 },
+  // 0.78 / 0.93 (was 1.2 / 0.86): at the higher intensity the floor light bars
+  // bled into a milky wash over the whole arena — the "cloudiness". Raising the
+  // threshold keeps the glow on genuine emitters only.
+  brent: { intensity: 0.78, threshold: 0.93, vignette: 0.6 },
+  // vignette 0.32 → 0.18: on a light stage the post vignette is a second
+  // darkening on top of the floor texture's own, and the two stacked into the
+  // dim, grey-cornered look. The floor's painted vignette is the one doing real
+  // compositional work; this one only needs to seal the frame edge.
+  priya: { intensity: 0.25, threshold: 0.97, vignette: 0.18 },
   exec: { intensity: 0.9, threshold: 0.82, vignette: 0.45 },
 }
 import { FightWorld } from './FightWorld'
@@ -70,6 +90,11 @@ const PROFILES: Record<BoutConfig['ai'], AIProfile> = {
 //   ?photomode=lobby            — hold on the Meet green room for stills
 const DOOR_Q = import.meta.env.DEV ? new URLSearchParams(window.location.search) : null
 const DOOR = DOOR_Q?.get('photomode') ?? null
+// ?sandbag=1 — TRAINING MODE: the opponent stands passive (same switch the
+// capture harness uses). For verifying a move's look with human eyes without
+// the live AI blocking/stuffing it: land the move, watch the reaction, remove
+// the param for the real fight.
+if (DOOR_Q?.has('sandbag')) (globalThis as { __sandbag?: boolean }).__sandbag = true
 const DOOR_BOUT = DOOR ? ['brent', 'priya', 'exec'].indexOf(DOOR) : -1
 // Set before first render so the Canvas key + stage dressing match the door's
 // bout (the mount effect re-asserts this after resetGauntlet()).
@@ -181,6 +206,8 @@ export default function PerformanceReview() {
 
   const rematch = () => {
     resetGauntlet()
+    resetFight() // same stale-pose wipe as continueFromBoutEnd
+    resetDummy()
     setStage(currentBout()) // remount the arena behind the opaque calendar
     bump((n) => n + 1)
     setPhase('calendar')
@@ -190,6 +217,14 @@ export default function PerformanceReview() {
     // Clear the last bout's floating lines so they don't haunt the calendar.
     leonard.callout = opponent.callout = ''
     leonard.calloutT = opponent.calloutT = 0
+    // WIPE THE POSE NOW, not at beginBout(). startFight() fades the opaque
+    // shell out over 420ms BEFORE beginBout() runs, so for those 420ms the live
+    // arena is visible — and it was still holding the LAST bout's state. You'd
+    // see the NEW opponent (Priya) lying in the position the OLD one (Brent)
+    // was knocked down in, then snap upright. Resetting here means the scene
+    // under the shell is already neutral before it starts to fade.
+    resetFight()
+    resetDummy()
     // NOW re-dress the room: the opaque calendar shell is about to cover the
     // screen, so the WebGL remount happens out of sight instead of under the
     // result card (see the `stage` latch above).
@@ -248,7 +283,7 @@ export default function PerformanceReview() {
             luminanceSmoothing={0.25}
           />
           <Vignette eskil={false} offset={0.3} darkness={BLOOM[stage.key]?.vignette ?? 0.6} />
-          <ToneMapping mode={ToneMappingMode.AGX} />
+          <ToneMapping mode={TONEMAP[stage.key] ?? ToneMappingMode.AGX} />
         </EffectComposer>
       </Canvas>
 
@@ -275,9 +310,11 @@ export default function PerformanceReview() {
           }}
         >
           {phase === 'calendar' && (
-            // First meeting of the day detours through the lobby (the controls
-            // live there); later joins go straight in — you know the drill.
-            <CalendarScreen onJoin={() => (gauntlet.index === 0 ? setPhase('briefing') : startFight())} />
+            // EVERY meeting goes through the green room. It was first-bout-only
+            // ("you know the drill"), but skipping it made later bouts start
+            // abruptly — joining a call is the ritual this whole phase is built
+            // on, and the controls recap is worth having each time.
+            <CalendarScreen onJoin={() => setPhase('briefing')} />
           )}
           {phase === 'briefing' && (
             <MeetingLobby title={bout.cal.title} organizer={bout.name} onEnter={startFight} />
@@ -290,62 +327,336 @@ export default function PerformanceReview() {
   )
 }
 
+// ── ROUND END ───────────────────────────────────────────────────────────────
+// A fighting game does not fade up one centred paragraph. It STAGES the result:
+// letterbox bars close, the verdict word slams in on an angled banner, then the
+// numbers arrive under it, then the button. Each beat has a job — the slam is
+// the punctuation on the KO, the stat strip is the "what just happened", the
+// button is the only thing you can act on and so it lands last.
+//
+// PHOTOSENSITIVITY: every animation here runs ONCE, forward, and stops. Nothing
+// loops, pulses or flashes — this stage already shipped one accidental strobe
+// (see the KO fix in fighterState) and a result screen is exactly where a
+// designer reaches for a flashing banner. Under prefers-reduced-motion every
+// element is simply placed in its final state with no motion at all.
+const SANS = '-apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif'
+const MONO = '"IBM Plex Mono", ui-monospace, Menlo, monospace'
+
+const END_KEYFRAMES = `
+@keyframes bo-bar-top   { from { transform: translateY(-100%) } to { transform: translateY(0) } }
+@keyframes bo-bar-bot   { from { transform: translateY(100%) }  to { transform: translateY(0) } }
+@keyframes bo-slam      { from { opacity: 0; transform: scale(1.5) } 60% { opacity: 1 } to { opacity: 1; transform: scale(1) } }
+@keyframes bo-swipe     { from { transform: scaleX(0) } to { transform: scaleX(1) } }
+@keyframes bo-rise      { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: translateY(0) } }
+@media (prefers-reduced-motion: reduce) {
+  [data-bo] { animation: none !important; opacity: 1 !important; transform: none !important }
+}
+`
+
+function EndStyles() {
+  return <style>{END_KEYFRAMES}</style>
+}
+
+/** One beat of the staged reveal. delay is in ms from the card appearing. */
+function beat(name: string, dur: number, delay: number, extra = ''): React.CSSProperties {
+  return {
+    animation: `${name} ${dur}ms cubic-bezier(0.16, 0.84, 0.3, 1) ${delay}ms both${extra}`,
+  }
+}
+
+function Letterbox() {
+  const bar: React.CSSProperties = {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: '11vh',
+    background: '#0b0a08',
+    zIndex: 2,
+  }
+  return (
+    <>
+      <div data-bo style={{ ...bar, top: 0, ...beat('bo-bar-top', 380, 0) }} />
+      <div data-bo style={{ ...bar, bottom: 0, ...beat('bo-bar-bot', 380, 0) }} />
+    </>
+  )
+}
+
+/** The verdict: a heavy word on a skewed banner that swipes open behind it.
+ *  The skew is what reads as "fighting game" more than any other single
+ *  choice — every result screen in the genre is built on a diagonal. */
+function Verdict({ word, tint, ink }: { word: string; tint: string; ink: string }) {
+  return (
+    // The skew lives HERE, on a static wrapper, and nowhere else. It used to be
+    // applied separately to the banner and to the word — with different
+    // transform-origins — so the two sheared by different amounts and the last
+    // letter of a long verdict ("UNCONVINCED") hung off the end of its own bar.
+    <div
+      style={{
+        position: 'relative',
+        display: 'inline-block',
+        margin: '0 0 22px',
+        zIndex: 3,
+        transform: 'skewX(-9deg)',
+        maxWidth: '86vw',
+      }}
+    >
+      <div
+        data-bo
+        style={{
+          position: 'absolute',
+          inset: '-4px -30px',
+          background: tint,
+          transformOrigin: 'left center',
+          ...beat('bo-swipe', 340, 120),
+        }}
+      />
+      <div
+        data-bo
+        style={{
+          position: 'relative',
+          fontFamily: SANS,
+          // Scales with the window the way a fighting game's result word does.
+          // 5.6vw, not 6.4: at 6.4 the longest verdict spanned the whole frame.
+          fontSize: 'clamp(30px, 5.6vw, 74px)',
+          fontWeight: 800,
+          letterSpacing: '-0.02em',
+          lineHeight: 1.05,
+          color: ink,
+          padding: '2px 18px',
+          whiteSpace: 'nowrap',
+          ...beat('bo-slam', 300, 220),
+        }}
+      >
+        {word}
+      </div>
+    </div>
+  )
+}
+
+/** The corporate-terminal readout under the verdict. Mono belongs HERE — these
+ *  are figures on a form — and nowhere near the verdict itself, which is the
+ *  loudest thing on screen and needs a heavy sans to carry it. */
+function StatStrip({ cells }: { cells: [string, string][] }) {
+  return (
+    <div
+      data-bo
+      style={{
+        display: 'flex',
+        gap: 1,
+        background: 'rgba(255,255,255,0.1)',
+        border: '1px solid rgba(255,255,255,0.1)',
+        marginBottom: 22,
+        zIndex: 3,
+        ...beat('bo-rise', 320, 620),
+      }}
+    >
+      {cells.map(([label, value]) => (
+        <div key={label} style={{ background: '#141210', padding: '9px 20px', minWidth: 104 }}>
+          <div style={{ fontFamily: MONO, fontSize: 9, letterSpacing: '0.18em', color: '#8f887a' }}>{label}</div>
+          <div style={{ fontFamily: SANS, fontSize: 21, fontWeight: 700, color: '#e8e2d2', marginTop: 3 }}>{value}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function BoutEndCard({ onContinue }: { onContinue: () => void }) {
   const last = gauntlet.results[gauntlet.results.length - 1]
   const bout = BOUTS.find((b) => b.key === last.opponent)!
   const more = !gauntletOver()
+  const won = last.won
+  // `fight` still holds the finished round — resetFight() does not run until
+  // continueFromBoutEnd, so the numbers are live here.
+  const secsLeft = Math.max(0, Math.ceil(fight.time))
   return (
     <Overlay>
-      <div style={{ ...kicker, color: last.won ? '#7bbf7b' : '#c8492f' }}>
-        {last.won ? 'AGENDA ITEM CLOSED' : 'JUDGED AGAINST YOU'}
+      <EndStyles />
+      <Letterbox />
+      <div
+        data-bo
+        style={{
+          fontFamily: MONO,
+          fontSize: 10,
+          letterSpacing: '0.34em',
+          color: won ? '#7bbf7b' : '#c8492f',
+          marginBottom: 14,
+          zIndex: 3,
+          ...beat('bo-rise', 280, 60),
+        }}
+      >
+        {bout.name} · {won ? 'AGENDA ITEM CLOSED' : 'JUDGED AGAINST YOU'}
       </div>
-      <h1 style={{ fontSize: 26, margin: '10px 0 6px', fontWeight: 700 }}>
-        {last.won ? `“${bout.koLine}”` : bout.lossLine}
-      </h1>
-      {last.won && (
-        <div style={{ fontSize: 13, color: '#b9b2a0', marginBottom: 4 }}>
-          Walked out at {Math.round(last.scorePct * 100)}% credibility.
+
+      <Verdict
+        word={won ? 'CONVINCED' : 'UNCONVINCED'}
+        tint={won ? '#e8c15a' : '#c8492f'}
+        ink={won ? '#1a1712' : '#fbeee9'}
+      />
+
+      {/* The line they actually say. Sans, and quoted only on a win — a loss is
+          a verdict delivered ABOUT you, not a line spoken to you. */}
+      <div
+        data-bo
+        style={{
+          fontFamily: SANS,
+          fontSize: 'clamp(14px, 1.5vw, 19px)',
+          fontWeight: 500,
+          lineHeight: 1.45,
+          color: '#d8d2c2',
+          maxWidth: 560,
+          margin: '0 0 20px',
+          zIndex: 3,
+          ...beat('bo-rise', 320, 460),
+        }}
+      >
+        {won ? `\u201C${bout.koLine}\u201D` : bout.lossLine}
+      </div>
+
+      <StatStrip
+        cells={[
+          ['CREDIBILITY', `${Math.round((won ? last.scorePct : 0) * 100)}%`],
+          ['HITS LANDED', String(fight.leoHits)],
+          ['HITS TAKEN', String(fight.oppHits)],
+          ['HARD STOP', `${secsLeft}s`],
+        ]}
+      />
+
+      <div data-bo style={{ zIndex: 3, ...beat('bo-rise', 300, 780) }}>
+        <button style={btn} onClick={onContinue}>
+          {more ? 'BACK TO CALENDAR \u2192' : 'SEE THE REVIEW \u2192'}
+        </button>
+        <div style={{ fontFamily: MONO, fontSize: 11, color: '#8f887a', marginTop: 12 }}>
+          {more ? 'Your calendar is already pinging.' : 'The building is quiet. Reception prints your rating.'}
         </div>
-      )}
-      <div style={{ fontSize: 12, color: '#8f887a', marginBottom: 18 }}>
-        {more ? 'Your calendar is already pinging.' : 'The building is quiet. Reception prints your rating.'}
       </div>
-      <button style={btn} onClick={onContinue}>{more ? 'BACK TO CALENDAR →' : 'SEE THE REVIEW →'}</button>
     </Overlay>
   )
 }
 
 function GauntletResult({ onRematch }: { onRematch: () => void }) {
   const rating = finalRating()
-  const color = rating === 'PIP' ? '#c8492f' : rating === 'EXCEEDS EXPECTATIONS' ? '#e8c15a' : '#7bbf7b'
+  const tint = rating === 'PIP' ? '#c8492f' : rating === 'EXCEEDS EXPECTATIONS' ? '#e8c15a' : '#7bbf7b'
+  const ink = rating === 'EXCEEDS EXPECTATIONS' ? '#1a1712' : '#fbeee9'
   const sub =
     rating === 'PIP'
-      ? '“We’re really investing in your growth.” The form is signed with the same handshake as victory.'
+      ? '\u201CWe\u2019re really investing in your growth.\u201D The form is signed with the same handshake as victory.'
       : rating === 'EXCEEDS EXPECTATIONS'
         ? 'The project is greenlit for Phase 2 of the Portal Refresh. Nothing was ever built in Phase 1.'
         : 'Sign-off achieved. The cycle begins again.'
+  const wins = gauntlet.results.filter((r) => r.won).length
   return (
     <Overlay>
-      <div style={kicker}>3:30 PM · ANNUAL REVIEW — FINAL</div>
-      <h1 style={{ fontSize: 30, margin: '10px 0 6px', fontWeight: 700, color }}>{rating}</h1>
-      <div style={{ fontSize: 13, color: '#b9b2a0', maxWidth: 480, marginBottom: 16 }}>{sub}</div>
-      <div style={{ ...controls, textAlign: 'left' }}>
-        {gauntlet.results.map((r) => {
+      <EndStyles />
+      <Letterbox />
+      <div
+        data-bo
+        style={{
+          fontFamily: MONO,
+          fontSize: 10,
+          letterSpacing: '0.34em',
+          color: '#b9976a',
+          marginBottom: 14,
+          zIndex: 3,
+          ...beat('bo-rise', 280, 60),
+        }}
+      >
+        3:30 PM · ANNUAL REVIEW — FINAL
+      </div>
+
+      <Verdict word={rating} tint={tint} ink={ink} />
+
+      <div
+        data-bo
+        style={{
+          fontFamily: SANS,
+          fontSize: 'clamp(13px, 1.4vw, 17px)',
+          lineHeight: 1.5,
+          color: '#d8d2c2',
+          maxWidth: 540,
+          margin: '0 0 20px',
+          zIndex: 3,
+          ...beat('bo-rise', 320, 460),
+        }}
+      >
+        {sub}
+      </div>
+
+      {/* THE CARD. A fighting game ends on a scorecard, and this one is also the
+          joke: three bouts itemised like a performance review, footed with the
+          only number that was ever real. */}
+      <div
+        data-bo
+        style={{
+          zIndex: 3,
+          textAlign: 'left',
+          minWidth: 'min(520px, 86vw)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          background: 'rgba(0,0,0,0.42)',
+          marginBottom: 22,
+          ...beat('bo-rise', 340, 620),
+        }}
+      >
+        {gauntlet.results.map((r, i) => {
           const b = BOUTS.find((x) => x.key === r.opponent)!
           return (
-            <div key={r.opponent}>
-              <b>{b.cardTitle}</b> — {r.won ? `convinced at ${Math.round(r.scorePct * 100)}% credibility` : 'unconvinced'}
+            <div
+              key={r.opponent}
+              style={{
+                display: 'flex',
+                alignItems: 'baseline',
+                gap: 12,
+                padding: '10px 16px',
+                borderTop: i ? '1px solid rgba(255,255,255,0.07)' : 'none',
+              }}
+            >
+              <span style={{ fontFamily: MONO, fontSize: 9, letterSpacing: '0.2em', color: '#8f887a', width: 46 }}>
+                BOUT {i + 1}
+              </span>
+              <span style={{ fontFamily: SANS, fontSize: 14, fontWeight: 600, color: '#e8e2d2', flex: 1 }}>
+                {b.name}
+              </span>
+              <span
+                style={{
+                  fontFamily: SANS,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  letterSpacing: '0.06em',
+                  color: r.won ? '#7bbf7b' : '#c8492f',
+                }}
+              >
+                {r.won ? `CONVINCED · ${Math.round(r.scorePct * 100)}%` : 'UNCONVINCED'}
+              </span>
             </div>
           )
         })}
-        <div style={{ marginTop: 10, color: '#e8c15a', fontWeight: 700 }}>
-          Actual Business Value Generated: $0.00
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            padding: '11px 16px',
+            borderTop: '1px solid rgba(255,255,255,0.14)',
+            background: 'rgba(232,193,90,0.07)',
+          }}
+        >
+          <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '0.16em', color: '#b9976a' }}>
+            ACTUAL BUSINESS VALUE GENERATED
+          </span>
+          <span style={{ fontFamily: SANS, fontSize: 14, fontWeight: 800, color: '#e8c15a' }}>$0.00</span>
         </div>
       </div>
-      <button style={btn} onClick={onRematch}>REQUEST A FOLLOW-UP REVIEW ↻</button>
+
+      <div data-bo style={{ zIndex: 3, ...beat('bo-rise', 300, 820) }}>
+        <button style={btn} onClick={onRematch}>
+          REQUEST A FOLLOW-UP REVIEW \u21bb
+        </button>
+        <div style={{ fontFamily: MONO, fontSize: 11, color: '#8f887a', marginTop: 12 }}>
+          {wins}/3 rooms convinced.
+        </div>
+      </div>
     </Overlay>
   )
 }
+
 
 function Overlay({ children }: { children: React.ReactNode }) {
   return (
@@ -371,17 +682,8 @@ function Overlay({ children }: { children: React.ReactNode }) {
   )
 }
 
-const kicker: React.CSSProperties = { fontSize: 11, letterSpacing: '0.3em', color: '#b9976a' }
-const controls: React.CSSProperties = {
-  fontSize: 12,
-  lineHeight: 1.9,
-  color: '#cfc8b6',
-  background: 'rgba(0,0,0,0.35)',
-  border: '1px solid rgba(255,255,255,0.1)',
-  borderRadius: 4,
-  padding: '14px 18px',
-  marginBottom: 20,
-}
+// `kicker` and `controls` retired with the old centred-paragraph result cards
+// (see BoutEndCard / GauntletResult, which now stage their own type).
 const btn: React.CSSProperties = {
   fontFamily: 'inherit',
   fontSize: 13,

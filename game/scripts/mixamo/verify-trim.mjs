@@ -21,15 +21,28 @@ const dir = join(here, '..', '..', 'public', 'models', '_mixamo_glb')
 
 const SOURCE_FPS = 30
 // must mirror AnimatedFighter.tsx
+// KEEP IN SYNC with AnimatedFighter's ATTACK_TRIM. This table went stale once
+// already and happily reported PASS on values the game no longer used.
 const ATTACK_TRIM = {
   jab: [11, 26, 1.09],
   heavy: [18, 43, 1.0],
-  throw: [27, 48, 1.33],
+  hurricane: [16, 76, 2.2],
+  grab: [27, 48, 1.33],
   jumpattack: [40, 58, 1.8],
+  combo: [24, 145, 1.7],
 }
-const LIMB = { jab: 'LeftHand', heavy: 'RightFoot', throw: 'RightHand', jumpattack: 'RightHand' }
+const LIMB = { jab: 'LeftHand', heavy: 'RightFoot', hurricane: 'LeftFoot', grab: 'RightHand', jumpattack: 'RightHand', combo: 'LeftHand' }
+// Distance-from-hips is DEGENERATE for a spinning strike — the limb orbits at a
+// constant radius, so the excursion reads 0.000m and the percentage check is
+// meaningless. These two are verified by peak limb SPEED instead
+// (scripts/mixamo/measure-new.mjs); here we only check that they fit the window.
+// Only the hurricane kick is a true spin. The combo is an uppercut now, so it
+// gets held to the full excursion assertion rather than the exemption.
+// crescent kick EXTENDS (unlike the old orbit-spin), so it takes the full
+// excursion assertion again
+const SPIN = new Set([])
 // gameplay window (startup+active+recovery frames @60) from frameData.ts
-const WINDOW60 = { jab: 11 + 3 + 13, heavy: 20 + 4 + 24, throw: 12 + 5 + 22, jumpattack: 11 + 10 + 4 }
+const WINDOW60 = { jab: 11 + 3 + 13, heavy: 20 + 4 + 24, hurricane: 22 + 6 + 27, grab: 12 + 5 + 22, jumpattack: 11 + 10 + 4, combo: 14 + 104 + 26 }
 // jumpattack is an OVERHEAD SLAM: "distance from hips" peaks on the ARCH (arms
 // overhead), not the strike — that metric is exactly what mis-placed the old
 // contact. For it, measure VERTICAL hand travel (y range) instead.
@@ -90,11 +103,15 @@ for (const [slot, trim] of Object.entries(ATTACK_TRIM)) {
   const wallSec = cut.duration / trim[2]
   const windowSec = WINDOW60[slot] / 60
   const kept = ((cutRange / fullRange) * 100).toFixed(0)
-  const ok = cutRange > fullRange * 0.6 && wallSec <= windowSec * 1.15
+  // A spinning strike has no radial excursion to measure, so for those the only
+  // meaningful assertion here is that the clip fits its gameplay window. Their
+  // contact frames are verified by peak limb speed in measure-new.mjs.
+  const fits = wallSec <= windowSec * 1.15
+  const ok = SPIN.has(slot) ? fits : cutRange > fullRange * 0.6 && fits
   if (ok) pass++
   console.log(
     `${ok ? 'PASS' : 'FAIL'}  ${slot.padEnd(11)} ` +
-      `strike excursion kept ${kept}% (${cutRange.toFixed(3)}m of ${fullRange.toFixed(3)}m full)  ` +
+      `${SPIN.has(slot) ? 'spin — excursion N/A' : `strike excursion kept ${kept}%`} (${cutRange.toFixed(3)}m of ${fullRange.toFixed(3)}m full)  ` +
       `| clip ${cut.duration.toFixed(3)}s @${trim[2]}x = ${wallSec.toFixed(3)}s vs window ${windowSec.toFixed(3)}s`,
   )
 }

@@ -41,7 +41,13 @@ export function FightCamera() {
     // Aim between the two fighters' centres of mass, so a towering opponent
     // lifts the shot instead of hanging out of the top of it.
     const aimY = (BODY.height + tallest) / 4 + topY * 0.4
-    camera.position.y += (aimY + 0.5 - camera.position.y) * CAMERA.followLerp
+    // +0.1, was +0.5. This offset above the aim point IS the downtilt, and the
+    // downtilt decides how much of the frame is floor: at +0.5 the horizon sat
+    // at screen y +0.29 (wide) / +0.38 (tight) — 64–69% of the frame was
+    // ground. At +0.1 the horizon rides ~+0.06/+0.08, splitting the frame
+    // ~53/47 — the classic near-level fighting-game camera, and the sky/board
+    // band gets the room back.
+    camera.position.y += (aimY + 0.1 - camera.position.y) * CAMERA.followLerp
     camera.lookAt(mid, aimY, 0)
   })
 

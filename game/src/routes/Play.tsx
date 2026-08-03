@@ -21,6 +21,7 @@ import {
 } from '../state/progress'
 import { ACHIEVEMENTS, loadUnlocked } from '../content/achievements'
 import { JR_ACHIEVEMENTS_CATALOG, loadJRUnlocked } from '../content/jrAchievements'
+import { LUNCH_ACHIEVEMENTS_CATALOG, loadLunchUnlocked } from '../content/lunchAchievements'
 import { HrFileCode } from '../ui/HrFileCode'
 
 type Tone = 'cleared' | 'current' | 'locked' | 'soon'
@@ -40,8 +41,9 @@ export default function Play() {
 
   const p1Earned = loadUnlocked()
   const p2Earned = loadJRUnlocked()
-  const totalEarned = p1Earned.size + p2Earned.size
-  const totalAchv = ACHIEVEMENTS.length + JR_ACHIEVEMENTS_CATALOG.length
+  const p3Earned = loadLunchUnlocked()
+  const totalEarned = p1Earned.size + p2Earned.size + p3Earned.size
+  const totalAchv = ACHIEVEMENTS.length + JR_ACHIEVEMENTS_CATALOG.length + LUNCH_ACHIEVEMENTS_CATALOG.length
 
   return (
     <div className="min-h-screen w-full bg-[#f4f5f7] text-[#172b4d] flex flex-col" style={{ fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif' }}>
@@ -104,6 +106,12 @@ export default function Play() {
               <AchvGroup
                 label="Jira Run"
                 items={JR_ACHIEVEMENTS_CATALOG.map((a) => ({ id: a.id, emoji: a.emoji, title: a.title, earned: p2Earned.has(a.id) }))}
+              />
+            </div>
+            <div className="mt-5">
+              <AchvGroup
+                label="Lunch Dash"
+                items={LUNCH_ACHIEVEMENTS_CATALOG.map((a) => ({ id: a.id, emoji: a.emoji, title: a.title, earned: p3Earned.has(a.id) }))}
               />
             </div>
           </div>
