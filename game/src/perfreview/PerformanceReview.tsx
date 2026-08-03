@@ -74,6 +74,7 @@ import {
   type AIProfile,
 } from './dummyAI'
 import { markBeaten } from '../state/progress'
+import { setAnnouncerGender, announce, primeAnnouncer } from './fightAudio'
 
 type Phase = 'calendar' | 'briefing' | 'fighting' | 'boutEnd' | 'over'
 
@@ -129,6 +130,9 @@ export default function PerformanceReview() {
     resetGauntlet()
     resetFight()
     resetDummy()
+    // Warm the announcer cache while the player reads the calendar — the
+    // first "FIGHT!" must not race its own mp3 decode.
+    primeAnnouncer()
     if (import.meta.env.DEV) {
       ;(window as unknown as { __fight?: unknown }).__fight = {
         fight, leonard, opponent, resetFight, stepFight, resetDummy, readDummyIntent, gauntlet,
@@ -184,6 +188,11 @@ export default function PerformanceReview() {
 
   const beginBout = () => {
     const bout = currentBout()
+    // THE ANNOUNCER: Priya gets "FINISH HER!"; everyone gets "FIGHT!" as the
+    // arena fades in (0.25s — the shout lands right as control is handed over).
+    setAnnouncerGender(bout.key === 'priya' ? 'her' : 'him')
+    primeAnnouncer()
+    announce('fight', 0.25)
     setOpponentProfile(PROFILES[bout.ai])
     resetFight({
       oppMoves: bout.moves,

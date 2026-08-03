@@ -264,6 +264,78 @@ export function playFightCue(e: FightEvent): void {
       punch(true)
       tone('sine', 90, 30, 0.5, 1.0, 0.04)
       noise(0.3, 700, 0.5, 0.04)
+      announce('ko', 0.35) // "K.O.!" — after the crunch, over the freeze-frame
+      break
+    // ── the announcer (see below) ──
+    case 'annBigHit': {
+      // OCCASIONAL, like MK: a shout on every heavy would become wallpaper.
+      const now = Date.now()
+      if (now - lastShoutAt < SHOUT_COOLDOWN_MS || Math.random() > 0.45) break
+      lastShoutAt = now
+      announce(DAMAGE_POOL[Math.floor(Math.random() * DAMAGE_POOL.length)])
+      break
+    }
+    case 'annNearKO': // the opponent's bar first drops under 25% — the classic
+      lastShoutAt = Date.now() // suppress a DAMAGE shout stepping on it
+      announce(annGender === 'her' ? 'finishher' : 'finishhim')
+      break
+    case 'annWin': // opponent KO'd: K.O. already played on 'ko'; the verdict
+      announce('aligned', 1.4) // lands as the result card does
       break
   }
+}
+
+// ── THE ANNOUNCER — pre-rendered ElevenLabs voice (the MK god-voice) ────────
+// Files from scripts/render-fight-announcer.mjs. Decoded once, cached; play
+// through the same master/limiter as the cues so the mix stays one system.
+type AnnName =
+  | 'fight' | 'ko' | 'finishhim' | 'finishher' | 'aligned'
+  | 'damage' | 'pushback' | 'noted' | 'escalated' | 'synergy' | 'closetheloop'
+const DAMAGE_POOL: AnnName[] = ['damage', 'pushback', 'noted', 'escalated', 'synergy']
+const SHOUT_COOLDOWN_MS = 7000
+let lastShoutAt = 0
+let annGender: 'him' | 'her' = 'him'
+const annBuffers = new Map<AnnName, AudioBuffer>()
+const annLoading = new Set<AnnName>()
+
+/** Per-bout: Priya gets "FINISH HER!". Called by PerformanceReview.beginBout. */
+export function setAnnouncerGender(g: 'him' | 'her'): void {
+  annGender = g
+}
+
+function loadAnn(name: AnnName): void {
+  if (annBuffers.has(name) || annLoading.has(name)) return
+  annLoading.add(name)
+  fetch(`/sounds/fight/announcer/${name}.mp3`)
+    .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
+    .then((ab) => ac().decodeAudioData(ab))
+    .then((buf) => annBuffers.set(name, buf))
+    .catch(() => {}) // missing file = silent announcer, never a broken fight
+    .finally(() => annLoading.delete(name))
+}
+
+/** Warm the cache at fight mount so the first shout isn't late. */
+export function primeAnnouncer(): void {
+  const all: AnnName[] = ['fight', 'ko', 'finishhim', 'finishher', 'aligned', ...DAMAGE_POOL]
+  for (const n of all) loadAnn(n)
+}
+
+/** Play a line (delay in seconds). Loud and proud — the voice IS the event.
+ *  A cold cache retries briefly (4 × 250ms) — enough to cover the very first
+ *  "FIGHT!" while its decode is in flight, short enough that a hit shout
+ *  never arrives absurdly after its hit. */
+export function announce(name: AnnName, delay = 0, retries = 4): void {
+  const c = ac()
+  const buf = annBuffers.get(name)
+  if (!buf) {
+    loadAnn(name)
+    if (retries > 0) window.setTimeout(() => announce(name, 0, retries - 1), 250)
+    return
+  }
+  const src = c.createBufferSource()
+  src.buffer = buf
+  const g = c.createGain()
+  g.gain.value = 1.0 // files are pre-limited at −0.7 dBFS; master scales them
+  src.connect(g).connect(master!)
+  src.start(c.currentTime + delay)
 }

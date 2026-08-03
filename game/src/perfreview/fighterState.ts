@@ -27,7 +27,7 @@ const PUSH_NORM = 2 / (PUSH_N * (PUSH_N + 1)) // = 1/406 at N = 28
 // will land. Every arcade fighter does this: the swing is unconditional, only
 // the impact is earned. Without it a kick that gets blocked — or that you throw
 // at nothing — is completely silent, which reads as the input being dropped.
-export type FightEvent = 'swing' | 'swingHeavy' | 'whiff' | 'block' | 'hit' | 'hitHeavy' | 'throw' | 'counter' | 'ko'
+export type FightEvent = 'swing' | 'swingHeavy' | 'whiff' | 'block' | 'hit' | 'hitHeavy' | 'throw' | 'counter' | 'ko' | 'annBigHit' | 'annNearKO' | 'annWin'
 let onFightEvent: ((e: FightEvent, voice?: number) => void) | null = null
 export function setFightEventHandler(fn: ((e: FightEvent, voice?: number) => void) | null): void {
   onFightEvent = fn
@@ -140,6 +140,7 @@ export const fight = {
   oppHits: 0,
   // last connect, for the HUD announcer / debug ("CLARIFY  6")
   lastHit: null as null | { by: 'leonard' | 'opponent'; move: string; dmg: number; kind: string },
+  annNearKO: false, // the FINISH HIM shout — once per bout, first time under 25%
 }
 
 function makeFighter(
@@ -238,6 +239,7 @@ export function resetFight(opts: ResetOpts = {}): void {
   fight.round = 1
   fight.alpha = 0
   fight.lastHit = null
+  fight.annNearKO = false
 }
 
 /** Drawn position: eased between the last two sim ticks so motion stays smooth
@@ -615,6 +617,19 @@ function applyCounter(counterer: Fighter, attacker: Fighter): void {
   checkKO(counterer, attacker)
 }
 
+// THE ANNOUNCER's triggers (fightAudio decides whether to actually shout —
+// cooldowns and dice live there; the sim only reports what happened).
+// Opponent-only by design: the voice calls YOUR blows, per the blueprint's
+// arcade framing (Rebecca: "when the opponent suffers a really bad hit").
+function annCheck(def: Fighter, big: boolean): void {
+  if (def.id !== 'opponent') return
+  if (big) emit('annBigHit')
+  if (!fight.annNearKO && def.health > 0 && def.health <= def.maxHealth * 0.25) {
+    fight.annNearKO = true
+    emit('annNearKO')
+  }
+}
+
 function applyHit(att: Fighter, def: Fighter, m: MoveDef): void {
   // SUPER ARMOR: a strike into an armored wind-up deals damage but does NOT
   // interrupt — the armored fighter powers through. Throws and counters ignore
@@ -633,6 +648,7 @@ function applyHit(att: Fighter, def: Fighter, m: MoveDef): void {
     else fight.oppHits++
     fight.hitstop = Math.max(fight.hitstop, FEEL.hitstopLight)
     emit('hit')
+    annCheck(def, false)
     record(att, m)
     checkKO(att, def)
     return
@@ -645,6 +661,7 @@ function applyHit(att: Fighter, def: Fighter, m: MoveDef): void {
   def.move = null
   def.moveHit = false
   def.flash = 6
+  annCheck(def, m.heavy === true || m.floors === true || m.damage >= 12)
   if (m.applyScope) def.scopeStacks = Math.min(3, def.scopeStacks + 1) // the ask grows
   if (m.derail) def.keySwapT = DERAIL_FRAMES // hostile UI: your keys stop meaning what they meant
   // Hit while AIRBORNE → slammed to the floor, knocked down (anti-air payoff).
@@ -660,6 +677,7 @@ function applyHit(att: Fighter, def: Fighter, m: MoveDef): void {
     fight.hitstop = FEEL.hitstopHeavy
     fight.shake = Math.max(fight.shake, FEEL.shakeHeavy)
     emit('hitHeavy')
+    annCheck(def, true)
     record(att, m)
     checkKO(att, def)
     return
@@ -783,6 +801,7 @@ function applyThrow(att: Fighter, def: Fighter, m: MoveDef): void {
   // position, but you SEE them stumble instead of blinking backwards.
   def.pushDist = dir * ARENA.throwPushback
   def.pushT = PUSH_N
+  annCheck(def, false)
   gainMeter(att, VITALS.meterOnHit)
   fight.hitstop = FEEL.hitstopThrow
   fight.shake = Math.max(fight.shake, FEEL.shakeHeavy * 0.7)
@@ -808,6 +827,7 @@ function checkKO(att: Fighter, def: Fighter): void {
     // waits for hitstop === 0 to raise the card.
     fight.hitstop = Math.max(fight.hitstop, FEEL.koFreeze)
     emit('ko')
+    if (def.id === 'opponent') emit('annWin')
   }
 }
 
