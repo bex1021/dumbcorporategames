@@ -16,6 +16,9 @@ import {
   BufferGeometry,
   DoubleSide,
   BackSide,
+  CanvasTexture,
+  RepeatWrapping,
+  ClampToEdgeWrapping,
   MeshStandardMaterial,
   MeshBasicMaterial,
   DirectionalLight,
@@ -24,7 +27,7 @@ import {
   Mesh,
   Group,
 } from 'three'
-import { terrainHeight, rampHeight, RAMPS } from './terrain'
+import { terrainHeight, rampHeight, rampAt, RAMPS, type Ramp } from './terrain'
 import { signalState } from './signalState'
 import { carPosition } from './carState'
 import { DRIVE_WORLD } from './driveConfig'
@@ -291,6 +294,7 @@ export function DriveWorld() {
   return (
     <>
       <SkyDome />
+      <CloudDome />
       <CityEnv />
       <DriveLights />
       <Ground />
@@ -331,11 +335,19 @@ export function DriveWorld() {
 }
 
 function DriveLights() {
-  // Lower fill so the sun's shadows actually read; the sun carries the scene.
+  // The sun carries the scene; fill only keeps shadows from going black.
+  //
+  // Previously flat ambient 0.5 + hemisphere 0.4 = 0.9 of fill against a 1.2
+  // sun. That much omnidirectional light lifts the shadow side almost to the lit
+  // side, which is exactly what reads as "flat" — real midday has a hard sun and
+  // comparatively little fill. Rebalanced toward the sun, and the fill that
+  // remains is mostly HEMISPHERE rather than ambient: hemisphere is directional
+  // (cool skylight from above, warm bounce off the road below), so it shades
+  // surfaces by their orientation instead of washing every face equally.
   return (
     <>
-      <ambientLight intensity={0.5} color="#eef1f4" />
-      <hemisphereLight args={['#e2ebf2', '#9aa08c', 0.4]} />
+      <ambientLight intensity={0.22} color="#eef1f4" />
+      <hemisphereLight args={['#cfe0f0', '#b0a68e', 0.55]} />
       <SunLight />
     </>
   )
@@ -367,18 +379,27 @@ function SunLight() {
       <directionalLight
         ref={ref}
         castShadow
-        intensity={1.2}
-        color="#fff6ea"
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
-        shadow-camera-left={-95}
-        shadow-camera-right={95}
-        shadow-camera-top={95}
-        shadow-camera-bottom={-95}
+        intensity={1.7}
+        color="#fff4e2"
+        // 4096 over an 84 m half-window ≈ 24 shadow texels/m, up from ~11 at
+        // 2048/95. That is the difference between a lamp-post shadow being a
+        // soft grey smear and reading as a pole. The window is tightened as well
+        // as the map enlarged — resolution is texels PER METRE, so shrinking the
+        // area is as effective as growing the map and costs nothing.
+        shadow-mapSize-width={4096}
+        shadow-mapSize-height={4096}
+        shadow-camera-left={-84}
+        shadow-camera-right={84}
+        shadow-camera-top={84}
+        shadow-camera-bottom={-84}
         shadow-camera-near={20}
         shadow-camera-far={430}
-        shadow-bias={-0.0005}
-        shadow-normalBias={1.0}
+        shadow-bias={-0.0004}
+        // normalBias was 1.0 — over a metre of push-off, which detaches shadows
+        // from whatever casts them ("peter-panning": a car floating above its own
+        // shadow). At 4096 the texels are small enough that 0.25 clears the
+        // self-shadow acne it was there to hide, and contact is restored.
+        shadow-normalBias={0.25}
       />
       <primitive object={target} />
     </>
@@ -411,6 +432,107 @@ function SkyDome() {
   return (
     <mesh geometry={geo}>
       <meshBasicMaterial vertexColors side={BackSide} fog={false} depthWrite={false} />
+    </mesh>
+  )
+}
+
+// ── Clouds ───────────────────────────────────────────────────────────────────
+// A second, slightly smaller dome inside the sky gradient, carrying a PROCEDURAL
+// cloud texture. Painted into a canvas at load with fractal Brownian motion
+// (four octaves of value noise) — no image download, same "generate it, don't
+// ship it" approach as the rest of this game's art.
+//
+// Why a dome and not a flat plane: a plane big enough to fill the view has a
+// visible far edge, and the sky dome doesn't depth-write so it can't hide it.
+// On a dome the clouds simply wrap, and there's no seam to chase.
+//
+// Alpha is multiplied by a vertical fade so cloud cover thins toward the horizon
+// and is gone entirely below it — real cloud decks recede to haze rather than
+// running into the ground, and it keeps the pale horizon band the fog matches.
+// The dome drifts very slowly (a full turn takes ~10 min, far longer than a
+// 150 s run), which reads as weather rather than a spinning skybox.
+function CloudDome() {
+  const ref = useRef<Mesh>(null)
+  const tex = useMemo(() => {
+    const W = 1024
+    const H = 512
+    const cv = document.createElement('canvas')
+    cv.width = W
+    cv.height = H
+    const ctx = cv.getContext('2d')!
+    const img = ctx.createImageData(W, H)
+
+    // value noise on a wrapping lattice, so the texture tiles seamlessly in u
+    const hash = (x: number, y: number) => {
+      const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453
+      return n - Math.floor(n)
+    }
+    const smooth = (t: number) => t * t * (3 - 2 * t)
+    const noise = (x: number, y: number, period: number) => {
+      const xi = Math.floor(x)
+      const yi = Math.floor(y)
+      const xf = smooth(x - xi)
+      const yf = smooth(y - yi)
+      // wrap x on `period` so the left and right edges agree
+      const wx = (v: number) => ((v % period) + period) % period
+      const a = hash(wx(xi), yi)
+      const b = hash(wx(xi + 1), yi)
+      const c2 = hash(wx(xi), yi + 1)
+      const d = hash(wx(xi + 1), yi + 1)
+      return a * (1 - xf) * (1 - yf) + b * xf * (1 - yf) + c2 * (1 - xf) * yf + d * xf * yf
+    }
+
+    for (let y = 0; y < H; y++) {
+      const v = y / H // 0 = top of the dome, 1 = bottom (v = 0.5 is the horizon)
+      // Cover has to reach DOWN to the horizon band, because that is the only
+      // sky a chase camera ever frames — between and above the buildings. An
+      // earlier fade concentrated cloud overhead and cleared it by v≈0.5, which
+      // looks correct in an editor fly-around and is invisible in play. Now the
+      // deck holds most of the way down and only feathers out in the last few
+      // degrees, where the fog and the pale horizon band take over.
+      const vertical = 1 - smooth(Math.min(1, Math.max(0, (v - 0.4) / 0.1)))
+      for (let x = 0; x < W; x++) {
+        let amp = 0.5
+        let freq = 4
+        let n = 0
+        for (let o = 0; o < 4; o++) {
+          n += amp * noise((x / W) * freq, (y / H) * freq * 0.5, freq)
+          freq *= 2
+          amp *= 0.5
+        }
+        // threshold into billows: below `cut` is clear sky, above ramps to solid
+        const cut = 0.52
+        const density = Math.max(0, (n - cut) / (1 - cut))
+        const a = Math.min(1, density * 1.9) * vertical
+        const i = (y * W + x) * 4
+        img.data[i] = 255
+        img.data[i + 1] = 255
+        img.data[i + 2] = 255
+        img.data[i + 3] = Math.round(a * 235)
+      }
+    }
+    ctx.putImageData(img, 0, 0)
+    const t = new CanvasTexture(cv)
+    t.wrapS = RepeatWrapping
+    t.wrapT = ClampToEdgeWrapping
+    t.anisotropy = 4
+    return t
+  }, [])
+
+  useFrame((_, dt) => {
+    if (ref.current) ref.current.rotation.y += dt * 0.01 // ~10 min per revolution
+  })
+
+  return (
+    <mesh ref={ref} geometry={useMemo(() => new SphereGeometry(840, 32, 16), [])}>
+      <meshBasicMaterial
+        map={tex}
+        side={BackSide}
+        transparent
+        opacity={0.9}
+        depthWrite={false}
+        fog={false}
+      />
     </mesh>
   )
 }
@@ -448,7 +570,10 @@ function Ground() {
       if (inAny(x, wz, WATER)) col.copy(water) // river + pond, painted blue
       // Authored jump ramps read as raw graded earth, so the hump is legible as
       // something built (and aimable at) rather than an invisible bump.
-      else if (rampHeight(x, wz) > 0.05) col.copy(dirt)
+      // Only ROADWORKS ramps read as graded earth. The parade kickers are truck
+      // beds — painting them dirt drew a brown mound on the tarmac under the
+      // vehicle, which is the "hill" that shouldn't be there.
+      else if (rampHeight(x, wz) > 0.05 && !rampAt(x, wz)?.kicker) col.copy(dirt)
       else if (inAny(x, wz, GREEN_AREAS)) col.copy(grass) // parks, golf, cemetery
       else if (inAny(x, wz, DISTRICT_REGIONS))
         col.copy(grey).multiplyScalar(0.95 + bh(Math.floor(x / 36), Math.floor(wz / 36)) * 0.1) // paved block — tint varies block to block
@@ -1392,10 +1517,135 @@ const RAMP_SIGNS = [
   { top: 'ELEVATED CORRIDOR PROGRAM', sub: 'delivered to scope as descoped · Q3' },
 ]
 
+
+// ── Ramp vehicles: the parade jump's set dressing ──────────────────────────
+// These are NOT decoration parked next to a mound — the terrain kicker under
+// them IS this bed, and the bed mesh is drawn exactly on it. Bed geometry is
+// derived from the ramp (angle = atan2(rise, len), length = the hypotenuse), so
+// the surface you see and the surface you drive can never disagree.
+//
+// Nothing is loaded on either deck: a car strapped to the bed would be sitting
+// in the middle of the run-up.
+function rampBedTransform(r: Ramp) {
+  const angle = Math.atan2(r.rise, r.len) // bed tilt
+  const bedLen = Math.hypot(r.len, r.rise)
+  return { angle, bedLen }
+}
+
+// A recovery truck: cab at the FRONT (north, past the lip), bed tilted down
+// behind it to meet the road. You drive up the bed and launch off the top —
+// over the cab, which sits well below the 4.4 m lip.
+function RecoveryTruck({ ramp }: { ramp: Ramp }) {
+  // GROUND height, not terrainHeight(): terrainHeight already includes this
+  // ramp's own rise, so basing the vehicle on it double-counted the lift and
+  // floated the bed ~2 m above the road — a deck you could never drive onto.
+  const y = terrainHeight(ramp.x, ramp.z) - rampHeight(ramp.x, ramp.z)
+  const { angle, bedLen } = rampBedTransform(ramp)
+  const lipZ = -ramp.len / 2 // local: the launch end
+  const W = ramp.halfW * 2
+  return (
+    <group position={[ramp.x, y, ramp.z]} rotation={[0, ramp.ry, 0]}>
+      {/* the BED — this is the drivable surface, drawn on the kicker */}
+      <group position={[0, ramp.rise / 2, 0]} rotation={[angle, 0, 0]}>
+        <mesh castShadow receiveShadow>
+          <boxGeometry args={[W, 0.22, bedLen]} />
+          <meshStandardMaterial color="#b9c0c6" />
+        </mesh>
+        {/* side rails, so the bed reads as a deck you drive onto */}
+        {[-1, 1].map((sx) => (
+          <mesh key={sx} position={[sx * (W / 2 - 0.1), 0.24, 0]} castShadow>
+            <boxGeometry args={[0.16, 0.3, bedLen]} />
+            <meshStandardMaterial color="#8f979e" />
+          </mesh>
+        ))}
+      </group>
+      {/* cab, ahead of the lip and comfortably under it */}
+      <group position={[0, 0, lipZ - 2.6]}>
+        <mesh position={[0, 1.55, 0]} castShadow>
+          <boxGeometry args={[2.6, 2.3, 3.2]} />
+          <meshStandardMaterial color="#d8dce0" />
+        </mesh>
+        <mesh position={[0, 2.1, -1.5]} castShadow>
+          <boxGeometry args={[2.45, 1.0, 0.28]} />
+          <meshStandardMaterial color="#2a3138" />
+        </mesh>
+        <mesh position={[0, 0.5, 1.4]} castShadow>
+          <boxGeometry args={[2.4, 0.9, 0.5]} />
+          <meshStandardMaterial color="#8f979e" />
+        </mesh>
+      </group>
+      {/* chassis rail + wheels tucked under the bed */}
+      <mesh position={[0, 0.85, 1.2]} castShadow>
+        <boxGeometry args={[2.2, 0.4, ramp.len * 0.7]} />
+        <meshStandardMaterial color="#8f979e" />
+      </mesh>
+      {[[-1.25, lipZ - 3.4], [1.25, lipZ - 3.4], [-1.25, 1.2], [1.25, 1.2], [-1.25, 3.2], [1.25, 3.2]].map(([dx, dz], i) => (
+        <mesh key={i} position={[dx, 0.6, dz]} rotation={[0, 0, Math.PI / 2]} castShadow>
+          <cylinderGeometry args={[0.6, 0.6, 0.34, 10]} />
+          <meshStandardMaterial color="#1b1e22" />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+// A parade float stranded mid-route with its back ramp down — same trick, but
+// dressed as the parade rather than as a breakdown, since it sits inside the
+// closure surrounded by the crowd.
+function ParadeFloat({ ramp }: { ramp: Ramp }) {
+  const y = terrainHeight(ramp.x, ramp.z) - rampHeight(ramp.x, ramp.z)
+  const { angle, bedLen } = rampBedTransform(ramp)
+  const lipZ = -ramp.len / 2
+  const W = ramp.halfW * 2
+  return (
+    <group position={[ramp.x, y, ramp.z]} rotation={[0, ramp.ry, 0]}>
+      {/* the ramp deck — the drivable surface */}
+      <group position={[0, ramp.rise / 2, 0]} rotation={[angle, 0, 0]}>
+        <mesh castShadow receiveShadow>
+          <boxGeometry args={[W, 0.22, bedLen]} />
+          <meshStandardMaterial color="#e6dcc2" />
+        </mesh>
+        {[-1, 1].map((sx) => (
+          <mesh key={sx} position={[sx * (W / 2 - 0.1), 0.22, 0]} castShadow>
+            <boxGeometry args={[0.16, 0.26, bedLen]} />
+            <meshStandardMaterial color="#c9a227" />
+          </mesh>
+        ))}
+      </group>
+      {/* float body ahead of the lip: skirted trailer + a civic centrepiece */}
+      <group position={[0, 0, lipZ - 3.2]}>
+        <mesh position={[0, 1.1, 0]} castShadow>
+          <boxGeometry args={[3.4, 2.2, 5.4]} />
+          <meshStandardMaterial color="#f0e6cf" />
+        </mesh>
+        <mesh position={[0, 2.5, 0]} castShadow>
+          <boxGeometry args={[2.6, 0.6, 4.2]} />
+          <meshStandardMaterial color="#c9a227" />
+        </mesh>
+        <mesh position={[0, 3.6, 0]} castShadow>
+          <sphereGeometry args={[1.1, 12, 10]} />
+          <meshStandardMaterial color="#3f7d8f" />
+        </mesh>
+      </group>
+      {[[-1.3, lipZ - 4.6], [1.3, lipZ - 4.6], [-1.3, 1.4], [1.3, 1.4]].map(([dx, dz], i) => (
+        <mesh key={i} position={[dx, 0.5, dz]} rotation={[0, 0, Math.PI / 2]} castShadow>
+          <cylinderGeometry args={[0.5, 0.5, 0.3, 10]} />
+          <meshStandardMaterial color="#1b1e22" />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
 function JumpRamps() {
   return (
     <>
       {RAMPS.map((r, i) => {
+        // Carrier-dressed ramps skip the barrels + works notice entirely — the
+        // lorry IS the explanation, and hazard furniture around it would read as
+        // two unrelated stories stacked in the same 16 m.
+        if (r.dressing === 'truck') return <RecoveryTruck key={i} ramp={r} />
+        if (r.dressing === 'float') return <ParadeFloat key={i} ramp={r} />
         const s = Math.sin(r.ry)
         const c = Math.cos(r.ry)
         const sign = RAMP_SIGNS[i % RAMP_SIGNS.length]
@@ -1579,15 +1829,29 @@ function Landmarks() {
         const len = Math.hypot(l.x, l.z) || 1
         const dx = -l.x / len
         const dz = -l.z / len
+        // Signs used to sit at a FIXED offset with no idea where the roads were,
+        // which planted the ShipMart Mall sign in Sepulveda Blvd. Keep the sign
+        // hugging its landmark and ROTATE it around the perimeter to find clear
+        // ground — walking it straight outward instead just marched it into the
+        // next street over.
         const off = landmarkRadius(l) + 7
-        const sx = l.x + dx * off
-        const sz = l.z + dz * off
+        const base = Math.atan2(dx, dz)
+        let sx = l.x + dx * off
+        let sz = l.z + dz * off
+        let ang = base
+        // fan out from the origin-facing angle so the sign still greets the city
+        for (const d of [0, 20, -20, 40, -40, 60, -60, 90, -90, 120, -120, 150, -150, 180]) {
+          const a = base + (d * Math.PI) / 180
+          const cx = l.x + Math.sin(a) * off
+          const cz = l.z + Math.cos(a) * off
+          if (!onRoad(cx, cz, 3)) { sx = cx; sz = cz; ang = a; break }
+        }
         return (
           <group key={i}>
             <group position={[l.x, terrainHeight(l.x, l.z), l.z]}>
               <LandmarkMesh l={l} />
             </group>
-            <LandmarkSign x={sx} z={sz} ry={Math.atan2(dx, dz)} label={l.label} />
+            <LandmarkSign x={sx} z={sz} ry={ang} label={l.label} />
           </group>
         )
       })}

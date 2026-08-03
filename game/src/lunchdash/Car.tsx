@@ -23,7 +23,7 @@ import { crash, damageTier, type DamageTier } from './crashState'
 import { bowl, sloshBowl } from './bowlState'
 import { resolveTrafficCollision } from './trafficState'
 import { useLunchStore } from './lunchStore'
-import { terrainHeight, rampHeight } from './terrain'
+import { terrainHeight, rampHeight, rampAt } from './terrain'
 import { updateEngine, engineOff, screech, crashHit, setParadeMix, playerHonk, toggleRadio } from './driveAudio'
 
 // Stand-in for the key map while the river has the car — every control reads
@@ -140,7 +140,11 @@ export function Car() {
     const sevBefore = crash.severity // remember pre-impact damage so the bowl can feel the jolt
     const ix = carPosition.x
     const iz = carPosition.z
-    const col = resolveCarCollision(ix, iz, DRIVE.carRadius)
+    // Pass how high we are OVER THE GROUND, so anything shorter than that is
+    // flown over instead of hit. Without this the barricades were invisible
+    // walls at any altitude and a jump could never clear them.
+    const aboveGround = Math.max(0, carAir.y - terrainHeight(ix, iz))
+    const col = resolveCarCollision(ix, iz, DRIVE.carRadius, aboveGround)
     if (col.hit) {
       carPosition.x = col.x
       carPosition.z = col.z
@@ -278,6 +282,17 @@ export function Car() {
         // compress the suspension on touchdown so the car dips + rebounds
         // instead of stopping dead (harder landing → deeper dip)
         susp.current.v -= Math.min(impact, 16) * 0.05
+        // …and refuse to launch again for a moment, scaled by how hard we hit.
+        // This is what makes a failed jump a FAILURE: you come down short, the
+        // car is planted, and the next ramp just gets driven over.
+        // Tuned DOWN from 0.25 + impact*0.045. That was ~1 s after a big jump —
+        // 24 m at speed — which meant a FAST first hop landed closer to the
+        // float and was then still locked out when it got there. Faster must
+        // never be worse. 0.4 s is enough to stop an accidental re-launch while
+        // leaving the designed truck→float chain comfortably makeable, and the
+        // kickers can't catapult you by accident anyway: their back face is a
+        // wall, not a slope.
+        carAir.settle = Math.max(carAir.settle, 0.12 + Math.min(impact, 16) * 0.018)
         if (impact > AIR.hardLanding) {
           crash.shake = Math.max(crash.shake, Math.min(1, impact / 14)) // landing jolt
           crashHit(Math.min(1, (impact - AIR.hardLanding) / 12) * 0.7) // suspension slam
@@ -291,23 +306,52 @@ export function Car() {
       // terrain is lifting the car right now; we remember the steepest recent climb
       // and fling the car when that climb rate falls off near the top.
       const vGround = Math.max(-60, Math.min(60, (gh - carAir.prevGh) / dt))
-      carAir.y = gh
+      const fell = carAir.prevGh - gh
+      if (carAir.settle > 0) carAir.settle = Math.max(0, carAir.settle - dt)
       carAir.climb = Math.max(vGround, carAir.climb)
+
       // Launch only if going FAST, after a STEEP climb, right at the CREST.
       // On an authored ramp the gates relax and the boost goes up, so a kicker
       // actually sends you; ordinary hill grade stays a gentle lift, which
       // keeps incidental terrain from repeatedly jolting the bowl.
       const onRamp = rampHeight(carPosition.x, carPosition.z) > 0.15
-      const minSpeed = onRamp ? AIR.rampMinSpeed : AIR.minSpeed
-      const launchMin = onRamp ? AIR.rampLaunchMin : AIR.launchMin
-      const boost = onRamp ? AIR.rampBoost : AIR.crestBoost
+      // A ramp may set its OWN launch gate (see Ramp.minSpeed) — the parade pair
+      // does, so failing the jump is failing to reach the speed.
+      const ramp = onRamp ? rampAt(carPosition.x, carPosition.z) : null
+      if (onRamp) {
+        carAir.rampGate = ramp?.minSpeed ?? AIR.rampMinSpeed
+        carAir.rampGateT = 0.25 // hold it briefly past the footprint edge
+      } else if (carAir.rampGateT > 0) {
+        carAir.rampGateT = Math.max(0, carAir.rampGateT - dt)
+      }
+      // Treat "just left a ramp" as still on it, so the lip uses the ramp's own
+      // gate and boost rather than the gentle natural-hill defaults.
+      const fromRamp = onRamp || carAir.rampGateT > 0
+      const minSpeed = fromRamp ? (onRamp ? (ramp?.minSpeed ?? AIR.rampMinSpeed) : carAir.rampGate) : AIR.minSpeed
+      const launchMin = fromRamp ? AIR.rampLaunchMin : AIR.launchMin
+      const boost = fromRamp ? AIR.rampBoost : AIR.crestBoost
       const fastEnough = Math.abs(carTelemetry.speed) >= minSpeed
-      if (fastEnough && carAir.climb > launchMin && vGround < carAir.climb * AIR.crestRatio) {
+      const settled = carAir.settle <= 0
+
+      // ORDER MATTERS. The launch test has to come BEFORE the fell-off-an-edge
+      // test, because on a kicker they fire on the very same frame: the lip IS
+      // the edge. Checking the edge first turned every ramp into a limp drop
+      // off the end instead of a jump.
+      if (settled && fastEnough && carAir.climb > launchMin && vGround < carAir.climb * AIR.crestRatio) {
         carAir.airborne = true
         carAir.vy = carAir.climb * boost
         carAir.climb = 0
-      } else if (vGround <= 0.05) {
-        carAir.climb = 0 // back on the flat without launching — forget the climb
+      } else if (fell > 0.35) {
+        // No launch, but the ground has dropped out from under us — fall off it
+        // properly instead of teleporting down, which read as falling THROUGH
+        // the ramp. This is the failed-jump case.
+        carAir.airborne = true
+        carAir.y = carAir.prevGh
+        carAir.vy = 0
+        carAir.climb = 0
+      } else {
+        carAir.y = gh
+        if (vGround <= 0.05) carAir.climb = 0 // back on the flat — forget the climb
       }
     }
     carAir.prevGh = gh

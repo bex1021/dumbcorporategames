@@ -410,8 +410,18 @@ export function setParadeMix(prox: number) {
   if (!c || !parade) return
   const t = c.currentTime
   const p = Math.min(1, prox)
-  parade.cheerGain.gain.setTargetAtTime(p * 0.09, t, 0.25)
-  parade.musicGain.gain.setTargetAtTime(p * 0.05, t, 0.25)
+  // LEVELS: these were 0.09 / 0.05 — roughly a tenth of the radio (master 0.58,
+  // song bus 0.6, voice 0.85). The bed was technically playing the whole time
+  // and simply inaudible under the engine and the station, so the parade read as
+  // a silent crowd. Raised to sit UNDER the radio but clearly present.
+  //
+  // The curve also matters: prox arrives linear in distance (1 - d/70), so at
+  // 35 m out a linear gain is already down 6 dB and the crowd only "appears" in
+  // the last few metres. Squaring it keeps the approach quiet and makes the
+  // swell bloom as you actually reach the barricades.
+  const swell = p * p
+  parade.cheerGain.gain.setTargetAtTime(swell * 0.55, t, 0.25)
+  parade.musicGain.gain.setTargetAtTime(swell * 0.3, t, 0.25)
 }
 
 // ───────────────────────── car radio (KPI 101.1 — broadcast) ─────────────────────────
@@ -612,10 +622,19 @@ function ensureBed() {
 // (or unless) song files are loaded.
 function playNext() {
   if (!radioOn) return
-  // talk-heavy: 4 talk segments up front, then a song, repeat — so the satire
-  // gets heard on a short (~2.5 min) run instead of one long song eating it.
+  // Talk-heavy: N talk segments, then a song, repeat — so the satire gets heard
+  // on a short (~2.5 min) run instead of one long song eating it. KPI is a
+  // business TALK station; the songs are the interruption, not the main event.
+  //
+  // N was 4, tuned when the only track was 2.6 min. The current pair run 3.1 and
+  // 3.6 min, which pushed the mix toward music and dropped the song-repeat gap to
+  // 8.9 min — under the ~10 min a player needs for four 150 s attempts. Six talk
+  // segments per song restores the original talk-heavy intent AND stretches the
+  // repeat gap to ~9.4 min. (A third song is the real fix for a hard guarantee;
+  // see radioSongs.md.)
+  const TALK_PER_SONG = 6
   const haveSong = songBuffers.some(Boolean)
-  const wantSong = haveSong && segStep % 5 === 4
+  const wantSong = haveSong && segStep % (TALK_PER_SONG + 1) === TALK_PER_SONG
   segStep++
   if (wantSong) playSong()
   else playLine()

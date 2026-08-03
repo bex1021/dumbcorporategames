@@ -1204,12 +1204,24 @@ function LeonardModel() {
     state.current = desired
     next?.reset().fadeIn(0.1).play()
     if (desired === 'Run' && next) next.timeScale = RUN_TIMESCALE
-    // The Mixamo running-slide clip is ~1.5s, but the slide only LASTS SLIDE_DUR
-    // (0.62s) before we crossfade back to Run. At normal speed you'd only ever
-    // see the first ~40% — the crouch-down wind-up — so Leonard never visibly
-    // gets low and a clean slide reads like a near-miss. Compress the whole clip
-    // into the slide window so the full drop→glide plays out while he's sliding.
-    if (desired === 'Slide' && next) next.timeScale = next.getClip().duration / SLIDE_DUR
+    // SLIDE timing. The Mixamo slide clip (~1.53s) reads as three beats: a drop
+    // (≈0–0.31s), a low glide (≈0.31–0.77s), then standing back up (≈0.77–1.53s).
+    // The slide itself only LASTS SLIDE_DUR (0.62s). Playing the WHOLE clip in
+    // that window crammed the stand-up into the slide, so Leonard sprang upright
+    // mid-slide and it read as a quick bob ("the slide feels shorter"). Instead,
+    // map the window onto just the drop→glide: skip the lean-in wind-up and stop
+    // at the bottom of the glide, BEFORE the stand-up. He drops fast and stays
+    // low for the bulk of SLIDE_DUR; the crossfade back to Run (below) pops him
+    // upright the moment the slide ends. LoopOnce+clamp stops a dropped frame
+    // from wrapping back to the start and re-dropping mid-slide.
+    if (desired === 'Slide' && next) {
+      const SLIDE_IN = 0.12  // skip the pre-drop lean-in
+      const SLIDE_OUT = 0.82 // bottom of the glide, just before the stand-up
+      next.setLoop(THREE.LoopOnce, 1)
+      next.clampWhenFinished = true
+      next.timeScale = (SLIDE_OUT - SLIDE_IN) / SLIDE_DUR
+      next.time = SLIDE_IN
+    }
     prev?.fadeOut(0.12)
   })
 

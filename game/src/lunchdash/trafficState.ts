@@ -322,7 +322,9 @@ export function initTraffic() {
         placeMoving(c)
         // don't spawn a moving car inside the closed parade segment — it'd be
         // trapped among the floats. Cars approaching it queue (see updateTraffic).
-        if (r.a.x === r.b.x && Math.abs(r.a.x - PARADE.x) < 1.5 && c.z > PARADE.z0 - 6 && c.z < PARADE.z1 + 6) continue
+        if (r.a.x === r.b.x && Math.abs(r.a.x - PARADE.x) < 1.5 && c.z > PARADE.z0 - 24 && c.z < PARADE.z1 + 40) continue
+        // same for the E–W cross-streets: don't spawn one standing in the crowd.
+        if (r.a.z === r.b.z && r.a.z > PARADE.z0 - 2 && r.a.z < PARADE.z1 + 2 && c.x > -78 && c.x < -10) continue
         cars.push(c)
         ci++
       }
@@ -482,12 +484,45 @@ export function updateTraffic(dt: number) {
     // solid PARADE_BARRIERS, so the traffic has to respect the closure too
     // (otherwise cars sail through a "closed" road the player can't).
     if (carNS && Math.abs(c.road!.a.x - PARADE.x) < 1.5) {
-      const buf = 5
+      // buf 5 stopped cars right at the barricade — 20 m INSIDE the southern
+      // carrier truck's ramp (crest z = 52, footprint 44→60), so traffic queued
+      // up and over the kicker. 38 m clears BOTH ramps (closure now spans
+      // z -83 → 63). The queue that forms south of that sits in the northbound
+      // lane only; the opposite lane is empty all the way through the closure,
+      // so there is still a clean line at the ramp for anyone committing to it.
+      const buf = 38
       if (c.z > PARADE.z0 - buf && c.z < PARADE.z1 + buf) {
         gap = 0 // somehow inside the closure — hold position
       } else {
         const stopZ = fz < 0 ? PARADE.z1 + buf : PARADE.z0 - buf
         const d = (stopZ - c.z) * fz // distance ahead to the near barricade line
+        if (d > 0.2 && d < gap) gap = d
+      }
+    }
+    // …and the CROSS-STREETS are closed too. The block above only ever stopped
+    // N–S cars driving ALONG Synergy Ave, so traffic on the E–W arterial that
+    // cuts through at z = -22 had no idea the parade existed and drove straight
+    // through the spectators — the "cars driving through the crowd" bug. The
+    // crowd is not in the solids list (they're people, not walls), so nothing
+    // else was stopping them.
+    //
+    // Same treatment, other axis: queue at the edge of the crowd corridor.
+    // Bounds cover the spectator rows (x -56.3 and -29.7) plus a margin, and we
+    // only apply it on cross-streets that actually run through the parade's z
+    // span, so traffic elsewhere in the city is untouched.
+    if (!carNS && c.road!.a.z > PARADE.z0 - 2 && c.road!.a.z < PARADE.z1 + 2) {
+      // Bounds cover the RAMPS as well as the crowd (west ramp spans x -72→-56,
+      // east -32→-16). Stopping only at the crowd edge left cars parked on the
+      // ramps themselves — both an obstacle in the middle of the run-up and a
+      // car sitting at a 20° angle. Closed road means closed: queue before the
+      // roadworks start, leaving the approach clear for a committed run.
+      const CROWD_X0 = -78
+      const CROWD_X1 = -10
+      if (c.x > CROWD_X0 && c.x < CROWD_X1) {
+        gap = 0 // already inside the corridor — hold rather than plough on
+      } else {
+        const stopX = fx < 0 ? CROWD_X1 : CROWD_X0
+        const d = (stopX - c.x) * fx // distance ahead to the near crowd edge
         if (d > 0.2 && d < gap) gap = d
       }
     }

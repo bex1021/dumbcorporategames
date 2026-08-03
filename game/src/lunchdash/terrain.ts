@@ -100,6 +100,19 @@ export type Ramp = {
   len: number // toe-to-toe length along that axis
   halfW: number // half-width across it
   rise: number // crest height above the natural grade
+  // Per-ramp launch gate (m/s). Below it the ramp does NOT throw you. Without
+  // it every ramp shares AIR.rampMinSpeed (13 m/s ≈ 29 mph), low enough that an
+  // amble popped the car ~2 m into the air — floaty, and it handed you an
+  // obstacle you hadn't earned.
+  minSpeed?: number
+  // Scenery that EXPLAINS the ramp. 'roadworks' (default) = graded earth,
+  // hazard barrels, a works notice. 'truck' = a recovery truck with its bed
+  // tilted down. 'float' = a stranded parade float with its back ramp down.
+  dressing?: 'roadworks' | 'truck' | 'float'
+  // ONE-WAY kicker: a straight incline climbing to a LIP that simply ends, and
+  // running off that lip is what throws the car. Driven the other way it is the
+  // back of a lorry — a wall — which is correct. Climbs from +z toward -z.
+  kicker?: boolean
 }
 
 // halfW spans the FULL right-of-way (12 m roadway + both 4 m sidewalks ≈ 13 m
@@ -114,7 +127,40 @@ export type Ramp = {
 export const RAMPS: Ramp[] = [
   { x: 10.5, z: -180, ry: Math.PI / 2, len: 20, halfW: 13, rise: 2.6 },
   { x: 84, z: -180, ry: Math.PI / 2, len: 20, halfW: 13, rise: 2.9 },
+
+  // ── The parade jump: a recovery truck, then a float ───────────────────────
+  // These are NOT road humps. The raised surface IS the vehicle — halfW is a
+  // truck bed (3.2 m), not the carriageway — so the road either side stays dead
+  // flat and you have to aim at it. Both are one-way kickers (see `kicker`).
+  //
+  //   TRUCK  parked hard against the south barricade, bed tilted to the road.
+  //          Lip at z = 32, a few metres short of the barricade at z = 25.
+  //   FLOAT  stranded mid-route with its back ramp down. Lip at z = -30, which
+  //          is what clears the north barricade at z = -45.
+  //
+  // Both gate on minSpeed 20 (~45 mph). UNDER it there is no launch at all: you
+  // drive up the bed, run off a 4 m lip with no impulse, drop, and hit the
+  // barricade. Over it you clear, land in the parade, and run to the float.
+  { x: -43, z: 36.5, ry: 0, len: 9, halfW: 2.4, rise: 4.4, minSpeed: 20, dressing: 'truck', kicker: true },
+  { x: -43, z: -25.5, ry: 0, len: 9, halfW: 2.4, rise: 3.6, minSpeed: 20, dressing: 'float', kicker: true },
 ]
+
+/** The authored ramp containing this point, if any — lets the car read a
+ *  ramp's own launch gate instead of one global threshold. */
+export function rampAt(x: number, z: number): Ramp | null {
+  for (const r of RAMPS) {
+    const s = Math.sin(r.ry)
+    const c = Math.cos(r.ry)
+    const dx = x - r.x
+    const dz = z - r.z
+    const along = dx * s + dz * c
+    const across = dx * c - dz * s
+    if (along <= -r.len / 2 || along >= r.len / 2) continue
+    if (Math.abs(across) >= r.halfW) continue
+    return r
+  }
+  return null
+}
 
 // Ramp contribution at a point — 0 everywhere outside the footprints, so the
 // flat downtown, the roads and every baked prop elsewhere are untouched.
@@ -130,8 +176,12 @@ export function rampHeight(x: number, z: number): number {
     const half = r.len / 2
     if (along <= -half || along >= half) continue
     if (Math.abs(across) >= r.halfW) continue
-    const t = (along + half) / r.len // 0 at the near toe → 1 at the far toe
-    const prof = (1 - Math.cos(2 * Math.PI * t)) / 2 // 0 → 1 → 0, crest at t = 0.5
+    const t = (along + half) / r.len // 0 at the -z end → 1 at the +z end
+    // Kicker = a straight incline at CONSTANT grade up to the lip. That matters:
+    // the launch fires when the climb rate collapses, and on a straight bed the
+    // rate holds all the way up then vanishes at the lip — a ramp jump. A
+    // raised-cosine hump flattens at its crest, so the car eases over instead.
+    const prof = r.kicker ? 1 - t : (1 - Math.cos(2 * Math.PI * t)) / 2
     // Feather the shoulders so the ramp eases into the road surface sideways
     // instead of presenting a wall to a car crossing it at an angle.
     const u = Math.abs(across) / r.halfW

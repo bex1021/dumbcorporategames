@@ -31,8 +31,15 @@ const BLIMPS = [
   { z: 26, motto: 'DISRUPT YOURSELF\nBEFORE WE DO', color: '#7a5a44' },
 ]
 
+// Blimps used to sit dead on PARADE.x — the same centreline the jump ramps aim
+// down — so looking up the float's ramp put an airship square in the crosshairs
+// and read as "this ramp fires you into a blimp". They now alternate to either
+// side of the route, which is also how a real parade flies them: over the crowd,
+// not over the marching lane.
+const BLIMP_OFF = 15
 function Blimp({ z, motto, color, i }: { z: number; motto: string; color: string; i: number }) {
   const ref = useRef<Group>(null)
+  const sideX = PARADE.x + (i % 2 === 0 ? -BLIMP_OFF : BLIMP_OFF)
   // float a fixed height above whatever ground is beneath it, so a blimp over
   // the high north end isn't visibly lower than one over the low south end.
   // Kept low (≈22m) so you can actually read the logos from street level —
@@ -45,7 +52,7 @@ function Blimp({ z, motto, color, i }: { z: number; motto: string; color: string
     }
   })
   return (
-    <group ref={ref} position={[PARADE.x, baseY, z]}>
+    <group ref={ref} position={[sideX, baseY, z]}>
       {/* envelope */}
       <mesh scale={[3.4, 2.8, 7]} castShadow>
         <sphereGeometry args={[1, 16, 12]} />
@@ -126,7 +133,18 @@ function Float({ z, color, word }: { z: number; color: string; word: string }) {
 const CROWD = (() => {
   const out: { x: number; z: number }[] = []
   for (const sx of [-55, -31]) for (let z = PARADE.z0; z <= PARADE.z1; z += 3.4) for (const r of [0, 1]) out.push({ x: sx + (sx < -43 ? -1 : 1) * r * 1.3, z: z + r * 1.1 })
-  for (let z = PARADE.z0 + 8; z <= PARADE.z1 - 8; z += 7) for (const dx of [-2.2, 2.2]) out.push({ x: PARADE.x + dx, z }) // marching column
+  // Marching column — with a GAP over the landing strip. A car clearing the
+  // barricade off the first carrier truck comes down around z = 10-20 and runs
+  // north to the second truck at z = -20; marchers standing in that lane would
+  // make a well-judged jump an unavoidable pile of HR incidents. The parade
+  // simply has a float-sized hole in it there, which is also why there is room
+  // for a second truck to be parked.
+  const LAND_Z1 = 24 // south end of the clear strip
+  const LAND_Z0 = -34 // north end — past the float's lip at z = -30
+  for (let z = PARADE.z0 + 8; z <= PARADE.z1 - 8; z += 7) {
+    if (z <= LAND_Z1 && z >= LAND_Z0) continue
+    for (const dx of [-2.2, 2.2]) out.push({ x: PARADE.x + dx, z })
+  }
   return out
 })()
 

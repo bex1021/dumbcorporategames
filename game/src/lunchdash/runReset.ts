@@ -24,6 +24,9 @@ export function resetRun() {
   carAir.airborne = false
   carAir.prevGh = gy
   carAir.climb = 0
+  carAir.settle = 0
+  carAir.rampGate = 0
+  carAir.rampGateT = 0
   driveClock.minutes = START_MIN
   driveClock.running = true
   boundary.zone = 'in'

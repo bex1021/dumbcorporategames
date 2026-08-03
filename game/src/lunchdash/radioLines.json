@@ -1,7 +1,7 @@
 {
   "station": "KPI 101.1",
-  "voiceHint": "Anchor = deadpan British business-radio DJ (Daniel). Exec soundbites = Samantha, filtered like a conference-call clip.",
-  "note": "Canonical radio talk script. Lines with an 'exec' field are two-voice: 'text' is read by the anchor, then 'exec' is the CEO/founder soundbite in a different voice. Edit here, then run: node scripts/render-radio.mjs \"Daniel\" \"Samantha\" to regenerate audio in public/sounds/radio/. Keep text TTS-friendly: 'K P I', 'A I', 'C E O', spell out numbers, no symbols. Playback = array order, looped; songs (radioSongs.md) interleave automatically.",
+  "voiceHint": "Anchor = Matilda (ElevenLabs XrExE9yKIg1WjnnlVkGX) — American markets anchor, Bloomberg-style: authoritative and direct. Exec soundbites = Adam (pNInz6obpgDQGcFmaJgB) — dominant and firm, filtered like a conference-call clip.",
+  "note": "Canonical radio talk script. Lines with an 'exec' field are two-voice: 'text' is read by the anchor, then 'exec' is the CEO/founder soundbite in a different voice. Edit here, then run: node scripts/render-radio.mjs to regenerate audio in public/sounds/radio/ (add --intros to re-do only the song tee-ups). Needs ELEVENLABS_API_KEY in game/.env. Keep text TTS-friendly: 'K P I', 'A I', 'C E O', spell out numbers, no symbols. Playback = array order, looped; songs (radioSongs.md) interleave automatically.",
   "lines": [
     {
       "id": "sting-open",
@@ -134,6 +134,12 @@
       "title": "Rise & Grind",
       "artist": "Synergy",
       "intro": "And now, topping this week's Corporate Slave Top Fifty. This is Rise and Grind, by Synergy. A song about living the dream. Someone's dream."
+    },
+    {
+      "id": "we-are-aligned",
+      "title": "We Are Aligned",
+      "artist": "The Wellness Committee",
+      "intro": "And now, at number nine. The ensemble your building is contractually required to play. This is We Are Aligned, by The Wellness Committee. A song about all of us. Or the ones still here."
     }
   ]
 }

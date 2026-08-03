@@ -11,7 +11,6 @@
 import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { Link } from 'react-router-dom'
-import { ExecSegue } from '../ui/ExecSegue'
 import { writePhase2Final } from '../state/campaignState'
 import { RunnerWorld, type HudState, type Checkpoint } from './RunnerWorld'
 import { TOTAL_UPDATES, PAL } from './runnerConfig'
@@ -522,18 +521,19 @@ function WinScreen({ result, onDesktop }: { result: RunResult; onDesktop: () => 
                 <JRMetric label="Actual business value" value="$0.00" bad />
               </div>
             </div>
-            {/* The missing segue: the Exec hands you to Lunch Dash and, in the
-                same breath, is why the salmon bowl exists at all — it's no
-                longer a prop that appears from nowhere in Phase 3. Same card,
-                same knock, same voice as every other phase boundary. */}
+            {/* Progression hand-off to the next phase. The Exec's ping — the
+                reason the salmon bowl exists at all — now lives on Lunch Dash's
+                OWN intro, which is itself a phone-notification screen, so it
+                isn't shown twice back-to-back. Here we just offer the clean
+                "next level" step; clicking it evolves into that phone screen. */}
             <div className="flex flex-col gap-2 items-start">
-              <ExecSegue
-                kind="slack"
-                time="10:46 AM"
-                message={<>Great hustle 🙂 Since you're heading out — do me a huge solid and grab my salmon bowl from Corporate Slop Bowlz? Back by 1:00, we've got the Architecture Sync. You're a lifesaver.</>}
+              <Link
                 to="/play/lunch-dash"
-                ctaLabel="Head out for lunch →"
-              />
+                className="inline-block rounded px-6 py-3 text-white text-[15px] font-semibold hover:brightness-110 transition"
+                style={{ background: '#00875a' }}
+              >
+                ▶ Next level: Lunch Dash →
+              </Link>
               <div className="flex gap-2 flex-wrap">
                 <button onClick={onDesktop} className="px-4 py-2.5 rounded border border-[#dfe1e6] bg-white text-[#42526e] text-[13px] font-medium hover:bg-[#f4f5f7] transition">⎋ Back to desk</button>
                 <Link to="/play" className="px-5 py-2.5 rounded border border-[#dfe1e6] bg-white text-[#42526e] text-[13px] font-medium hover:bg-[#f4f5f7] transition text-center">☰ Level select</Link>

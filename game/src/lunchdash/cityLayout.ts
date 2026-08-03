@@ -72,9 +72,13 @@ export const STOREFRONTS: Storefront[] = [
 // segment of Synergy Ave (x=-43), forcing a reroute. Cross-road barricades are
 // solid; the blimps + floats + crowd are set-dressing (see Parade.tsx).
 export const PARADE = { x: -43, z0: -45, z1: 25 }
+// Two barricades, not three. The pair at the ENDS is what actually closes the
+// 70 m of Synergy Ave; the one that used to sit at z = -10 only cut the interior
+// in half — and it sat exactly where a car jumping the closure has to come down
+// between the two carrier trucks (see RAMPS in terrain.ts). Removing it opens a
+// continuous landing strip without weakening the closure at all.
 export const PARADE_BARRIERS: Rect[] = [
   rect(-43, -45, 22, 2.4),
-  rect(-43, -10, 22, 2.4),
   rect(-43, 25, 22, 2.4),
 ]
 
@@ -456,7 +460,38 @@ function genAlleys(): { segs: AlleySeg[]; fences: Rect[] } {
       if (!connected) fences.push(vert ? rect(e.x, e.z, ALLEY_W + 0.8, 0.5) : rect(e.x, e.z, 0.5, ALLEY_W + 0.8))
     }
   }
-  return { segs, fences }
+
+  // ── Don't drive service lanes through solid buildings ─────────────────────
+  // The alley grammar lays lanes down the middle of each block, which is right
+  // for the district blocks (genDistricts already keeps its footprints off
+  // them). It knows nothing, though, about the hand-placed structures — and it
+  // was running THREE lanes straight through Alignly HQ, a 46 m tower, plus two
+  // through a storefront. In game that reads as a road passing through a
+  // building, because that is exactly what it was.
+  //
+  // Filtered here rather than by deleting segments by index, so the same thing
+  // can't quietly come back if the HQ or a storefront is ever moved or resized.
+  // Only structures declared ABOVE this point can be consulted (module init
+  // order) — which is all of the hand-placed ones; the generated district
+  // buildings are already alley-aware.
+  const keepOut: Rect[] = [
+    rect(HQ_BUILDING.x, HQ_BUILDING.z, HQ_BUILDING.w, HQ_BUILDING.d),
+    ...STOREFRONTS.map((s) => rect(s.x, s.z, s.w, s.d)),
+  ]
+  const half = ALLEY_W / 2
+  const segHitsBuilding = (s: AlleySeg) => {
+    const sx0 = Math.min(s.a.x, s.b.x) - half
+    const sx1 = Math.max(s.a.x, s.b.x) + half
+    const sz0 = Math.min(s.a.z, s.b.z) - half
+    const sz1 = Math.max(s.a.z, s.b.z) + half
+    return keepOut.some((r) => r.maxX > sx0 && r.minX < sx1 && r.maxZ > sz0 && r.minZ < sz1)
+  }
+  const kept = segs.filter((s) => !segHitsBuilding(s))
+  // …and drop any end-cap fence left stranded inside one of those footprints.
+  const keptFences = fences.filter(
+    (f) => !keepOut.some((r) => r.maxX > f.minX && r.minX < f.maxX && r.maxZ > f.minZ && r.minZ < f.maxZ),
+  )
+  return { segs: kept, fences: keptFences }
 }
 const ALLEY_GEN = genAlleys()
 export const ALLEYS: AlleySeg[] = ALLEY_GEN.segs
@@ -580,9 +615,16 @@ export const PARKING: Rect[] = [
 // ---------- palms (LA) + park trees ----------
 export const PALMS: Tree[] = (() => {
   const out: Tree[] = []
+  // Palms were scattered across the LA quarter with NO placement checks at all
+  // — unlike TREES below, which has always guarded against roads — so ten of
+  // them stood in the middle of Sepulveda and Deliverable Dr. Same guards now:
+  // off the carriageway, off the avenues, and out of building footprints.
   for (let i = 0; i < 34; i++) {
     const x = 55 + h2(i, 41) * 235
     const z = 188 + h2(i, 42) * 108
+    if (onRoad(x, z, 2.5)) continue
+    if (distToAvenues(x, z) < 9) continue
+    if (onAlley(x, z, 1.5)) continue
     out.push({ x, z, h: 7 + h2(i, 43) * 4 })
   }
   return out
@@ -652,17 +694,31 @@ export const BARNS: Building[] = (() => {
 })()
 
 // ---------- collision ----------
-const SOLIDS: Rect[] = [
-  ...[...BUILDINGS, HQ_BUILDING, ...BARNS].map((b) => rect(b.x, b.z, b.w, b.d)),
-  ...STOREFRONTS.map((s) => rect(s.x, s.z, s.w, s.d)),
-  ...PARADE_BARRIERS,
-  ...LANDMARK_SOLIDS,
-  ...BRIDGE_RAILS,
-  ...TREES.map((t) => rect(t.x, t.z, 1.4, 1.4)),
+// Solids carry a HEIGHT. Collision used to be purely 2-D — every obstacle was an
+// infinitely tall wall — which is invisible until something asks the car to
+// leave the ground: a car five metres in the air over a one-metre barricade was
+// still shoved back by it, reading as an invisible wall in mid-flight. Anything
+// the player can be ABOVE needs to know how tall it is.
+//
+// Infinity = you can never clear it (buildings, landmarks, trees). Everything
+// else is measured from what's actually drawn.
+type Solid = Rect & { h: number }
+const withH = (r: Rect, h: number): Solid => ({ ...r, h })
+
+const SOLIDS: Solid[] = [
+  ...[...BUILDINGS, HQ_BUILDING, ...BARNS].map((b) => withH(rect(b.x, b.z, b.w, b.d), Infinity)),
+  ...STOREFRONTS.map((s) => withH(rect(s.x, s.z, s.w, s.d), Infinity)),
+  // barricades are waist-high crowd barriers — jumpable, and that is the point
+  ...PARADE_BARRIERS.map((r) => withH(r, 1.2)),
+  ...LANDMARK_SOLIDS.map((r) => withH(r, Infinity)),
+  // bridge rails are low, but clearing one means landing in the river, which the
+  // dunk sequence already handles
+  ...BRIDGE_RAILS.map((r) => withH(r, 1.1)),
+  ...TREES.map((t) => withH(rect(t.x, t.z, 1.4, 1.4), Infinity)),
   // dumpsters are real obstacles (cans stay knock-through)
-  ...ALLEY_PROPS.filter((p) => p.kind === 'dumpster').map((p) => rect(p.x, p.z, 2.2, 1.6)),
+  ...ALLEY_PROPS.filter((p) => p.kind === 'dumpster').map((p) => withH(rect(p.x, p.z, 2.2, 1.6), 1.7)),
   // back-lot fences capping dead-end alleys
-  ...ALLEY_FENCES,
+  ...ALLEY_FENCES.map((r) => withH(r, 1.8)),
 ]
 
 function pushOutOfRect(cx: number, cz: number, r: Rect, rad: number): { x: number; z: number; hit: boolean } {
@@ -702,11 +758,20 @@ export function pointInBuilding(x: number, z: number, r: number): boolean {
   return false
 }
 
-export function resolveCarCollision(x: number, z: number, r: number): { x: number; z: number; hit: boolean } {
+/** `aboveGround` is the car's height over the terrain. Obstacles shorter than
+ *  that are flown OVER rather than collided with — without it the game has no
+ *  vertical dimension and any jump lands you in an invisible wall. */
+export function resolveCarCollision(
+  x: number,
+  z: number,
+  r: number,
+  aboveGround = 0,
+): { x: number; z: number; hit: boolean } {
   let cx = x
   let cz = z
   let hit = false
   for (const s of SOLIDS) {
+    if (aboveGround > s.h) continue // clearing it
     const res = pushOutOfRect(cx, cz, s, r)
     if (res.hit) {
       cx = res.x
