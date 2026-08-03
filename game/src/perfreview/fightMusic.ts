@@ -50,11 +50,18 @@ const ARCADE: Record<MusicBout, BoutCfg> = {
   exec: { bpm: 134, roots: [45, 41, 38, 40], triads: [[57, 60, 64], [53, 57, 60], [62, 65, 69], [64, 68, 71]] },
 }
 
-// ── KOMBAT (A): static minor drone, pump over progression ───────────────────
+// ── KOMBAT (A): A PHRYGIAN — the war mode ───────────────────────────────────
+// First cut borrowed the campaign's F and G MAJOR chords and read too bright
+// for combat. Phrygian's flat second (the Bb a half-step above home) is the
+// menace interval — film-trailer war music and MK live here. All triads
+// minor except the Exec's raw dominant.
 const KOMBAT: Record<MusicBout, BoutCfg> = {
-  brent: { bpm: 124, roots: [45, 45, 41, 43], triads: [[57, 60, 64], [57, 60, 64], [53, 57, 60], [55, 59, 62]] },
-  priya: { bpm: 138, roots: [45, 45, 41, 43], triads: [[57, 60, 64], [57, 60, 64], [53, 57, 60], [55, 59, 62]] },
-  exec: { bpm: 130, roots: [45, 45, 41, 40], triads: [[57, 60, 64], [57, 60, 64], [53, 57, 60], [64, 68, 71]] },
+  // Brent: pure phrygian grind — home, home, the Bb sneer, home.
+  brent: { bpm: 124, roots: [45, 45, 46, 45], triads: [[57, 60, 64], [57, 60, 64], [58, 62, 65], [57, 60, 64]] },
+  // Priya: the sneer plus a minor-v prowl (Gm, not G major) — movement, no light.
+  priya: { bpm: 138, roots: [45, 45, 46, 43], triads: [[57, 60, 64], [57, 60, 64], [58, 62, 65], [55, 58, 62]] },
+  // The Exec: half-step pump into a raw E dominant — the boss bares the blade.
+  exec: { bpm: 130, roots: [45, 46, 45, 40], triads: [[57, 60, 64], [58, 62, 65], [57, 60, 64], [64, 68, 71]] },
 }
 
 // ── ORCHESTRA (B): cinematic hybrid — braams, taiko, string ostinato ────────
@@ -312,10 +319,11 @@ class FightMusic {
       if (sib === 10) this.duo(midi(55), t, stepDur * 4, 0.07, 0.04) // G3
     }
 
-    // LEAD — the motif an octave DOWN, gliding: same logo, bared teeth
+    // LEAD — the motif an octave DOWN, gliding — and PHRYGIAN: its B natural
+    // flattens to Bb in this style only. Same four-note logo, war paint.
     if (tier >= 2) {
       const ld = LEAD[s]
-      if (ld) this.duo(midi(ld.n - 12), t, ld.d * stepDur * 0.9, 0.13, 0.05)
+      if (ld) this.duo(midi((ld.n === 71 ? 70 : ld.n) - 12), t, ld.d * stepDur * 0.9, 0.13, 0.05)
     }
 
     // ORCH HIT — every bar downbeat at match point (MK's slam)
