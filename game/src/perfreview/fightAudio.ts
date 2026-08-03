@@ -256,9 +256,13 @@ export function playFightCue(e: FightEvent): void {
       tone('sine', 120, 50, 0.12, 0.6, 0.13)
       break
     case 'tech': // throw BROKEN — a shove-off: two hands slapping apart
-      noise(0.06, 1800, 0.5) // the grip slap
-      tone('sine', 200, 120, 0.09, 0.5, 0.02) // bodies shoving apart
-      noise(0.1, 700, 0.3, 0.05) // the disengage scuff
+      // Measured −11.9 dBFS on the first pass, quieter than a BLOCK (−9.3)
+      // even though breaking a grab is the bigger read. Levelled to sit just
+      // above block: it must read as "that did something" without competing
+      // with a clean hit (−1.3).
+      noise(0.06, 1800, 0.85) // the grip slap
+      tone('sine', 220, 120, 0.1, 0.8, 0.02) // bodies shoving apart
+      noise(0.1, 700, 0.45, 0.05) // the disengage scuff
       break
     case 'counter': // record scratch — "Actually, great point."
       // The reflect DAMAGES the attacker, so it gets an impact too — a scratch
@@ -359,7 +363,13 @@ export function announce(name: AnnName, delay = 0, retries = 4): void {
   const src = c.createBufferSource()
   src.buffer = buf
   const g = c.createGain()
-  g.gain.value = 1.0 // files are pre-limited at −0.7 dBFS; master scales them
+  // 2.4, MEASURED not guessed: at 1.0 the voice peaked −8.6 to −11.5 dBFS
+  // against a −0.1 dBFS punch — the announcer was the quietest thing in a
+  // mix he is supposed to sit on top of. The master limiter (−2 dBFS, 20:1)
+  // is what keeps this from clipping, and it also ducks the punches under
+  // the shout for exactly the length of the line, which is the effect
+  // arcade fighters get by side-chaining.
+  g.gain.value = 2.4
   src.connect(g).connect(master!)
   src.start(c.currentTime + delay)
 }

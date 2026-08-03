@@ -8,12 +8,16 @@
 // verdict from the ceiling.
 //
 // Triggers (wired in fighterState → fightAudio):
+//   bout start               → "FIGHT!"
+//   first clean connect      → "FIRST HIT!"
 //   big hit on the opponent  → one of the DAMAGE pool, occasional + cooldown
-//   opponent first under 25% → "CLOSE THE LOOP!"  (the FINISH HIM moment)
-//   opponent KO'd            → "ALIGNED."         (the fatality card)
+//   your throw gets teched   → "COUNTERED!"       (occasional)
+//   opponent first under 25% → "FINISH HIM/HER!"  (once per bout)
+//   any KO                   → "K.O.!"
+//   opponent KO'd            → "FLAWLESS VICTORY." at 88%+ HP, then "ALIGNED." 
 //
 // Usage:
-//   node scripts/render-fight-announcer.mjs             # Clyde (default)
+//   node scripts/render-fight-announcer.mjs             # Callum (the pick)
 //   node scripts/render-fight-announcer.mjs <voiceId>   # audition another
 //
 // Requirements: `ffmpeg`, ELEVENLABS_API_KEY in game/.env (never committed).
@@ -26,10 +30,12 @@ import { fileURLToPath } from 'node:url'
 const here = dirname(fileURLToPath(import.meta.url))
 const root = join(here, '..')
 
-// Clyde — ElevenLabs' gravelly "war veteran" premade. The radio already owns
-// Adam (the exec) and Matilda (the anchor); the announcer must be a THIRD
-// person, not the exec moonlighting.
-const voiceId = process.argv[2] || '2EiwWnXFnvU5JabPnv8n'
+// Callum — "Husky Trickster". Chosen by audition (2026-08-03, Rebecca) over
+// Clyde/Brian/Adam: the husky rasp reads as a villain enjoying the violence,
+// which is exactly the MK announcer's register. The radio already owns Adam
+// (the exec) and Matilda (the anchor); the announcer must be a THIRD person,
+// not the exec moonlighting — which is why Adam lost despite scoring well.
+const voiceId = process.argv[2] || 'N2lVS1w4EtoT3dr4eOWO'
 
 function apiKey() {
   let raw = ''
@@ -105,8 +111,8 @@ async function say(text, out) {
 // menacing candidate on this account, into voice-audition/ for A-B listening.
 const AUDITION = process.argv.includes('--audition')
 const CANDIDATES = [
-  { name: 'clyde', id: '2EiwWnXFnvU5JabPnv8n' }, // war-vet gravel (current)
-  { name: 'callum', id: 'N2lVS1w4EtoT3dr4eOWO' }, // "Husky Trickster" — villain energy
+  { name: 'callum', id: 'N2lVS1w4EtoT3dr4eOWO' }, // "Husky Trickster" — THE PICK
+  { name: 'clyde', id: '2EiwWnXFnvU5JabPnv8n' }, // war-vet gravel (was the default)
   { name: 'brian', id: 'nPczCjzI2devNBz1zQrb' }, // "Deep, Resonant"
   { name: 'adam', id: 'pNInz6obpgDQGcFmaJgB' }, // "Dominant, Firm" (the radio exec)
 ]
