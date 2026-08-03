@@ -26,7 +26,7 @@
 // every bout; the harmony under it changes per opponent. That's leitmotif
 // development: same four notes, friendlier or meaner rooms.
 
-export type MusicStyle = 'arcade' | 'kombat'
+export type MusicStyle = 'arcade' | 'kombat' | 'orchestra'
 export type MusicBout = 'brent' | 'priya' | 'exec'
 
 const midi = (n: number) => 440 * Math.pow(2, (n - 69) / 12)
@@ -55,6 +55,16 @@ const KOMBAT: Record<MusicBout, BoutCfg> = {
   brent: { bpm: 124, roots: [45, 45, 41, 43], triads: [[57, 60, 64], [57, 60, 64], [53, 57, 60], [55, 59, 62]] },
   priya: { bpm: 138, roots: [45, 45, 41, 43], triads: [[57, 60, 64], [57, 60, 64], [53, 57, 60], [55, 59, 62]] },
   exec: { bpm: 130, roots: [45, 45, 41, 40], triads: [[57, 60, 64], [57, 60, 64], [53, 57, 60], [64, 68, 71]] },
+}
+
+// ── ORCHESTRA (B): cinematic hybrid — braams, taiko, string ostinato ────────
+// Same real progressions as ARCADE (the strings need harmony to saw at), at
+// trailer tempos. The "orchestra" is all synthesis: filtered saws as strings,
+// slow-attack saw stacks as brass/braams, pitched booms as taiko.
+const ORCH: Record<MusicBout, BoutCfg> = {
+  brent: { bpm: 96, roots: [45, 41, 45, 43], triads: [[57, 60, 64], [53, 57, 60], [57, 60, 64], [55, 59, 62]] },
+  priya: { bpm: 126, roots: [45, 41, 48, 43], triads: [[57, 60, 64], [53, 57, 60], [60, 64, 67], [55, 59, 62]] },
+  exec: { bpm: 112, roots: [45, 41, 38, 40], triads: [[57, 60, 64], [53, 57, 60], [62, 65, 69], [64, 68, 71]] },
 }
 
 const BARS = 4
@@ -118,7 +128,8 @@ class FightMusic {
   }
 
   private cfg(): BoutCfg {
-    return (this.style === 'arcade' ? ARCADE : KOMBAT)[this.bout]
+    const table = this.style === 'arcade' ? ARCADE : this.style === 'kombat' ? KOMBAT : ORCH
+    return table[this.bout]
   }
 
   /** Start (or restyle) the loop. Call from a user gesture. */
@@ -212,7 +223,8 @@ class FightMusic {
 
   private scheduleStep(s: number, t: number, stepDur: number) {
     if (this.style === 'arcade') this.arcadeStep(s, t, stepDur)
-    else this.kombatStep(s, t, stepDur)
+    else if (this.style === 'kombat') this.kombatStep(s, t, stepDur)
+    else this.orchestraStep(s, t, stepDur)
   }
 
   // ── ARCADE: Jira Run's bones, 16-bit muscle ──────────────────────────────
@@ -270,10 +282,35 @@ class FightMusic {
     // BASS PUMP — every 16th, accented on the classic techno grid (0, 6, 10)
     const accent = sib === 0 || sib === 6 || sib === 10
     this.tone(midi(root - 12), t, 0.09, 'square', accent ? 0.14 : 0.07)
+    // SUB — a sine an octave below the pump, on the accents (weight, not notes)
+    if (accent) this.tone(midi(root - 24), t, 0.14, 'sine', 0.12)
+
+    // DARK PAD — root+fifth drone refreshed every half-bar, following the
+    // chords. This is most of the "more music": harmony that breathes under
+    // the pump instead of dry machinery. Present from the first bar.
+    if (sib === 0 || sib === 8) {
+      this.pad(t, [root, root + 7], stepDur * 8 * 1.05, 0.05)
+      if (tier >= 1) this.pad(t, [triad[1] + 12], stepDur * 8 * 1.05, 0.028) // add the 3rd — color
+    }
+
+    // ARP — dark 16th cycle (root · b3 · 5 · octave) from tier 1, saw, low in
+    // the mix; doubles an octave up at match point
+    const ext = [triad[0], triad[1], triad[2], triad[0] + 12]
+    if (tier >= 1) {
+      this.tone(midi(ext[(sib + 2) % 4]), t, 0.09, 'sawtooth', 0.032)
+      if (tier >= 3) this.tone(midi(ext[(sib + 2) % 4] + 12), t, 0.07, 'sawtooth', 0.018)
+    }
 
     // RAVE STAB — saw chord on the off-beats from tier 1
     if (tier >= 1 && (sib === 3 || sib === 11)) this.stab(t, triad, 0.14, 0.07)
     if (tier >= 3 && (sib === 7 || sib === 15)) this.stab(t, triad.map((n) => n + 12), 0.1, 0.045)
+
+    // CALL — before the full theme earns its entrance, a sparse two-note
+    // shadow of the motif answers the stabs (bars 2 and 4, tier 1 only)
+    if (tier === 1 && (bar === 1 || bar === 3)) {
+      if (sib === 6) this.duo(midi(57), t, stepDur * 3, 0.07, 0.04) // A3
+      if (sib === 10) this.duo(midi(55), t, stepDur * 4, 0.07, 0.04) // G3
+    }
 
     // LEAD — the motif an octave DOWN, gliding: same logo, bared teeth
     if (tier >= 2) {
@@ -284,13 +321,66 @@ class FightMusic {
     // ORCH HIT — every bar downbeat at match point (MK's slam)
     if (tier >= 3 && sib === 0) this.orchHit(t, [triad[0] - 12, ...triad], 0.14)
 
-    // DRUMS — four-on-the-floor ALWAYS (the genre's law); snare from tier 1;
-    // tom fill down the last half of bar 4 from tier 2
+    // DRUMS — four-on-the-floor ALWAYS (the genre's law). Closed hats live
+    // from the start; snare from tier 1 with ghost notes from tier 2; ride
+    // pings the off-beats from tier 2; tom fill down the last half of bar 4.
     if (sib % 4 === 0) this.kick(t)
+    if (sib % 2 === 1) this.noise(t, 0.03, 'highpass', 9000, 0.7, 0.028)
     if (tier >= 1 && (sib === 4 || sib === 12)) this.noise(t, 0.16, 'bandpass', 1500, 1.1, 0.14)
+    if (tier >= 2 && (sib === 7 || sib === 15)) this.noise(t, 0.09, 'bandpass', 1500, 1.1, 0.05) // ghosts
+    if (tier >= 2 && sib % 4 === 2) this.noise(t, 0.08, 'highpass', 6200, 2.2, 0.035) // ride ping
     if (tier >= 2 && bar === 3 && sib >= 12) this.tom(t, 200 - (sib - 12) * 28)
-    if (tier >= 1 && sib % 2 === 1) this.noise(t, 0.03, 'highpass', 9000, 0.7, 0.028)
     if (tier >= 3 && sib % 2 === 0) this.noise(t, 0.05, 'highpass', 7000, 0.7, 0.04)
+  }
+
+  // ── ORCHESTRA: braams, taiko, string ostinato — the trailer hybrid ───────
+  private orchestraStep(s: number, t: number, stepDur: number) {
+    const { roots, triads } = this.cfg()
+    const bar = Math.floor(s / STEPS_PER_BAR)
+    const sib = s % STEPS_PER_BAR
+    const root = roots[bar]
+    const triad = triads[bar]
+    const tier = this.tier
+
+    // LOW STRINGS — sustained root per half-bar, always (the floor); the
+    // chord's third joins from tier 1 so the progression keeps its color
+    if (sib === 0 || sib === 8) {
+      this.pad(t, tier >= 1 ? [root - 12, root, triad[1]] : [root - 12, root], stepDur * 8 * 1.06, 0.055)
+    }
+
+    // STRING OSTINATO — staccato saw pulse on the root/octave; 8ths at tier 0,
+    // driving 16ths with the fifth woven in from tier 1
+    if (tier >= 1) {
+      const line = [root, root + 12, root + 7, root + 12]
+      this.tone(midi(line[sib % 4] + 12), t, stepDur * 0.8, 'sawtooth', 0.045)
+    } else if (sib % 2 === 0) {
+      this.tone(midi((sib % 4 === 0 ? root : root + 12) + 12), t, stepDur * 1.6, 'sawtooth', 0.04)
+    }
+
+    // TAIKO — big skins. Sparse war-drum at tier 0; gallop (x··x··x·) from
+    // tier 1; thundering doubles at match point
+    if (sib === 0 || sib === 8) { this.kick(t); this.tom(t, 110) }
+    if (tier >= 1 && (sib === 3 || sib === 6 || sib === 11 || sib === 14)) this.tom(t, 130)
+    if (tier >= 3 && (sib === 2 || sib === 10)) this.tom(t, 95)
+
+    // MILITARY SNARE — from tier 1; roll into every bar line at tier 3
+    if (tier >= 1 && (sib === 4 || sib === 12)) this.noise(t, 0.14, 'bandpass', 2200, 1.6, 0.11)
+    if (tier >= 3 && sib >= 13) this.noise(t, 0.05, 'bandpass', 2200, 1.6, 0.04 + (sib - 13) * 0.02)
+
+    // BRAAM — the trailer blast: detuned saw cluster swelling on the loop's
+    // first downbeat from tier 2; bars 1 AND 3 at match point
+    if (tier >= 2 && sib === 0 && (bar === 0 || (tier >= 3 && bar === 2))) {
+      this.braam(t, [root - 24, root - 12, root - 5, root], stepDur * 12)
+    }
+
+    // BRASS — the motif as a war-cry: saw stack, slow attack, from tier 2
+    if (tier >= 2) {
+      const ld = LEAD[s]
+      if (ld) this.brass(t, ld.n, ld.d * stepDur * 0.95, 0.09)
+    }
+
+    // CYMBAL — crash on the loop downbeat from tier 2
+    if (tier >= 2 && s === 0) this.noise(t, 0.6, 'highpass', 5000, 0.5, 0.06)
   }
 
   // ---- voices ----
@@ -308,6 +398,78 @@ class FightMusic {
     o.connect(g).connect(this.out)
     o.start(t)
     o.stop(t + dur + 0.03)
+  }
+
+  /** Sustained filtered-saw chord — the pad/strings floor. Soft attack,
+   *  lowpassed so it sits UNDER everything rhythmic. */
+  private pad(t: number, notes: number[], dur: number, vol: number) {
+    const ctx = this.ctx
+    if (!ctx || !this.out) return
+    for (const n of notes) {
+      const o = ctx.createOscillator()
+      o.type = 'sawtooth'
+      o.frequency.setValueAtTime(midi(n), t)
+      const f = ctx.createBiquadFilter()
+      f.type = 'lowpass'
+      f.frequency.setValueAtTime(900, t)
+      const g = ctx.createGain()
+      g.gain.setValueAtTime(0.0001, t)
+      g.gain.linearRampToValueAtTime(vol, t + dur * 0.25)
+      g.gain.setValueAtTime(vol, t + dur * 0.7)
+      g.gain.linearRampToValueAtTime(0.0001, t + dur)
+      o.connect(f).connect(g).connect(this.out)
+      o.start(t)
+      o.stop(t + dur + 0.05)
+    }
+  }
+
+  /** The trailer BRAAM: detuned saw cluster, slow swell, filter opening. */
+  private braam(t: number, notes: number[], dur: number) {
+    const ctx = this.ctx
+    if (!ctx || !this.out) return
+    for (const n of notes) {
+      for (const det of [0.994, 1.006]) {
+        const o = ctx.createOscillator()
+        o.type = 'sawtooth'
+        o.frequency.setValueAtTime(midi(n) * det, t)
+        const f = ctx.createBiquadFilter()
+        f.type = 'lowpass'
+        f.frequency.setValueAtTime(300, t)
+        f.frequency.linearRampToValueAtTime(1600, t + dur * 0.5)
+        const g = ctx.createGain()
+        g.gain.setValueAtTime(0.0001, t)
+        g.gain.linearRampToValueAtTime(0.05, t + 0.06)
+        g.gain.setValueAtTime(0.05, t + dur * 0.6)
+        g.gain.linearRampToValueAtTime(0.0001, t + dur)
+        o.connect(f).connect(g).connect(this.out)
+        o.start(t)
+        o.stop(t + dur + 0.05)
+      }
+    }
+  }
+
+  /** Brass war-cry: saw stack in octaves with a breathy attack. */
+  private brass(t: number, n: number, dur: number, vol: number) {
+    const ctx = this.ctx
+    if (!ctx || !this.out) return
+    for (const [oct, v] of [[0, 1], [-12, 0.7]] as const) {
+      const o = ctx.createOscillator()
+      o.type = 'sawtooth'
+      o.frequency.setValueAtTime(midi(n + oct) * 0.985, t)
+      o.frequency.linearRampToValueAtTime(midi(n + oct), t + 0.05)
+      const f = ctx.createBiquadFilter()
+      f.type = 'lowpass'
+      f.frequency.setValueAtTime(700, t)
+      f.frequency.linearRampToValueAtTime(2400, t + 0.09)
+      const g = ctx.createGain()
+      g.gain.setValueAtTime(0.0001, t)
+      g.gain.linearRampToValueAtTime(vol * v, t + 0.05)
+      g.gain.setValueAtTime(vol * v, t + Math.max(0.06, dur * 0.75))
+      g.gain.linearRampToValueAtTime(0.0001, t + dur)
+      o.connect(f).connect(g).connect(this.out)
+      o.start(t)
+      o.stop(t + dur + 0.05)
+    }
   }
 
   /** Detuned dual-square — the "16-bit" lead voice (chorus width, no FX). */
