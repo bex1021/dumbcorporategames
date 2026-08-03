@@ -1,0 +1,121 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>fight music — audition booth</title>
+<style>
+  body { font: 14px ui-monospace, Menlo, monospace; background: #141210; color: #e8e2d2; padding: 28px; max-width: 720px; margin: 0 auto; }
+  h3 { margin: 0 0 4px; }
+  .sub { color: #8f887a; margin-bottom: 20px; }
+  fieldset { border: 1px solid #3a352c; border-radius: 8px; margin: 0 0 16px; padding: 12px 16px 16px; }
+  legend { color: #b9976a; font-size: 11px; letter-spacing: 0.2em; padding: 0 6px; }
+  button { font: inherit; padding: 10px 16px; margin: 4px 6px 4px 0; background: #26221c; color: #e8e2d2; border: 1px solid #4a4436; border-radius: 6px; cursor: pointer; }
+  button.on { background: #e8c15a; color: #1a1712; border-color: #e8c15a; font-weight: 600; }
+  button.stopbtn { border-color: #c8492f; color: #e88a7a; }
+  input[type=range] { width: 100%; accent-color: #e8c15a; }
+  .heatrow { display: flex; align-items: center; gap: 14px; }
+  .tierlabel { min-width: 210px; color: #b9976a; }
+  .hint { color: #8f887a; font-size: 12px; margin-top: 8px; line-height: 1.5; }
+</style>
+
+<h3>Fight music — audition booth</h3>
+<div class="sub">Pick a style and an opponent, then drag INTENSITY to hear the track escalate the way a real fight would. Everything is the Alignly 4-note theme underneath.</div>
+
+<fieldset>
+  <legend>STYLE</legend>
+  <button data-style="arcade" class="on">D — Arcade Continuity (16-bit)</button>
+  <button data-style="kombat">A — Corporate Kombat (industrial)</button>
+</fieldset>
+
+<fieldset>
+  <legend>OPPONENT</legend>
+  <button data-bout="brent" class="on">Bout 1 — Brent (the Wall)</button>
+  <button data-bout="priya">Bout 2 — Priya (the Storm)</button>
+  <button data-bout="exec">Final — The Exec</button>
+</fieldset>
+
+<fieldset>
+  <legend>INTENSITY — how close the fight is to a KO</legend>
+  <div class="heatrow">
+    <input id="heat" type="range" min="0" max="100" value="0" />
+    <span class="tierlabel" id="tierlabel">calm — opening exchanges</span>
+  </div>
+  <div class="hint">In the game this rides the health bars automatically: layers add in as either fighter nears a KO, and changes always land on the next bar of music.</div>
+</fieldset>
+
+<fieldset>
+  <legend>TRANSPORT</legend>
+  <button id="play" class="on">▶ Play</button>
+  <button id="stop" class="stopbtn">■ Stop</button>
+  <button id="win">Bout won — fanfare</button>
+  <button id="lose">Bout lost — deflate</button>
+  <button id="arc">🥊 Simulate a whole fight (45s)</button>
+</fieldset>
+
+<div class="hint">Tiers: 0–34 calm (bass + drums) · 35–69 momentum (+arp, hats, snare) · 70–87 <b>the theme arrives</b> (motif lead) · 88+ match point (orchestra hits, everything on).</div>
+
+<script type="module">
+  import { fightMusic } from '/src/perfreview/fightMusic.ts'
+
+  let style = 'arcade'
+  let bout = 'brent'
+  let arcTimer = null
+
+  const heat = document.getElementById('heat')
+  const tierlabel = document.getElementById('tierlabel')
+  const labelFor = (h) =>
+    h < 0.35 ? 'calm — opening exchanges'
+    : h < 0.7 ? 'momentum — trading hits'
+    : h < 0.88 ? 'THE THEME ARRIVES — someone is hurting'
+    : 'MATCH POINT — next clean hit ends it'
+
+  const applyHeat = () => {
+    const h = heat.value / 100
+    fightMusic.setHeat(h)
+    tierlabel.textContent = labelFor(h)
+  }
+  heat.oninput = () => { stopArc(); applyHeat() }
+
+  const restart = () => {
+    if (!fightMusic.isPlaying()) return
+    fightMusic.stop()
+    setTimeout(() => fightMusic.start(bout, style, heat.value / 100), 180)
+  }
+
+  for (const b of document.querySelectorAll('[data-style]')) {
+    b.onclick = () => {
+      style = b.dataset.style
+      document.querySelectorAll('[data-style]').forEach((x) => x.classList.toggle('on', x === b))
+      restart()
+    }
+  }
+  for (const b of document.querySelectorAll('[data-bout]')) {
+    b.onclick = () => {
+      bout = b.dataset.bout
+      document.querySelectorAll('[data-bout]').forEach((x) => x.classList.toggle('on', x === b))
+      restart()
+    }
+  }
+
+  const stopArc = () => { if (arcTimer) { clearInterval(arcTimer); arcTimer = null } }
+
+  document.getElementById('play').onclick = () => { stopArc(); applyHeat(); fightMusic.start(bout, style, heat.value / 100) }
+  document.getElementById('stop').onclick = () => { stopArc(); fightMusic.stop() }
+  document.getElementById('win').onclick = () => { stopArc(); fightMusic.victory() }
+  document.getElementById('lose').onclick = () => { stopArc(); fightMusic.defeat() }
+
+  // Simulate a fight: heat climbs 0 → 1 over 45s (with little scuffles and
+  // breathers), then the win fanfare.
+  document.getElementById('arc').onclick = () => {
+    stopArc()
+    heat.value = 0
+    applyHeat()
+    fightMusic.start(bout, style, 0)
+    const t0 = Date.now()
+    arcTimer = setInterval(() => {
+      const p = (Date.now() - t0) / 45000
+      if (p >= 1) { stopArc(); fightMusic.victory(); return }
+      const wobble = Math.sin(p * 19) * 0.06
+      heat.value = Math.round(Math.max(0, Math.min(1, p + wobble)) * 100)
+      applyHeat()
+    }, 250)
+  }
+</script>
