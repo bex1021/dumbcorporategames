@@ -20,6 +20,7 @@ type Snap = {
   last: string
   scope: number
   derailT: number
+  teachGrabT: number
   meterDenied: number
   oppLabel: string
   ready: boolean // can Leonard act on this frame?
@@ -244,6 +245,15 @@ export function FightHud() {
             {'🗒️'.repeat(s.scope)} SCOPE +{s.scope} (throw to descope)
           </span>
         )}
+        {/* THE BLOCK LESSON (playtest: "why does blocking not seem to work?")
+            Blocking is airtight vs strikes — measured, zero clean hits through
+            a held guard — but grabs ignore it BY GENRE LAW, and nothing ever
+            said so. Now the game says so, the moment it happens. */}
+        {s.teachGrabT > 0 && (
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#b98ae0', letterSpacing: '0.02em' }}>
+            🤝 GRABBED — throws go THROUGH block · dash back (double-tap A) or jab first
+          </span>
+        )}
         {/* DERAIL — the honest cruelty indicator: your J/K are swapped */}
         {s.derailT > 0 && (
           <span style={{ fontSize: 11, color: '#e86a5a', fontWeight: 700, letterSpacing: '0.02em' }}>
@@ -278,6 +288,7 @@ function snapshot(): Snap {
     last: fight.lastHit ? `${fight.lastHit.by} ${fight.lastHit.move} (${fight.lastHit.dmg})` : '',
     scope: leonard.scopeStacks,
     derailT: leonard.keySwapT,
+    teachGrabT: fight.teachGrabT,
     meterDenied: leonard.meterDeniedT,
     oppLabel: `${bout.name} — ${bout.barLabel}`,
     ...commitSnap(),

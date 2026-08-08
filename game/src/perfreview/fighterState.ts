@@ -151,6 +151,11 @@ export const fight = {
   lastHit: null as null | { by: 'leonard' | 'opponent'; move: string; dmg: number; kind: string },
   annNearKO: false, // the FINISH HIM shout — once per bout, first time under 25%
   annFirstHit: false, // the FIRST HIT call — once per bout, on the first clean connect
+  // TEACHING (playtest 2026-08-03, "why does blocking not seem to work?"):
+  // measured, a pure turtle takes ZERO clean strikes — but eats a grab every
+  // ~4s, and nothing ever says grabs ignore block. Frames remaining on the
+  // HUD lesson, set when a throw lands on a BLOCKING Leonard.
+  teachGrabT: 0,
 }
 
 function makeFighter(
@@ -257,6 +262,7 @@ export function resetFight(opts: ResetOpts = {}): void {
   fight.lastHit = null
   fight.annNearKO = false
   fight.annFirstHit = false
+  fight.teachGrabT = 0
 }
 
 /** Drawn position: eased between the last two sim ticks so motion stays smooth
@@ -275,6 +281,7 @@ export function stepFight(pIntent: Intent, oIntent: Intent): void {
   // Screenshake always decays (it reads well even during the freeze).
   fight.shake *= FEEL.shakeDecay
   if (fight.shake < 0.001) fight.shake = 0
+  if (fight.teachGrabT > 0) fight.teachGrabT--
 
   // Snapshot for RENDER INTERPOLATION. The sim runs at a fixed 60 Hz but the
   // display often doesn't (a ProMotion Mac is 120 Hz), so drawing raw sim
@@ -842,6 +849,10 @@ function applyBlock(att: Fighter, def: Fighter, m: MoveDef): void {
 }
 
 function applyThrow(att: Fighter, def: Fighter, m: MoveDef): void {
+  // The lesson fires only when it teaches: Leonard was HOLDING BLOCK and got
+  // grabbed anyway. (The AI needs no tutoring, and an open-guard grab is not
+  // the confusion being answered.)
+  if (def.id === 'leonard' && def.blocking) fight.teachGrabT = 110 // ~1.8s
   def.health = Math.max(0, def.health - m.damage)
   if (att.id === 'leonard') fight.leoHits++
   else fight.oppHits++
