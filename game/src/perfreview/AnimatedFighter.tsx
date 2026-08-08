@@ -359,6 +359,15 @@ function clipFor(f: Fighter): string {
   }
 }
 
+// ── Rig readiness — read by PerformanceReview's bout-start gate ─────────────
+// True only while a fighter's models are LOADED AND MOUNTED. A cold first
+// load ships ~14MB of GLBs; the bout used to start the moment the player
+// clicked JOIN, so Brent stood there punching an empty spot until Leonard's
+// Suspense resolved. This component body only runs after every useGLTF above
+// it has resolved, so the mount effect below is the true "I am standing in
+// the arena" signal.
+export const rigReady = { leonard: false, opponent: false }
+
 export function AnimatedFighter({
   bodyUrl,
   fighter,
@@ -437,6 +446,15 @@ export function AnimatedFighter({
     const a = actions.idle
     if (a) a.reset().play()
   }, [actions])
+
+  // Readiness signal for the bout-start gate (see rigReady above): this
+  // effect can only run once every model this fighter needs has resolved.
+  useEffect(() => {
+    rigReady[fighter.id] = true
+    return () => {
+      rigReady[fighter.id] = false
+    }
+  }, [fighter.id])
 
   // DEV: expose the rig so foot-grounding can be measured, not eyeballed.
   useEffect(() => {

@@ -51,7 +51,7 @@ export const BOUTS: BoutConfig[] = [
     startHP: 80, // the warm-up bar — Bout 1 is the tutorial, not the siege
     oppScale: 1.0,
     koLine: '…yeah, okay. That’ll work.',
-    lossLine: 'ENG UNCONVINCED — the backlog wins. Product has heard.',
+    lossLine: 'ENG UNCONVINCED — the backlog wins. The invite reappears: same time, same room.',
     // Deep Tron blue, not black — a near-black stage made Leonard's black
     // clothes vanish. fogNear pushed out so the backdrop's horizon glow (the
     // band his silhouette reads against) isn't hazed away.
@@ -80,7 +80,7 @@ export const BOUTS: BoutConfig[] = [
     startHP: 145,
     oppScale: 1.0,
     koLine: 'Okay. I’m aligned.',
-    lossLine: 'PRODUCT UNCONVINCED — scope stands. The Exec has heard.',
+    lossLine: 'PRODUCT UNCONVINCED — scope stands. Priya has “found 30 minutes” to do this again.',
     // fogNear 20: on the light set the fog otherwise washes the kanban wall
     // into the haze before you can read it.
     // Light stage: fog stays FAR out. Haze on a pale set is exactly the white
@@ -119,7 +119,7 @@ export const BOUTS: BoutConfig[] = [
     // fit the taller fighter. 1.28 still towers (a head and shoulders over
     // Leonard) while leaving the shot composable at close quarters.
     koLine: 'Great sync. Ship it.',
-    lossLine: 'PLACED ON A PIP — “We’re really investing in your growth.”',
+    lossLine: 'NOT ALIGNED — “Let’s regroup and run this back.” The room resets.',
     // light 1.4 (was 0.85): against a bright sunset window the fighters were
     // crushing to silhouettes. fogNear pushed out so the city keeps its detail.
     // Bracketed to the parallax stack (near city ~13 from camera, mid ~17):
@@ -156,6 +156,19 @@ export function recordBout(won: boolean, scorePct: number): void {
   gauntlet.index++
 }
 
+/** MUST-WIN PROGRESSION (playtest 2026-08-03): a lost bout is not a step
+ *  forward with a handicap — the meeting regenerates and you take it again.
+ *  The loss is recorded long enough to drive the UNCONVINCED card, then this
+ *  undoes it so the calendar shows the same meeting as NOW and the final
+ *  summary only ever contains wins. */
+export function retryBout(): void {
+  const last = gauntlet.results[gauntlet.results.length - 1]
+  if (last && !last.won) {
+    gauntlet.results.pop()
+    gauntlet.index--
+  }
+}
+
 export function gauntletOver(): boolean {
   return gauntlet.index >= BOUTS.length
 }
@@ -165,33 +178,35 @@ export function resetGauntlet(): void {
   gauntlet.results = []
 }
 
-// ── The chain (LOCKED): last bout's score sets the next opener ──────────────
-// Dominate a bout → walk into the next with a buffer; get out-scored or KO'd →
-// start on the back foot. Clamped so the worst case is a handicap (−25%),
-// never a wall (Mercy). Bout 1 always starts clean.
+// ── The chain, retired (playtest 2026-08-03) ────────────────────────────────
+// The old rule carried your last score into the next opener (75–100%
+// credibility). With must-win progression there are no losses to carry, and
+// the reduced bar read as a BUG in playtesting ("why does the fight start
+// with less HP?"). Every meeting is now a fresh room: 100.
 export function leonardStartHP(): number {
-  const prev = gauntlet.results[gauntlet.index - 1]
-  if (!prev) return 100
-  const score = prev.won ? prev.scorePct : 0
-  return Math.round(100 * (0.75 + 0.25 * Math.max(0, Math.min(1, score))))
+  return 100
 }
 
 // One line of continuity for the fight card: how the last room reports you.
 export function chainNote(): string | null {
+  // Flavor only since the mercy chain retired — every room starts fresh, but
+  // word still travels. (Results only ever contain WINS now; see retryBout.)
   const prev = gauntlet.results[gauntlet.index - 1]
   if (!prev) return null
   const from = prev.opponent === 'brent' ? 'Eng' : 'Product'
-  if (!prev.won) return `${from} was not convinced. Word travels. (Credibility ${leonardStartHP()}%)`
-  if (prev.scorePct > 0.7) return `${from} signed off clean. Word travels. (Credibility ${leonardStartHP()}%)`
-  return `${from} signed off — barely. Word travels. (Credibility ${leonardStartHP()}%)`
+  if (prev.scorePct > 0.7) return `${from} signed off clean. Word travels.`
+  return `${from} signed off — barely. Word travels.`
 }
 
 // ── Final rating (graybox endings; full ending suite is Build H) ────────────
 export type Rating = 'EXCEEDS EXPECTATIONS' | 'MEETS EXPECTATIONS' | 'PIP'
 export function finalRating(): Rating {
+  // Must-win progression means the summary screen is only reachable with all
+  // three rooms convinced — so the rating grades HOW you won: average ending
+  // credibility across the day. (PIP is kept in the type for the copy, but is
+  // unreachable through normal play now — losses regenerate the meeting.)
   const all = gauntlet.results
-  const finalBout = all[all.length - 1]
-  if (all.length === BOUTS.length && all.every((r) => r.won)) return 'EXCEEDS EXPECTATIONS'
-  if (finalBout?.won) return 'MEETS EXPECTATIONS'
-  return 'PIP'
+  if (all.length < BOUTS.length || !all.every((r) => r.won)) return 'PIP'
+  const avg = all.reduce((sum, r) => sum + r.scorePct, 0) / all.length
+  return avg >= 0.5 ? 'EXCEEDS EXPECTATIONS' : 'MEETS EXPECTATIONS'
 }

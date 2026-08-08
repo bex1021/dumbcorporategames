@@ -1,9 +1,10 @@
 // Performance Review — Phase 4 route shell (Build C2: the three-bout gauntlet).
 //
 // Brent (Architecture Sync) → Priya (Product Review) → the Exec (The Ask).
-// Fight cards punctuate the bouts, each result CHAINS into the next opener
-// (score → starting Credibility), losses advance with a handicap (Mercy:
-// never a wall), and the gauntlet ends in a graybox rating screen. Full
+// Fight cards punctuate the bouts. MUST-WIN progression (playtest
+// 2026-08-03): a lost bout regenerates — the invite reappears and you take
+// the same room again; only wins advance the day, so the final rating
+// screen is only ever reached with all three convinced. Full
 // endings/stat-sheet/The Stare are Build H.
 
 import { Suspense, useEffect, useState } from 'react'
@@ -59,8 +60,8 @@ import {
   gauntlet,
   gauntletOver,
   recordBout,
+  retryBout,
   resetGauntlet,
-  leonardStartHP,
   finalRating,
   type BoutConfig,
 } from './boutState'
@@ -76,6 +77,7 @@ import {
 import { markBeaten } from '../state/progress'
 import { setAnnouncerGender, announce, primeAnnouncer } from './fightAudio'
 import { fightMusic } from './fightMusic'
+import { rigReady } from './AnimatedFighter'
 
 type Phase = 'calendar' | 'briefing' | 'fighting' | 'boutEnd' | 'over'
 
@@ -178,9 +180,9 @@ export default function PerformanceReview() {
       if (fight.over && fight.hitstop <= 0) {
         const won = fight.winner === 'leonard'
         recordBout(won, won ? leonard.health / leonard.maxHealth : 0)
-        // CAMPAIGN: the day is BEATEN when the gauntlet ends on a convinced
-        // Exec — the final bout's result, not a 3-0 sweep, because the chain
-        // deliberately lets a lost morning bout carry forward as a handicap.
+        // CAMPAIGN: the day is BEATEN when the Exec is convinced. Under
+        // must-win progression this only happens with all three rooms won —
+        // losses regenerate the meeting instead of advancing (retryBout).
         if (gauntletOver() && won) markBeaten('phase4')
         setPhase('boutEnd')
       } else raf = requestAnimationFrame(loop)
@@ -198,24 +200,40 @@ export default function PerformanceReview() {
     // arena fades in (0.25s — the shout lands right as control is handed over).
     setAnnouncerGender(bout.key === 'priya' ? 'her' : 'him')
     primeAnnouncer()
-    announce('fight', 0.25)
-    // THE SCORE — Corporate Kombat (Rebecca's pick, 2026-08-03). Starts cold
-    // with each bout's own arrangement; FightWorld feeds it heat from the
-    // health bars every frame and cuts it dead at the KO.
-    fightMusic.start(bout.key, 'kombat', 0)
     setOpponentProfile(PROFILES[bout.ai])
     resetFight({
       oppMoves: bout.moves,
-      leoHP: leonardStartHP(), // THE CHAIN: last bout's score writes this opener
+      leoHP: 100, // every meeting is a fresh room (the mercy chain retired — boutState)
       oppHP: bout.startHP, // the ramp up the org chart
       regenPerSec: bout.regenPerSec,
       voice: bout.voice,
-      oppScale: bout.oppScale,
-          oppTech: bout.throwTech, // the Exec's size is a gameplay fact, not just art
+      oppScale: bout.oppScale, // the Exec's size is a gameplay fact, not just art
+      oppTech: bout.throwTech,
     })
     resetDummy()
-    fight.started = true
     setPhase('fighting')
+    // THE GATE (playtest 2026-08-03): don't start the clock — or shout
+    // "FIGHT!" — until both bodies are actually standing in the arena. On a
+    // cold first load ~14MB of character GLBs can still be in flight when the
+    // player clicks JOIN, and the bout opened with Brent punching the empty
+    // spot where Leonard hadn't loaded yet. rigReady flips as each fighter's
+    // Suspense resolves; the 8s ceiling means a stalled network degrades to
+    // the old behavior instead of hanging the fight forever.
+    const t0 = Date.now()
+    const ignite = () => {
+      if (fight.started || fight.over) return
+      if ((rigReady.leonard && rigReady.opponent) || Date.now() - t0 > 8000) {
+        announce('fight', 0.25)
+        // THE SCORE — Corporate Kombat (Rebecca's pick, 2026-08-03): each
+        // bout's own arrangement; FightWorld feeds it heat from the health
+        // bars every frame and cuts it dead at the KO.
+        fightMusic.start(bout.key, 'kombat', 0)
+        fight.started = true
+      } else {
+        window.setTimeout(ignite, 100)
+      }
+    }
+    ignite()
   }
 
   // Fade the whole shell out over the room, THEN start the bout — so the last
@@ -253,6 +271,11 @@ export default function PerformanceReview() {
     // NOW re-dress the room: the opaque calendar shell is about to cover the
     // screen, so the WebGL remount happens out of sight instead of under the
     // result card (see the `stage` latch above).
+    // MUST-WIN: a lost bout was recorded only to drive the UNCONVINCED card.
+    // Undo it — the calendar re-shows the same meeting as NOW, and you take
+    // the room again. Only wins advance the day.
+    const last = gauntlet.results[gauntlet.results.length - 1]
+    if (last && !last.won) retryBout()
     setStage(currentBout())
     bump((n) => n + 1)
     setPhase(gauntletOver() ? 'over' : 'calendar')
@@ -548,10 +571,15 @@ function BoutEndCard({ onContinue }: { onContinue: () => void }) {
 
       <div data-bo style={{ zIndex: 3, ...beat('bo-rise', 300, 780) }}>
         <button style={btn} onClick={onContinue}>
-          {more ? 'BACK TO CALENDAR \u2192' : 'SEE THE REVIEW \u2192'}
+          {/* MUST-WIN: a loss never advances — the same meeting regenerates. */}
+          {!won ? 'REJOIN \u2014 SAME TIME, SAME ROOM \u2192' : more ? 'BACK TO CALENDAR \u2192' : 'SEE THE REVIEW \u2192'}
         </button>
         <div style={{ fontFamily: MONO, fontSize: 11, color: '#8f887a', marginTop: 12 }}>
-          {more ? 'Your calendar is already pinging.' : 'The building is quiet. Reception prints your rating.'}
+          {!won
+            ? 'The invite is already back on your calendar. Attendance still required.'
+            : more
+              ? 'Your calendar is already pinging.'
+              : 'The building is quiet. Reception prints your rating.'}
         </div>
       </div>
     </Overlay>
@@ -672,7 +700,10 @@ function GauntletResult({ onRematch }: { onRematch: () => void }) {
 
       <div data-bo style={{ zIndex: 3, ...beat('bo-rise', 300, 820) }}>
         <button style={btn} onClick={onRematch}>
-          REQUEST A FOLLOW-UP REVIEW \u21bb
+          {/* NOT "\u21bb" as bare JSX text \u2014 escapes only resolve inside JS
+              strings, and the literal backslash-u rendered on screen (a
+              playtester read it as "u2lbb"). */}
+          REQUEST A FOLLOW-UP REVIEW {'\u21bb'}
         </button>
         <div style={{ fontFamily: MONO, fontSize: 11, color: '#8f887a', marginTop: 12 }}>
           {wins}/3 rooms convinced.
