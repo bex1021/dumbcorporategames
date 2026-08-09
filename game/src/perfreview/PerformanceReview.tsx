@@ -51,7 +51,7 @@ import { FightWorld } from './FightWorld'
 import { FightCamera } from './FightCamera'
 import { FightHud } from './FightHud'
 import { CalendarScreen, MeetingLobby } from './CalendarScreen'
-import { CAMERA } from './fightConfig'
+import { CAMERA, ROUND } from './fightConfig'
 import { fight, leonard, opponent, resetFight, stepFight } from './fighterState'
 import { readLeonardIntent } from './fightInput'
 import {
@@ -75,6 +75,7 @@ import {
   type AIProfile,
 } from './dummyAI'
 import { markBeaten } from '../state/progress'
+import { FIGHT_ACHIEVEMENTS_CATALOG, loadFightUnlocked, saveFightUnlocked } from '../content/fightAchievements'
 import { setAnnouncerGender, announce, primeAnnouncer } from './fightAudio'
 import { fightMusic } from './fightMusic'
 import { rigReady } from './AnimatedFighter'
@@ -180,6 +181,26 @@ export default function PerformanceReview() {
       if (fight.over && fight.hitstop <= 0) {
         const won = fight.winner === 'leonard'
         recordBout(won, won ? leonard.health / leonard.maxHealth : 0)
+        // ── Achievements: per-bout awards, judged on a WON room only ──────
+        // (content/fightAchievements.ts holds the catalog; predicates live
+        // here, next to the stats — same split as the other three games.)
+        if (won) {
+          const earned: string[] = []
+          if (leonard.health >= leonard.maxHealth * 0.88) earned.push('flawless')
+          if (fight.statMinHP <= leonard.maxHealth * 0.1) earned.push('comeback')
+          if (fight.statThrowsLanded >= 5) earned.push('offline')
+          if (fight.statThrowsAttempted === 0) earned.push('strictly')
+          if (fight.statBlocks >= 12) earned.push('listener')
+          if (ROUND.seconds - fight.time <= 30) earned.push('hardstop')
+          if (fight.statTeched >= 3) earned.push('however')
+          // day-level, judged when the Exec falls (must-win: that means 3/3)
+          if (gauntletOver()) {
+            earned.push('aligned')
+            if (finalRating() === 'EXCEEDS EXPECTATIONS') earned.push('exceeds')
+            if (gauntlet.retries === 0) earned.push('noresched')
+          }
+          if (earned.length) saveFightUnlocked(earned)
+        }
         // CAMPAIGN: the day is BEATEN when the Exec is convinced. Under
         // must-win progression this only happens with all three rooms won —
         // losses regenerate the meeting instead of advancing (retryBout).
@@ -610,6 +631,7 @@ function BoutEndCard({ onContinue, onRetry }: { onContinue: () => void; onRetry:
 
 function GauntletResult({ onRematch }: { onRematch: () => void }) {
   const rating = finalRating()
+  const earnedSet = loadFightUnlocked()
   const tint = rating === 'PIP' ? '#c8492f' : rating === 'EXCEEDS EXPECTATIONS' ? '#e8c15a' : '#7bbf7b'
   const ink = rating === 'EXCEEDS EXPECTATIONS' ? '#1a1712' : '#fbeee9'
   const sub =
@@ -717,6 +739,27 @@ function GauntletResult({ onRematch }: { onRematch: () => void }) {
             ACTUAL BUSINESS VALUE GENERATED
           </span>
           <span style={{ fontFamily: SANS, fontSize: 14, fontWeight: 800, color: '#e8c15a' }}>$0.00</span>
+        </div>
+      </div>
+
+      {/* ── ACHIEVEMENTS — same collection the level-select hub shows.
+          Earned badges at full strength, locked ones ghosted; the strip reads
+          like the other games' end screens without breaking this card's
+          cinematic layout. */}
+      <div data-bo style={{ zIndex: 3, marginBottom: 20, ...beat('bo-rise', 300, 760) }}>
+        <div style={{ fontFamily: MONO, fontSize: 9, letterSpacing: '0.3em', color: '#8f887a', marginBottom: 8 }}>
+          ACHIEVEMENTS · {FIGHT_ACHIEVEMENTS_CATALOG.filter((a) => earnedSet.has(a.id)).length}/{FIGHT_ACHIEVEMENTS_CATALOG.length}
+        </div>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+          {FIGHT_ACHIEVEMENTS_CATALOG.map((a) => (
+            <span
+              key={a.id}
+              title={earnedSet.has(a.id) ? `${a.title} — ${a.desc}` : 'Locked'}
+              style={{ fontSize: 20, opacity: earnedSet.has(a.id) ? 1 : 0.22, filter: earnedSet.has(a.id) ? 'none' : 'grayscale(1)' }}
+            >
+              {a.emoji}
+            </span>
+          ))}
         </div>
       </div>
 

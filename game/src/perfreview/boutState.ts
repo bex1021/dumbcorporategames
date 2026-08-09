@@ -7,6 +7,8 @@
 // resetFight opts.
 
 import { BRENT_MOVES, PRIYA_MOVES, OPP_MOVES, type MoveDef } from './frameData'
+import { fight } from './fighterState'
+import { ROUND } from './fightConfig'
 
 export type OpponentKey = 'brent' | 'priya' | 'exec'
 export type AIStyle = 'turtle' | 'rushdown' | 'boss'
@@ -46,9 +48,9 @@ export const BOUTS: BoutConfig[] = [
     voice: 'brent',
     moves: BRENT_MOVES,
     ai: 'turtle',
-    regenPerSec: 1.3, // Backlog Regen — pauses ~2s after any damage; the tax on slow play
+    regenPerSec: 0.9, // Backlog Regen — eased with the O nerf: throws pay 30% less, so slow play is already taxed
     throwTech: 0.5, // the Wall learns your grab habit — but throws still teach Bout 1
-    startHP: 80, // the warm-up bar — Bout 1 is the tutorial, not the siege
+    startHP: 72, // the warm-up bar — Bout 1 is the tutorial, not the siege (80 pre-O-nerf)
     oppScale: 1.0,
     koLine: '…yeah, okay. That’ll work.',
     lossLine: 'ENG UNCONVINCED — the backlog wins. The invite reappears: same time, same room.',
@@ -77,7 +79,7 @@ export const BOUTS: BoutConfig[] = [
     // 145 (was 95): the smooth mid-boss difficulty lever. Humans were racing
     // her down in ~26s before her string pressure could accumulate — every
     // AI-side knob moved win rates ~3 points, the pool moves them ~15 per +25.
-    startHP: 145,
+    startHP: 120, // was 145 — playtest: a real human called her brutal; the bots overrated us all
     oppScale: 1.0,
     koLine: 'Okay. I’m aligned.',
     lossLine: 'PRODUCT UNCONVINCED — scope stands. Priya has “found 30 minutes” to do this again.',
@@ -107,13 +109,13 @@ export const BOUTS: BoutConfig[] = [
     moves: OPP_MOVES,
     ai: 'boss',
     regenPerSec: 0,
-    throwTech: 0.85, // the Exam: chain-throwing him was a measured free win (100%)
+    throwTech: 0.7, // eased with the O nerf — a 7-damage throw doesn't need 0.85 armor
     // 85 (was 100): the throw tech extends every fight (throws now sometimes
     // break), which handed his offense ~10 extra seconds of exposure per run
     // and sank the human rows ~20pts below target. A smaller pool gives the
     // time back to mixing players; the spam bot's damage is tech-starved
     // either way, so this barely helps the cheese.
-    startHP: 85,
+    startHP: 68, // 85 pre-O-nerf: throws lost 30% of their payout and his fight is BUILT on eating throws
     oppScale: 1.28, // larger-than-life — final-boss energy. Was 1.4, which put
     // his head through the top of the frame even after the camera learned to
     // fit the taller fighter. 1.28 still towers (a head and shoulders over
@@ -136,15 +138,26 @@ export const BOUTS: BoutConfig[] = [
 
 // ── Gauntlet state ───────────────────────────────────────────────────────────
 
+export type BoutStats = {
+  throwsAttempted: number
+  throwsLanded: number
+  teched: number // Leonard's grabs broken by the opponent
+  blocks: number // hits Leonard blocked
+  minHP: number // Leonard's lowest credibility during the bout
+  secs: number // how long the room took
+}
+
 export type BoutResult = {
   opponent: OpponentKey
   won: boolean
   scorePct: number // Leonard's ending health fraction (0 on a KO loss) — THE score
+  stats: BoutStats // achievement fuel — snapshotted from the sim at recordBout
 }
 
 export const gauntlet = {
   index: 0,
   results: [] as BoutResult[],
+  retries: 0, // meetings regenerated this day (Zero Reschedules watches this)
 }
 
 export function currentBout(): BoutConfig {
@@ -152,7 +165,19 @@ export function currentBout(): BoutConfig {
 }
 
 export function recordBout(won: boolean, scorePct: number): void {
-  gauntlet.results.push({ opponent: currentBout().key, won, scorePct })
+  gauntlet.results.push({
+    opponent: currentBout().key,
+    won,
+    scorePct,
+    stats: {
+      throwsAttempted: fight.statThrowsAttempted,
+      throwsLanded: fight.statThrowsLanded,
+      teched: fight.statTeched,
+      blocks: fight.statBlocks,
+      minHP: fight.statMinHP,
+      secs: ROUND.seconds - fight.time,
+    },
+  })
   gauntlet.index++
 }
 
@@ -166,6 +191,7 @@ export function retryBout(): void {
   if (last && !last.won) {
     gauntlet.results.pop()
     gauntlet.index--
+    gauntlet.retries++
   }
 }
 
@@ -176,6 +202,7 @@ export function gauntletOver(): boolean {
 export function resetGauntlet(): void {
   gauntlet.index = 0
   gauntlet.results = []
+  gauntlet.retries = 0
 }
 
 // ── The chain, retired (playtest 2026-08-03) ────────────────────────────────

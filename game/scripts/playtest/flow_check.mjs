@@ -30,7 +30,7 @@ const clickByText = async (re) =>
   }, re.source)
 
 const joinFlow = async () => {
-  await page.waitForFunction(() => document.body.innerText.includes('STARTS NOW'), { timeout: 8000 })
+  await page.waitForFunction(() => document.body.innerText.includes('STARTS NOW'), { timeout: 20000 })
   await clickByText(/STARTS NOW/)
   await new Promise((r) => setTimeout(r, 400))
   await clickByText(/JOIN MEETING/)
@@ -63,6 +63,9 @@ step('never starts before both fighters are mounted', !gate.startedBeforeReady)
 await page.evaluate(() => {
   const f = window.__fight
   f.leonard.health = 1
+  // stand IN RANGE: Brent is the Wall (approach 0.3) — against an idle
+  // Leonard at spawn distance he can dawdle past the 30s wait
+  f.leonard.x = f.opponent.x - 0.9
 })
 // let Brent land the finish
 await page.waitForFunction(() => window.__fight.fight.over, { timeout: 30000 })

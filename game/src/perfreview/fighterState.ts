@@ -156,6 +156,14 @@ export const fight = {
   // ~4s, and nothing ever says grabs ignore block. Frames remaining on the
   // HUD lesson, set when a throw lands on a BLOCKING Leonard.
   teachGrabT: 0,
+  // ── Per-bout achievement stats (content/fightAchievements.ts) ──────────
+  // All Leonard-side, all reset by resetFight; PerformanceReview snapshots
+  // them into the bout result at recordBout.
+  statThrowsAttempted: 0,
+  statThrowsLanded: 0,
+  statTeched: 0, // Leonard's throws broken by the opponent
+  statBlocks: 0, // hits Leonard blocked
+  statMinHP: 100, // Leonard's lowest credibility this bout
 }
 
 function makeFighter(
@@ -263,6 +271,11 @@ export function resetFight(opts: ResetOpts = {}): void {
   fight.annNearKO = false
   fight.annFirstHit = false
   fight.teachGrabT = 0
+  fight.statThrowsAttempted = 0
+  fight.statThrowsLanded = 0
+  fight.statTeched = 0
+  fight.statBlocks = 0
+  fight.statMinHP = leonard.health
 }
 
 /** Drawn position: eased between the last two sim ticks so motion stays smooth
@@ -282,6 +295,7 @@ export function stepFight(pIntent: Intent, oIntent: Intent): void {
   fight.shake *= FEEL.shakeDecay
   if (fight.shake < 0.001) fight.shake = 0
   if (fight.teachGrabT > 0) fight.teachGrabT--
+  if (leonard.health < fight.statMinHP) fight.statMinHP = leonard.health
 
   // Snapshot for RENDER INTERPOLATION. The sim runs at a fixed 60 Hz but the
   // display often doesn't (a ProMotion Mac is 120 Hz), so drawing raw sim
@@ -495,6 +509,7 @@ function advanceFighter(f: Fighter, intent: Intent): void {
 }
 
 function startMove(f: Fighter, def: MoveDef): void {
+  if (f.id === 'leonard' && def.kind === 'throw') fight.statThrowsAttempted++
   f.meter -= def.meterCost
   f.state = 'startup'
   f.armorLeft = def.armor ?? 0
@@ -629,6 +644,7 @@ function tryConnect(att: Fighter, def: Fighter): void {
     const techScale = RAMP[Math.min(att.thrStreak, RAMP.length - 1)]
     att.thrStreak++
     if (def.techSkill * techScale > 0 && simRng() < def.techSkill * techScale) {
+      if (att.id === 'leonard') fight.statTeched++
       att.moveHit = true // the grab is consumed — no re-roll on later active frames
       const dir = def.x < att.x ? -1 : 1
       def.pushDist = dir * 0.55
@@ -829,6 +845,7 @@ function applyHit(att: Fighter, def: Fighter, m: MoveDef): void {
 function applyBlock(att: Fighter, def: Fighter, m: MoveDef): void {
   const chip = Math.max(1, Math.round(m.damage * 0.08)) // "listening costs something"
   att.thrStreak = 0 // even a BLOCKED strike proves mixing — the throw re-arms
+  if (def.id === 'leonard') fight.statBlocks++
   // Chip is NON-LETHAL — you can't be chipped to death through a block. This is
   // what stops mash-into-block from slowly winning; you must land clean / throw.
   def.health = Math.max(1, def.health - chip)
@@ -853,6 +870,7 @@ function applyThrow(att: Fighter, def: Fighter, m: MoveDef): void {
   // grabbed anyway. (The AI needs no tutoring, and an open-guard grab is not
   // the confusion being answered.)
   if (def.id === 'leonard' && def.blocking) fight.teachGrabT = 110 // ~1.8s
+  if (att.id === 'leonard') fight.statThrowsLanded++
   def.health = Math.max(0, def.health - m.damage)
   if (att.id === 'leonard') fight.leoHits++
   else fight.oppHits++
