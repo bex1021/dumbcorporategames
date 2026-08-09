@@ -115,8 +115,11 @@ export const LEONARD_MOVES: Record<string, MoveDef> = {
     name: "Let's Take This Offline",
     line: "Let's take this offline.",
     kind: 'throw',
-    damage: 10,
-    startup: 12, // was 14 — snappier off the press; the throw is your anti-turtle
+    // 7 (was 10) + startup back to 14 (playtest: "O is too powerful"). The
+    // throw's value is the KNOCKDOWN and the descope, not the damage — at 10
+    // it was also winning the damage race it was only meant to referee.
+    damage: 7,
+    startup: 14,
     active: 5, // was 2 — the grab stays "live" longer so it isn't a 33ms window
     recovery: 22,
     reach: 1.04, // was 0.93 — connects at the range you'd actually be blocking at

@@ -65,7 +65,7 @@ export const EXEC_AI: AIProfile = {
   reactEvade: 0.05,
   throwStuff: 0.15,
   throwEvade: 0.6,
-  punish: 0.9,
+  punish: 0.82,
   offense: { jab: 0.5, heavy: 0.2, third: 0, pipMix: 0.08 },
   grabTurtle: 0.7,
   antiAir: 0.6, // reads jump-ins well — the exam
@@ -96,7 +96,7 @@ export const BRENT_AI: AIProfile = {
 export const PRIYA_AI: AIProfile = {
   name: 'priya',
   moves: { jab: 'tinyThought', heavy: 'quickAdd', third: 'circleBack', grab: 'parkThat', parry: 'loveThatEnergy' },
-  cooldown: [5, 12], // rushdown: decisions come FAST — the string is the danger
+  cooldown: [7, 15], // rushdown, but with a breath — [5,12] read as relentless to a real human
   approach: 1,
   farDash: 0.3,
   riseBlock: [8, 14], // barely guards — she'd rather keep talking
@@ -109,9 +109,9 @@ export const PRIYA_AI: AIProfile = {
   reactEvade: 0.15, // slippery instead of sturdy
   throwStuff: 0.2,
   throwEvade: 0.35,
-  punish: 0.9,
+  punish: 0.78,
   offense: { jab: 0.6, heavy: 0.24, third: 0.13, pipMix: 0 }, // rest = a rare breath
-  grabTurtle: 0.65,
+  grabTurtle: 0.4, // was 0.65 — one grab every ~4s of blocking is what read as "block is broken"
   antiAir: 0.3, // heads-down rushdown — jump-ins are her weakness (variety!)
   phaseGated: false,
 }
