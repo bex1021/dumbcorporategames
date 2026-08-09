@@ -236,6 +236,7 @@ export type ResetOpts = {
   voice?: string // fightScript side for the opponent
   oppScale?: number // body size (the Exec looms) — drives vertical reach too
   oppTech?: number // 0..1 — the opponent's throw-tech skill (see connectMove)
+  leoMeter?: number // starting Alignment bars (the Jira Run sprint credit)
 }
 
 /** Full reset — fresh bout / rematch. No opts = the standalone Exec sandbag
@@ -251,6 +252,7 @@ export function resetFight(opts: ResetOpts = {}): void {
   }
   opponent.heightScale = opts.oppScale ?? 1
   opponent.techSkill = opts.oppTech ?? 0
+  if (opts.leoMeter) leonard.meter = Math.min(VITALS.meterMax, opts.leoMeter)
   leonard.thrStreak = 0
   opponent.thrStreak = 0
   fightMods.regenPerSec = opts.regenPerSec ?? 0

@@ -61,6 +61,7 @@ import {
   gauntletOver,
   recordBout,
   retryBout,
+  sprintCredit,
   resetGauntlet,
   finalRating,
   type BoutConfig,
@@ -230,6 +231,7 @@ export default function PerformanceReview() {
       voice: bout.voice,
       oppScale: bout.oppScale, // the Exec's size is a gameplay fact, not just art
       oppTech: bout.throwTech,
+      leoMeter: sprintCredit().bars, // the Jira Run coins, cashed in (B2)
     })
     resetDummy()
     setPhase('fighting')

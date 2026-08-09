@@ -586,6 +586,13 @@ function Receipt({ result }: { result: RunResult }) {
         Productivity Receipt
       </div>
       <ReceiptRow label="Story points collected" value={result.score.toLocaleString()} />
+      {/* B2 (playtest): the coins finally DO something — every 400 story
+          points banks one bar of starting Alignment for the afternoon's
+          Performance Review (sprintCredit in perfreview/boutState). */}
+      <ReceiptRow
+        label="Banked for the afternoon"
+        value={`${Math.min(4, Math.floor(result.score / 400))} Alignment`}
+      />
       <ReceiptRow label="Sprints cleared" value={`${result.updates} / ${TOTAL_UPDATES}`} />
       <div className="my-2.5 border-t border-dashed border-white/20" />
       <div className="flex items-baseline justify-between">

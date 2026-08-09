@@ -7,7 +7,7 @@
 // meeting opens its invite; JOIN MEETING fades into the fight.
 
 import { useEffect, useState } from 'react'
-import { BOUTS, gauntlet, chainNote, type BoutConfig } from './boutState'
+import { BOUTS, gauntlet, chainNote, sprintCredit, type BoutConfig } from './boutState'
 
 const PX_PER_MIN = 2 // grid: 12 PM top, 120px per hour
 const GRID_HOURS = ['12 PM', '1 PM', '2 PM', '3 PM', '4 PM', '5 PM']
@@ -123,6 +123,12 @@ export function CalendarScreen({ onJoin }: { onJoin: () => void }) {
             {chainNote() && (
               <div style={{ ...inviteRow, fontStyle: 'italic', color: '#70757a', borderLeft: '3px solid #dadce0', paddingLeft: 10 }}>
                 “{chainNote()}”
+              </div>
+            )}
+            {sprintCredit().bars > 0 && (
+              <div style={{ ...inviteRow, color: '#188038' }}>
+                ⚡ Sprint credit: start with {sprintCredit().bars} Alignment
+                {' '}({sprintCredit().storyPoints.toLocaleString()} story points banked this morning)
               </div>
             )}
             <button style={joinBtn} onClick={join}>▶ JOIN MEETING</button>

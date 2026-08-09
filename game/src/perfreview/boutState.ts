@@ -9,6 +9,7 @@
 import { BRENT_MOVES, PRIYA_MOVES, OPP_MOVES, type MoveDef } from './frameData'
 import { fight } from './fighterState'
 import { ROUND } from './fightConfig'
+import { readPhase2Final } from '../state/campaignState'
 
 export type OpponentKey = 'brent' | 'priya' | 'exec'
 export type AIStyle = 'turtle' | 'rushdown' | 'boss'
@@ -203,6 +204,17 @@ export function resetGauntlet(): void {
   gauntlet.index = 0
   gauntlet.results = []
   gauntlet.retries = 0
+}
+
+// ── SPRINT CREDIT — the Jira Run coins finally pay out (playtest B2) ────────
+// Phase 2 banks storyPoints into the campaign receipts; until now nothing
+// ever read them. Now every 400 story points = one bar of starting Alignment
+// meter in EVERY afternoon bout (cap 4 — one full special of head start).
+// The morning's sprint literally fuels the afternoon's pitch.
+export function sprintCredit(): { bars: number; storyPoints: number } {
+  const p2 = readPhase2Final()
+  const sp = p2?.storyPoints ?? 0
+  return { bars: Math.min(4, Math.floor(sp / 400)), storyPoints: sp }
 }
 
 // ── The chain, retired (playtest 2026-08-03) ────────────────────────────────
