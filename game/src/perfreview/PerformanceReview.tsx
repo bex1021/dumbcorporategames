@@ -256,6 +256,17 @@ export default function PerformanceReview() {
     setPhase('calendar')
   }
 
+  // A LOSS is one keypress from the rematch (playtest: "too much clicking
+  // after you get defeated"). No calendar round-trip: undo the recorded loss,
+  // wipe the scene, and beginBout the SAME meeting directly — the stage never
+  // changes on a retry, so there's no remount to hide.
+  const retrySameBout = () => {
+    leonard.callout = opponent.callout = ''
+    leonard.calloutT = opponent.calloutT = 0
+    retryBout()
+    beginBout()
+  }
+
   const continueFromBoutEnd = () => {
     // Clear the last bout's floating lines so they don't haunt the calendar.
     leonard.callout = opponent.callout = ''
@@ -270,12 +281,8 @@ export default function PerformanceReview() {
     resetDummy()
     // NOW re-dress the room: the opaque calendar shell is about to cover the
     // screen, so the WebGL remount happens out of sight instead of under the
-    // result card (see the `stage` latch above).
-    // MUST-WIN: a lost bout was recorded only to drive the UNCONVINCED card.
-    // Undo it — the calendar re-shows the same meeting as NOW, and you take
-    // the room again. Only wins advance the day.
-    const last = gauntlet.results[gauntlet.results.length - 1]
-    if (last && !last.won) retryBout()
+    // result card (see the `stage` latch above). (Win path only — a LOSS goes
+    // through retrySameBout above and never returns to the calendar.)
     setStage(currentBout())
     bump((n) => n + 1)
     setPhase(gauntletOver() ? 'over' : 'calendar')
@@ -369,7 +376,7 @@ export default function PerformanceReview() {
           )}
         </div>
       )}
-      {phase === 'boutEnd' && <BoutEndCard onContinue={continueFromBoutEnd} />}
+      {phase === 'boutEnd' && <BoutEndCard onContinue={continueFromBoutEnd} onRetry={retrySameBout} />}
       {phase === 'over' && <GauntletResult onRematch={rematch} />}
     </div>
   )
@@ -508,7 +515,7 @@ function StatStrip({ cells }: { cells: [string, string][] }) {
   )
 }
 
-function BoutEndCard({ onContinue }: { onContinue: () => void }) {
+function BoutEndCard({ onContinue, onRetry }: { onContinue: () => void; onRetry: () => void }) {
   const last = gauntlet.results[gauntlet.results.length - 1]
   const bout = BOUTS.find((b) => b.key === last.opponent)!
   const more = !gauntletOver()
@@ -516,6 +523,21 @@ function BoutEndCard({ onContinue }: { onContinue: () => void }) {
   // `fight` still holds the finished round — resetFight() does not run until
   // continueFromBoutEnd, so the numbers are live here.
   const secsLeft = Math.max(0, Math.ceil(fight.time))
+  // ENTER advances (playtest: a defeat should be ONE keypress from the
+  // rematch). Loss → straight back into the same room; win → the normal
+  // continue. The handler mounts with the card, so a stray Enter mid-fight
+  // can't skip anything.
+  useEffect(() => {
+    const act = won ? onContinue : onRetry
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code === 'Enter' || e.code === 'NumpadEnter') {
+        e.preventDefault()
+        act()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [won, onContinue, onRetry])
   return (
     <Overlay>
       <EndStyles />
@@ -570,16 +592,16 @@ function BoutEndCard({ onContinue }: { onContinue: () => void }) {
       />
 
       <div data-bo style={{ zIndex: 3, ...beat('bo-rise', 300, 780) }}>
-        <button style={btn} onClick={onContinue}>
-          {/* MUST-WIN: a loss never advances — the same meeting regenerates. */}
-          {!won ? 'REJOIN \u2014 SAME TIME, SAME ROOM \u2192' : more ? 'BACK TO CALENDAR \u2192' : 'SEE THE REVIEW \u2192'}
+        <button style={btn} onClick={won ? onContinue : onRetry}>
+          {/* MUST-WIN: a loss never advances — ENTER restarts the same room. */}
+          {!won ? 'PRESS ENTER \u2014 REJOIN THE MEETING' : more ? 'BACK TO CALENDAR \u2192' : 'SEE THE REVIEW \u2192'}
         </button>
         <div style={{ fontFamily: MONO, fontSize: 11, color: '#8f887a', marginTop: 12 }}>
           {!won
-            ? 'The invite is already back on your calendar. Attendance still required.'
+            ? 'Same time. Same room. Attendance still required.'
             : more
-              ? 'Your calendar is already pinging.'
-              : 'The building is quiet. Reception prints your rating.'}
+              ? 'Your calendar is already pinging. (Enter works too.)'
+              : 'The building is quiet. Reception prints your rating. (Enter works too.)'}
         </div>
       </div>
     </Overlay>

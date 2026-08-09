@@ -69,22 +69,22 @@ await page.waitForFunction(() => window.__fight.fight.over, { timeout: 30000 })
 await new Promise((r) => setTimeout(r, 2600))
 let text = await page.evaluate(() => document.body.innerText)
 step('loss card shows UNCONVINCED', /JUDGED AGAINST YOU|UNCONVINCED/.test(text))
-step('loss card offers REJOIN, not review', /REJOIN/.test(text) && !/SEE THE REVIEW/.test(text))
+step('loss card offers PRESS ENTER, not review', /PRESS ENTER/.test(text) && !/SEE THE REVIEW/.test(text))
 
-// ── rejoin: the same meeting must regenerate ────────────────────────────────
-await clickByText(/REJOIN/)
-await new Promise((r) => setTimeout(r, 900))
+// ── ENTER: one keypress, straight back into the same room ───────────────────
+// (playtest: no calendar round-trip on a defeat)
+await page.keyboard.press('Enter')
+await page.waitForFunction(() => window.__fight.fight.started && !window.__fight.fight.over, { timeout: 15000 })
 const after = await page.evaluate(() => ({
   index: window.__fight.gauntlet.index,
   results: window.__fight.gauntlet.results.length,
   text: document.body.innerText,
 }))
 step('gauntlet did NOT advance (index 0, no recorded results)', after.index === 0 && after.results === 0)
-step('calendar shows Architecture Sync as NOW again', /Architecture Sync[\s\S]{0,80}STARTS NOW/.test(after.text))
+step('ENTER lands directly in the fight — no calendar between', !/STARTS NOW|JOIN MEETING/.test(after.text))
 
 // ── round 2: win, and the day advances ──────────────────────────────────────
-await joinFlow()
-await page.waitForFunction(() => window.__fight.fight.started, { timeout: 15000 })
+await new Promise((r) => setTimeout(r, 300))
 await new Promise((r) => setTimeout(r, 600))
 await page.evaluate(() => {
   const f = window.__fight
