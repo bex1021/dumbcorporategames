@@ -183,7 +183,9 @@ function distToAvenues(px: number, pz: number): number {
   return best
 }
 
-export const TUNNEL: Rect = { minX: -100, maxX: -76, minZ: 4, maxZ: 38 }
+// TUNNEL removed (playtest 2026-08-03): it was one floating roof slab over
+// the parade-reroute road — read as a lobby roof that hid the car. See
+// DriveWorld.Tunnel for the fuller note.
 
 // LA freeway overpass (elevated road box)
 export const OVERPASS = { minX: 70, maxX: 226, z: 234, width: 12, y: 11 }

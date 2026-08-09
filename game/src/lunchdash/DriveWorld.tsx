@@ -45,7 +45,6 @@ import {
   COUNTRY_TREES,
   BRIDGES,
   AVENUE_LINES,
-  TUNNEL,
   PARKING,
   LANDMARKS,
   DOCKS,
@@ -309,7 +308,6 @@ export function DriveWorld() {
       <TrafficLights />
       <StopSigns />
       <Docks />
-      <Tunnel />
       <Overpass />
       <InstancedBoxes items={CITY_OPAQUE} />
       <InstancedBoxes items={CITY_GLASS} glass />
@@ -1197,17 +1195,6 @@ function Docks() {
         </group>
       ))}
     </>
-  )
-}
-
-function Tunnel() {
-  const w = TUNNEL.maxX - TUNNEL.minX
-  const d = TUNNEL.maxZ - TUNNEL.minZ
-  return (
-    <mesh position={[(TUNNEL.minX + TUNNEL.maxX) / 2, 4, (TUNNEL.minZ + TUNNEL.maxZ) / 2]}>
-      <boxGeometry args={[w, 0.8, d]} />
-      <meshStandardMaterial color="#3a3a3e" />
-    </mesh>
   )
 }
 
