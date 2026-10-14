@@ -9,6 +9,7 @@
     "typecheck": "tsc -b",
     "lint": "eslint .",
     "preview": "vite preview",
+    "start": "node server.mjs",
     "mixamo:import": "node scripts/mixamo/import.mjs"
   },
   "dependencies": {
